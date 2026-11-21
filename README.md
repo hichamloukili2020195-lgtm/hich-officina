@@ -33,7 +33,11 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
 - **Macro CNC**: modelli pronti (foratura profonda, tasca circolare, centraggio, cambio utensile, pausa ogni N pezzi,
   scanalatura, misura con tastatore, pezzi in serie con contatore, griglia di pezzi su piu origini) e macro personali
   con parametri, da simulare con i valori scritti. Chiamata `G65 P....` con argomenti a lettere (A = #1, B = #2, ...).
-- **Apri e simula un programma**: un programma ISO incollato o da file (anche fatto da altri) diventa un percorso con
+- **Controlla e simula un programma**: anche **da una foto** dello schermo della macchina o del computer (nell'APK:
+  il testo si legge sul telefono, senza rete; le lettere lette al posto delle cifre si correggono). Il **controllo**
+  segnala riga per riga: taglio senza F o con il mandrino fermo, rapidi in X Y sotto Z0, G96 senza limite dei giri,
+  T senza M6, correttore H di un altro utensile, avanzamenti o quote fuori misura, parentesi aperte, cicli senza G80,
+  fine programma mancante, righe che non si capiscono. Poi un programma ISO incollato o da file (anche fatto da altri) diventa un percorso con
   simulazione animata passo per passo (3D, dall'alto, di fronte, sezione del tornio), quote massime di lavoro,
   utensili con giri e avanzamenti, tempo stimato. Legge anche le macro (variabili, IF, WHILE, G65, M98) e i cicli
   del tornio G71/G70, G74, G75, G76.

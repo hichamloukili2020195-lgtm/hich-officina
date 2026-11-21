@@ -227,6 +227,13 @@ canvas.disegno-tela{height:330px;touch-action:none}
   .sim-righe{height:auto;flex:1;min-height:200px;max-height:360px}
   canvas.disegno-tela{height:460px}
 }
+.controllo-esito{font-weight:700;padding:12px 14px;border-radius:12px;background:var(--riga);border:1px solid var(--bordo)}
+.controllo-esito.buona{color:var(--ok)} .controllo-esito.fuori{color:var(--errore)} .controllo-esito.avviso{color:var(--avviso)}
+.controllo{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.controllo-voce{background:var(--riga);border:1px solid var(--bordo);border-left:4px solid var(--tenue);border-radius:10px;padding:8px 10px;font-size:13.5px}
+.controllo-voce.errore{border-left-color:var(--errore)} .controllo-voce.avviso{border-left-color:var(--avviso)}
+.controllo-riga{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:2px}
+.controllo-riga code{font:12.5px var(--mono);color:var(--tenue);overflow-wrap:anywhere}
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--testo);color:var(--fondo);
   padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
 .toast.vedi{opacity:1}

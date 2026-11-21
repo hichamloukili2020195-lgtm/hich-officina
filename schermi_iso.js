@@ -126,26 +126,57 @@
 
   // ----- apri un programma -----
   A.schermi.apri = {
-    titolo: 'Apri un programma',
+    titolo: 'Controlla un programma',
     render(m) {
       const v = A.sezione('apri');
       const pan = el('div', { class: 'pannello' }), esito = el('div');
-      m.append(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salvati') + 'Scegli un file', onclick: () => A.scegliTesto(t => { f.metti('testo', t); analizza(); }) })]), pan,
-        el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('codice') + 'Leggi il programma', onclick: () => analizza() })]), esito);
+      const notaFoto = el('div');
+      const foto = el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Leggi da una foto', onclick: () => {
+        if (!A.ANDROID || !A.ANDROID.leggiFoto) { A.avviso('La lettura delle foto funziona nell\'app Android (APK). Qui incolla il testo o scegli un file.'); return; }
+        window.__fotoLetta = (testo, errore) => {
+          if (errore || !testo) { A.avviso(errore || 'Nella foto non ho trovato testo'); return; }
+          const p = O.pulisciLettura(testo);
+          f.metti('modo', 'auto'); f.metti('testo', p.testo);
+          notaFoto.innerHTML = '';
+          notaFoto.appendChild(A.info('<b>Letto dalla foto: ' + p.testo.split('\n').length + ' righe</b>' + (p.cambiate ? ', ' + p.cambiate + ' corrette (lettere lette al posto delle cifre)' : '') + (p.tolte ? ', ' + p.tolte + ' tolte (non erano programma)' : '') + '. Confronta il testo con lo schermo prima di fidarti: una cifra letta male cambia la quota.', 'avviso'));
+          analizza();
+        };
+        A.ANDROID.leggiFoto();
+      } });
+      m.append(el('div', { class: 'pulsanti' }, [foto, el('button', { class: 'pul sec', html: A.icona('salvati') + 'Scegli un file', onclick: () => A.scegliTesto(t => { f.metti('testo', t); analizza(); }) })]), notaFoto, pan,
+        el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('codice') + 'Controlla e simula', onclick: () => analizza() })]), esito);
       const f = A.modulo(pan, [{ id: 'modo', et: 'Macchina', tipo: 'scelta', scelte: [['auto', 'La riconosce da sola'], ['fresa', 'Fresa'], ['tornio', 'Tornio']] },
         { id: 'testo', et: 'Programma (incollalo qui)', tipo: 'area', mono: true, righe: 10 }], v, () => {});
       const analizza = () => {
         esito.innerHTML = '';
         if (!String(v.testo || '').trim()) { esito.appendChild(A.info('Incolla un programma o scegli un file.')); return; }
-        const r = O.eseguiISO(v.testo, { modo: v.modo });
-        mostraAnalisi(esito, r, v.testo, 'Programma aperto');
+        const r = O.controllaISO(v.testo, { modo: v.modo });
+        mostraAnalisi(esito, r, v.testo, 'Programma aperto', true);
       };
       if (String(v.testo || '').trim()) analizza();
     }
   };
   /** Riassunto di un programma letto: quote, utensili, tempo, avvisi, pulsanti. */
-  function mostraAnalisi(m, r, testo, titolo) {
+  /** Il controllo del programma: errori e avvisi riga per riga. */
+  function mostraControllo(m, r) {
+    const S = r.segnalazioni || [];
+    const err = S.filter(x => x.livello === 'errore'), avv = S.filter(x => x.livello === 'avviso'), note = S.filter(x => x.livello === 'nota');
+    m.appendChild(el('div', { class: 'sez', testo: 'Controllo del programma' }));
+    m.appendChild(el('div', { class: 'controllo-esito ' + (err.length ? 'fuori' : avv.length ? 'avviso' : 'buona'), testo: err.length ? err.length + (err.length === 1 ? ' errore' : ' errori') + (avv.length ? ' e ' + avv.length + (avv.length === 1 ? ' avviso' : ' avvisi') : '') : avv.length ? 'Nessun errore, ' + avv.length + (avv.length === 1 ? ' avviso' : ' avvisi') : 'Nessun errore trovato' }));
+    if (!err.length && !avv.length && !note.length) return;
+    const lista = el('div', { class: 'controllo' });
+    err.concat(avv, note).slice(0, 80).forEach(x => {
+      const riga = x.riga >= 0 ? (r.righe[x.riga] || '').trim() : '';
+      lista.appendChild(el('div', { class: 'controllo-voce ' + x.livello }, [
+        el('div', { class: 'controllo-riga' }, [el('b', { testo: x.riga >= 0 ? 'Riga ' + (x.riga + 1) : 'Programma' }), riga ? el('code', { testo: riga.length > 60 ? riga.slice(0, 60) + '…' : riga }) : null]),
+        el('div', { testo: x.testo })]));
+    });
+    m.appendChild(lista);
+  }
+  A.mostraControllo = mostraControllo;
+  function mostraAnalisi(m, r, testo, titolo, controllo) {
     if (r.errore) m.appendChild(el('p', { class: 'errore', testo: 'Il programma si ferma: ' + r.errore }));
+    if (controllo) mostraControllo(m, r);
     const Lm = r.limiti, q = (k, w) => (Lm[k][w] === null ? '—' : fmt(Lm[k][w], 3));
     m.appendChild(A.misuratore('Tempo stimato', fmt(r.tempo, r.tempo < 10 ? 1 : 0), 'min'));
     const tor = r.modo === 'tornio';
@@ -160,7 +191,7 @@
         r.utensili.map(u => { const d = tab.find(x => Number(x.t) === u.t); return '<tr><td><b>' + u.t + '</b></td><td>' + esc(d ? descrUt(d) : (u.commento || '')) + '</td><td>' + u.s.join(', ') + '</td><td>' + u.f.map(x => fmt(x, 3)).join(', ') + '</td><td>' + fmt(u.lunghezza / 1000, 2) + ' m</td></tr>'; }).join('') + '</table></div>' }));
     }
     if (r.messaggi.length) m.appendChild(A.info(r.messaggi.map(x => '<b>' + esc(x.testo) + '</b> (riga ' + (x.riga + 1) + ')').join('<br>'), 'avviso'));
-    if (r.avvisi.length) m.appendChild(A.info(esc(r.avvisi.join(' · ')), 'avviso'));
+    if (!controllo && r.segnalazioni && r.segnalazioni.length) mostraControllo(m, r);
     m.appendChild(el('div', { class: 'pulsanti' }, [
       el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Simula', onclick: () => { A.param.sim = { testo, modo: r.modo, titolo }; A.vai('simula'); } }),
       el('button', { class: 'pul sec', html: A.icona('codice') + 'Listato', onclick: () => {

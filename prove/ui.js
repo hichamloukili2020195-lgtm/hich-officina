@@ -223,7 +223,7 @@ const server = http.createServer((q, r) => {
   // apri un programma incollato (tornio)
   await vai('apri');
   await pg.fill('#f-testo', '%\nO0100 (BOCCOLA)\nG21 G18 G99\nT0202\nG50 S2500\nG96 S180 M3\nG0 X52 Z2\nG1 X50 Z0 F.15\nG1 Z-30\nG2 X56 Z-33 R3\nG0 X100 Z50\nM30\n%');
-  await pg.click('text=Leggi il programma');
+  await pg.click('text=Controlla e simula');
   const ap = await pg.textContent('#schermo');
   ok(ap.includes('Tempo stimato') && ap.includes('-33'), 'apertura del programma');
   await foto('13-apri');
@@ -420,6 +420,23 @@ const server = http.createServer((q, r) => {
   ok((await pg.$$eval('.elenco .elem', x => x.length)) === 1, 'programma salvato perso');
   const sw = await pg.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()));
   ok(sw, 'service worker non registrato');
+
+  // lettura da foto: telefono finto che restituisce il testo letto (nel browser la lettura non c'e)
+  const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx2.addInitScript(() => { window.Android = { leggiFoto() { setTimeout(() => window.__fotoLetta('Program Edit\n1 %\n2 O0007 (PROVA)\n3 G21 G17 G9O\n4 T1 M6\n5 S2OOO M3\n6 G0 X1O Y1O Z5\n7 G1 Z-2 F15O\n8 G1 X5O\n9 G0 Z-1\n10 G0 X0 Y0\n11 M30', null), 20); } }; });
+  const pg2 = await ctx2.newPage();
+  pg2.on('pageerror', e => errori.push('pagina 2: ' + e.message));
+  await pg2.goto(url + '#apri'); await pg2.waitForTimeout(150);
+  await pg2.click('text=Leggi da una foto'); await pg2.waitForTimeout(250);
+  const letto = await pg2.inputValue('#f-testo');
+  ok(letto.startsWith('%\nO0007 (PROVA)\nG21 G17 G90') && letto.includes('S2000 M3') && letto.includes('F150'), 'testo letto dalla foto: ' + JSON.stringify(letto.slice(0, 80)));
+  const ctl = await pg2.textContent('.controllo');
+  ok(ctl.includes('Riga 10') && ctl.includes('sotto Z0'), 'errore del rapido sotto Z0 non segnalato: ' + ctl.slice(0, 200));
+  ok(/1 errore/.test(await pg2.textContent('.controllo-esito')), 'esito del controllo');
+  if (dirFoto) await pg2.screenshot({ path: path.join(dirFoto, '25-foto-letta.png'), fullPage: true });
+  await pg2.click('button.pul:text-is("Simula")'); await pg2.waitForTimeout(200);
+  ok((await pg2.$$eval('.dro-riga', x => x.length)) === 3, 'simulazione del programma letto');
+  await ctx2.close();
 
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }

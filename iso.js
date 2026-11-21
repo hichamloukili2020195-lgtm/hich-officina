@@ -130,7 +130,12 @@
     let modo = opz.modo && opz.modo !== 'auto' ? opz.modo : indovinaModo(testo);
     const tornio = modo === 'tornio';
     const avvisi = [], messaggi = [], segmenti = [];
-    const avvisa = (m, riga) => { const t = (riga !== undefined ? 'Riga ' + (riga + 1) + ': ' : '') + m; if (avvisi.length < 40 && !avvisi.includes(t)) avvisi.push(t); };
+    const segnalazioni = [];   // {riga, livello:'errore'|'avviso', testo}: il controllo del programma
+    const avvisa = (m, riga, livello) => {
+      const t = (riga !== undefined ? 'Riga ' + (riga + 1) + ': ' : '') + m;
+      if (avvisi.length < 40 && !avvisi.includes(t)) avvisi.push(t);
+      if (segnalazioni.length < 300 && !segnalazioni.some(x => x.riga === riga && x.testo === m)) segnalazioni.push({ riga: riga === undefined ? -1 : riga, livello: livello || 'avviso', testo: m });
+    };
     const globali = Object.assign({}, opz.vars || {});
     // stato macchina (in tornio x = diametro)
     const st = {
@@ -161,7 +166,11 @@
       let fmm = st.f;
       if (!rapido && st.perGiro) fmm = st.f * giriAttuali((st.x + x) / 2);
       tempo += rapido ? l / RAPIDO : (fmm > 0 ? l / fmm : 0);
-      if (!rapido && !(st.f > 0)) avvisa('movimento di lavoro senza avanzamento F', riga);
+      if (!rapido && !(st.f > 0)) avvisa('movimento di lavoro senza avanzamento F', riga, 'errore');
+      if (!rapido && !st.mandrino && !st.mandrinoAvvisato && opz.controlloMandrino !== false) { avvisa('taglio con il mandrino fermo: manca M3 o M4 (o la S)', riga, 'errore'); st.mandrinoAvvisato = true; }
+      if (rapido && !tornio && z < -1e-6 && st.z < -1e-6 && Math.hypot(x - st.x, y - st.y) > 1e-6) avvisa('rapido in X Y sotto Z0: possibile urto con il pezzo', riga, 'errore');
+      if (rapido && !tornio && !st.inCiclo && z < -1e-6 && st.z >= -1e-6) avvisa('rapido che scende sotto Z0: controlla che li non ci sia materiale', riga, 'avviso');
+      if ([x, y, z].some(v => Math.abs(v) > 3000)) avvisa('quota oltre 3000 mm: forse un numero letto male', riga, 'errore');
       if (utAtt && !rapido) utAtt.lunghezza += l;
       st.x = x; st.y = y; st.z = z;
     }
@@ -205,6 +214,10 @@
       }
     }
     function cicloForo(x, y, riga) {
+      st.inCiclo = true;
+      try { cicloForoDentro(x, y, riga); } finally { st.inCiclo = false; }
+    }
+    function cicloForoDentro(x, y, riga) {
       const c = st.ciclo, sc = scala();
       const zIn = st.zIniz !== null ? st.zIniz : st.z;
       const r = st.r !== null ? st.r : zIn, zf = st.zc;
@@ -478,19 +491,25 @@
           continue;
         }
         if (/^DO\s*\d+$/.test(t)) continue;
-        // blocco normale
-        const w = parole(t, riga);
+        // blocco normale (una riga che non si capisce si segnala e si salta)
+        let w;
+        try { w = parole(t, riga); } catch (e) {
+          if (!e.iso) throw e;
+          avvisa(e.message, riga, 'errore');
+          if (!st.primoErrore) st.primoErrore = e.message + ' (riga ' + (riga + 1) + ')';
+          continue;
+        }
         const sc = scala();
         let mossa = null, numG = null, senzaAssi = false;
         for (const g of w.G) {
           const gg = Math.round(g * 10) / 10;
-          if (gg === 0 || gg === 1 || gg === 2 || gg === 3) { st.moto = gg; mossa = gg; st.ciclo = null; }
+          if (gg === 0 || gg === 1 || gg === 2 || gg === 3) { if (st.ciclo) avvisa('ciclo fisso G' + st.ciclo + ' chiuso senza G80', riga, 'avviso'); st.moto = gg; mossa = gg; st.ciclo = null; }
           else if (gg === 4) { st.pausa += (w.P !== undefined ? w.P / 1000 : (w.X || w.U || 0)); senzaAssi = true; }
           else if (gg === 17 || gg === 18 || gg === 19) st.piano = gg;
           else if (gg === 20) st.pollici = true; else if (gg === 21) st.pollici = false;
           else if (gg === 90) st.ass = true; else if (gg === 91) st.ass = false;
           else if (gg === 94) st.perGiro = false; else if (gg === 95) st.perGiro = true;
-          else if (gg === 96) st.g96 = true; else if (gg === 97) st.g96 = false;
+          else if (gg === 96) { st.g96 = true; if (tornio && !st.giriMax && !w.G.some(v => Math.round(v) === 50 || Math.round(v) === 92)) avvisa('G96 (Vc costante) senza limite dei giri G50 S... o G92 S...: vicino al centro il mandrino va al massimo', riga, 'errore'); } else if (gg === 97) st.g96 = false;
           else if (gg === 98) { if (tornio) st.perGiro = false; else st.ritornoR = false; }
           else if (gg === 99) { if (tornio) st.perGiro = true; else st.ritornoR = true; }
           else if (gg === 50 && tornio) { if (w.S !== undefined) { st.giriMax = w.S; w.S = undefined; } senzaAssi = true; }
@@ -508,7 +527,7 @@
           else if (gg === 28 || gg === 30 || gg === 53) { numG = gg; }
           else if (gg === 31) { st.moto = 31; mossa = 31; }
           else if ([40, 41, 42, 43, 44, 49, 15, 16, 61, 64, 68, 69, 69.1, 54, 55, 56, 57, 58, 59, 54.1, 40.1, 5, 5.1, 8, 9].includes(gg)) {
-            if (gg === 41 || gg === 42) avvisa('compensazione raggio G' + gg + ': la simulazione mostra il centro utensile del programma', riga);
+            if (gg === 41 || gg === 42) avvisa('compensazione raggio G' + gg + ': la simulazione mostra il profilo programmato, non il centro utensile', riga, 'nota');
           }
           else avvisa('G' + gg + ' non simulato', riga);
         }
@@ -527,6 +546,8 @@
         }
         if (numG === 28 || numG === 30 || numG === 53) { avvisa('G' + numG + ': ritorno al punto macchina, non simulato', riga); continue; }
         if (w.F !== undefined) st.f = w.F * (st.perGiro ? 1 : sc);
+        if (w.F !== undefined && ((st.perGiro && w.F > 3 && !w.G.some(v => [32, 33, 76].includes(Math.round(v))) && st.moto !== 32) || (!st.perGiro && w.F > 20000))) avvisa('avanzamento F' + w.F + ' molto alto: controlla (numero letto male?)', riga, 'avviso');
+        if (w.H !== undefined && w.G.some(v => Math.round(v) === 43) && st.t && Math.round(w.H) !== st.t) avvisa('G43 H' + Math.round(w.H) + ' con l\'utensile T' + st.t + ': correttore di un altro utensile?', riga, 'avviso');
         if (w.S !== undefined) { st.s = w.S; if (utAtt && !utAtt.s.includes(Math.round(w.S))) utAtt.s.push(Math.round(w.S)); }
         if (w.T !== undefined) {
           const tt = Math.round(w.T);
@@ -539,7 +560,9 @@
         // M
         for (const mm of w.M) {
           const k = Math.round(mm);
-          if (k === 30 || k === 2) { if (pila.length === 0) st.finito = true; }
+          if (k === 3 || k === 4) { st.mandrino = true; st.mandrinoAvvisato = false; if (!(st.s > 0) && w.S === undefined) avvisa('mandrino acceso senza giri S', riga, 'avviso'); }
+          else if (k === 5 || k === 6) st.mandrino = false;
+          if (k === 30 || k === 2) { st.mandrino = false; if (pila.length === 0) st.finito = true; }
           else if (k === 0 || k === 1) messaggi.push({ tipo: 'stop', testo: 'M' + k + (st.ultimoCommento ? ': ' + st.ultimoCommento : ''), riga });
           else if (k === 98) {
             const num = Math.round(w.P || 0);
@@ -591,15 +614,17 @@
       }
     } catch (e) {
       if (!e.iso) throw e;
+      avvisa(e.message, pc - 1, 'errore');
       return risultato(e.message + ' (riga ' + (pc) + ')');
     }
-    return risultato(null);
+    return risultato(st.primoErrore || null);
 
     function risultato(err) {
       const fin = v => (isFinite(v) ? v : 0);
       const L = {};
       for (const k of ['x', 'y', 'z']) L[k] = { min: fin(lim[k][0]), max: fin(lim[k][1]), minLavoro: isFinite(lim.lavoro[k][0]) ? lim.lavoro[k][0] : null, maxLavoro: isFinite(lim.lavoro[k][1]) ? lim.lavoro[k][1] : null };
-      return { modo, segmenti, limiti: L, utensili, tempo: tempo + st.pausa / 60, avvisi, messaggi, errore: err, vars: Object.assign({}, globali), locali: Object.assign({}, locali), righe: P.righe };
+      segnalazioni.sort((a, b) => (a.livello === b.livello ? 0 : a.livello === 'errore' ? -1 : 1) || a.riga - b.riga);
+      return { modo, segmenti, limiti: L, utensili, tempo: tempo + st.pausa / 60, avvisi, messaggi, errore: err, segnalazioni, vars: Object.assign({}, globali), locali: Object.assign({}, locali), righe: P.righe };
     }
   }
 
@@ -621,7 +646,73 @@
     return tor > fre ? 'tornio' : 'fresa';
   }
 
-  const Iso = { eseguiISO: esegui, indovinaModo, pulisciRiga: pulisci };
+  /** Controllo del programma: esecuzione piu i controlli sul testo. Ritorna il risultato di esegui con le segnalazioni. */
+  function controlla(testo, opz) {
+    const r = esegui(testo, opz);
+    const S = r.segnalazioni, righe = r.righe;
+    const metti = (riga, livello, t) => { if (!S.some(x => x.riga === riga && x.testo === t)) S.push({ riga, livello, testo: t }); };
+    let fine = false;
+    righe.forEach((l, i) => {
+      const senza = l.replace(/;.*$/, '');
+      const ap = (senza.match(/\(/g) || []).length, ch = (senza.match(/\)/g) || []).length;
+      if (ap !== ch) metti(i, 'errore', 'parentesi del commento non chiuse');
+      const t = pulisci(l).testo;
+      if (/\bM0?(30|2|99)\b/.test(t)) fine = true;
+      if (r.modo === 'fresa' && /(^|[^A-Z#])T\d+/.test(t) && !/\bM0?6\b/.test(t)) {
+        const dopo = righe.slice(i + 1, i + 3).map(x => pulisci(x).testo).join(' ');
+        if (!/\bM0?6\b/.test(dopo) && !/G65|M98/.test(t)) metti(i, 'avviso', 'T senza M6: l\'utensile si prepara ma non si cambia');
+      }
+    });
+    if (!fine && righe.some(l => pulisci(l).testo)) metti(righe.length - 1, 'avviso', 'manca la fine del programma (M30 o M2)');
+    S.sort((a, b) => (a.livello === b.livello ? 0 : a.livello === 'errore' ? -1 : 1) || a.riga - b.riga);
+    return r;
+  }
+
+  /**
+   * Pulizia del testo letto da una foto: lettere maiuscole, O e I lette al posto di 0 e 1 dentro i numeri,
+   * virgole al posto dei punti, spazi dentro i numeri, numeri di riga dello schermo, righe che non sono programma.
+   * Ritorna {testo, cambiate, tolte}.
+   */
+  function pulisciLettura(testo) {
+    let cambiate = 0, tolte = 0, numeri = 0;
+    const out = [];
+    String(testo || '').replace(/\r/g, '').split('\n').forEach(riga => {
+      let r = riga.replace(/[‘’´`]/g, "'").replace(/[“”]/g, '"').replace(/\t/g, ' ').trim();
+      if (!r) return;
+      const prima = r;
+      // commenti a parte: non si toccano
+      const pezzi = r.split(/(\([^)]*\)?)/);
+      r = pezzi.map(p => {
+        if (p.startsWith('(')) return p.toUpperCase();
+        let q = p.toUpperCase();
+        q = q.replace(/(\d)\s*[,]\s*(\d)/g, '$1.$2');                   // 10,5 -> 10.5
+        q = q.replace(/([A-Z#])\s+(?=[-+]?[\d.#[])/g, '$1');              // X 10 -> X10
+        q = q.replace(/([-+\d.])\s+(?=[\d.])/g, (m0, a) => a);             // 10 .5 -> 10.5
+        // lettere lette al posto delle cifre, dentro un numero
+        q = q.replace(/[\d.][\dOLI|.]*/g, m0 => m0.replace(/O/g, '0').replace(/[LI|]/g, '1'));   // 1O.5 -> 10.5, 2OO -> 200
+        q = q.replace(/([GM])O(?=[\dO])/g, '$10').replace(/([GM])O(?=[\dO])/g, '$10');            // GO1 -> G01
+        let s2 = '';
+        const mappa = { S: '5', B: '8', Z: '2', D: '0', Q: '0' };
+        for (let i = 0; i < q.length; i++) {
+          const c = q[i], pr = s2[s2.length - 1] || '', nx = q[i + 1] || '';
+          if (mappa[c] && /[-+\d.]/.test(pr) && /[\d.]/.test(nx) && !/[A-Z]/.test(pr)) { s2 += mappa[c]; continue; }   // Z-S.0 -> Z-5.0
+          s2 += c;
+        }
+        return s2;
+      }).join('');
+      // numero di riga dello schermo davanti (non la N del programma): si toglie, non conta come correzione
+      const senzaNumero = r.replace(/^\d{1,5}\s+(?=[A-Z%(#:])/, '');
+      const primaN = prima.toUpperCase().replace(/^\d{1,5}\s+(?=[A-Z%(#:])/, '');
+      if (senzaNumero !== r) numeri++;
+      r = senzaNumero;
+      if (!/^(%|[O:]\d+|\(|;)/.test(r) && !/[GMXYZUWFSTNIJKRPQ#]-?[\d.#[]/.test(r) && !/^(IF|WHILE|END|GOTO|DO)/.test(r)) { tolte++; return; }
+      if (r !== primaN && r.replace(/\s+/g, '') !== primaN.replace(/\s+/g, '').replace(/,/g, '.')) cambiate++;
+      out.push(r);
+    });
+    return { testo: out.join('\n'), cambiate, tolte, numeri };
+  }
+
+  const Iso = { eseguiISO: esegui, controllaISO: controlla, pulisciLettura, indovinaModo, pulisciRiga: pulisci };
   Object.assign(O, Iso);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

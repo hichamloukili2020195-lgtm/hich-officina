@@ -2,6 +2,7 @@ package it.hich.officina;
 
 import android.app.Activity;
 import android.content.ClipData;
+import android.graphics.Rect;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.content.Context;
@@ -24,18 +25,26 @@ import android.widget.Toast;
 
 import org.json.JSONObject;
 
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Apre Hich-Officina (assets/www) in una WebView e le da salvataggio, condivisione, appunti e scelta dei file. */
 public class MainActivity extends Activity {
     private static final int SCEGLI_FILE = 1;
     private static final int SALVA_IN = 2;
     private static final int SCEGLI_INPUT = 3;
+    private static final int LEGGI_FOTO = 4;
     private WebView web;
     private WebView stampa;                         // la pagina da stampare resta viva finche la stampa parte
     private String daSalvare;                       // testo in attesa della cartella scelta con "Salva in..."
@@ -127,6 +136,13 @@ public class MainActivity extends Activity {
             attesaInput = null;
             return;
         }
+        if (richiesta == LEGGI_FOTO) {
+            Uri u = null;
+            if (esito == RESULT_OK) u = (dati != null && dati.getData() != null) ? dati.getData() : fotoCamera;
+            if (u == null) { rispostaFoto(null, "Nessuna foto"); return; }
+            leggiTesto(u);
+            return;
+        }
         if (richiesta == SALVA_IN) {
             if (esito == RESULT_OK && dati != null && dati.getData() != null && daSalvare != null) {
                 try (OutputStream o = getContentResolver().openOutputStream(dati.getData(), "wt")) {
@@ -148,6 +164,56 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             avviso("Il file non si legge: " + e.getMessage());
         }
+    }
+
+    /** Legge il testo della foto sul telefono e lo manda alla pagina, riga per riga dall'alto. */
+    private void leggiTesto(Uri u) {
+        try {
+            InputImage img = InputImage.fromFilePath(this, u);
+            TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS).process(img)
+                .addOnSuccessListener(t -> rispostaFoto(righe(t), null))
+                .addOnFailureListener(e -> rispostaFoto(null, "Lettura non riuscita: " + e.getMessage()));
+        } catch (Exception e) {
+            rispostaFoto(null, "Foto non leggibile: " + e.getMessage());
+        }
+    }
+
+    /** Le righe del testo letto: i pezzi alla stessa altezza (numero di riga e programma) stanno nella stessa riga. */
+    private static String righe(Text t) {
+        List<float[]> pos = new ArrayList<>();      // centro y, altezza, sinistra
+        List<String> testi = new ArrayList<>();
+        for (Text.TextBlock b : t.getTextBlocks()) for (Text.Line l : b.getLines()) {
+            Rect r = l.getBoundingBox();
+            if (r == null) continue;
+            pos.add(new float[]{r.exactCenterY(), r.height(), r.left});
+            testi.add(l.getText());
+        }
+        Integer[] ordine = new Integer[pos.size()];
+        for (int i = 0; i < ordine.length; i++) ordine[i] = i;
+        java.util.Arrays.sort(ordine, (a, b) -> Float.compare(pos.get(a)[0], pos.get(b)[0]));
+        StringBuilder out = new StringBuilder();
+        List<Integer> riga = new ArrayList<>();
+        float centro = -1, alto = 0;
+        for (int k = 0; k <= ordine.length; k++) {
+            boolean nuova = k == ordine.length || (centro >= 0 && Math.abs(pos.get(ordine[k])[0] - centro) > Math.max(4, alto * 0.55f));
+            if (nuova && !riga.isEmpty()) {
+                riga.sort((a, b) -> Float.compare(pos.get(a)[2], pos.get(b)[2]));
+                StringBuilder r = new StringBuilder();
+                for (Integer i : riga) { if (r.length() > 0) r.append(' '); r.append(testi.get(i)); }
+                out.append(r).append('\n');
+                riga.clear();
+            }
+            if (k == ordine.length) break;
+            int i = ordine[k];
+            if (riga.isEmpty()) { centro = pos.get(i)[0]; alto = pos.get(i)[1]; }
+            riga.add(i);
+        }
+        return out.toString();
+    }
+
+    private void rispostaFoto(String testo, String errore) {
+        final String js = "window.__fotoLetta && window.__fotoLetta(" + (testo == null ? "null" : JSONObject.quote(testo)) + "," + (errore == null ? "null" : JSONObject.quote(errore)) + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
     }
 
     private void avviso(String t) {
@@ -267,6 +333,31 @@ public class MainActivity extends Activity {
                     }
                 });
                 stampa.loadDataWithBaseURL("file:///android_asset/www/", html, "text/html", "UTF-8", null);
+            });
+        }
+
+        /** Foto di un programma (fotocamera o galleria): il testo letto arriva a window.__fotoLetta(testo, errore). */
+        @JavascriptInterface
+        public void leggiFoto() {
+            runOnUiThread(() -> {
+                Intent galleria = new Intent(Intent.ACTION_GET_CONTENT);
+                galleria.setType("image/*");
+                galleria.addCategory(Intent.CATEGORY_OPENABLE);
+                Intent chooser = Intent.createChooser(galleria, "Foto del programma");
+                fotoCamera = null;
+                if (Build.VERSION.SDK_INT >= 29) {
+                    try {
+                        ContentValues cv = new ContentValues();
+                        cv.put(MediaStore.MediaColumns.DISPLAY_NAME, "programma_" + System.currentTimeMillis() + ".jpg");
+                        cv.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+                        cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Hich-Officina");
+                        fotoCamera = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                        Intent foto = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                        foto.putExtra(MediaStore.EXTRA_OUTPUT, fotoCamera);
+                        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{foto});
+                    } catch (Exception e) { fotoCamera = null; }
+                }
+                try { startActivityForResult(chooser, LEGGI_FOTO); } catch (Exception e) { rispostaFoto(null, "Nessuna app per le foto"); }
             });
         }
 

@@ -31,3 +31,8 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    // Riconoscimento del testo sul telefono, senza rete (lettura dei programmi dalle foto)
+    implementation 'com.google.mlkit:text-recognition:16.0.1'
+}

@@ -199,7 +199,7 @@ prova('lettura ISO: cicli di foratura e archi', () => {
   const fondi = r.segmenti.filter(s => !s.rapido && Math.abs(s.z + 15) < 1e-9);
   assert.strictEqual(fondi.length, 4);
   vicino(r.limiti.x.maxLavoro, 30); vicino(r.limiti.y.minLavoro, -30);
-  const c = O.eseguiISO('G90 G17 G0 X10 Y0 Z0\nG1 F100\nG2 X-10 Y0 I-10 J0\nG2 X10 Y0 R10\nG3 X10 Y0 I-10 J0', { modo: 'fresa' });
+  const c = O.eseguiISO('G90 G17 G0 X10 Y0 Z0 S1000 M3\nG1 F100\nG2 X-10 Y0 I-10 J0\nG2 X10 Y0 R10\nG3 X10 Y0 I-10 J0', { modo: 'fresa' });
   assert.deepStrictEqual(c.avvisi, []);
   vicino(c.limiti.y.minLavoro, -10, 0.01); vicino(c.limiti.y.maxLavoro, 10, 0.01);   // primo arco sotto, secondo sopra, cerchio intero
   const t = O.eseguiISO('G18 G0 X0 Z2\nG1 Z0 F.1\nG3 X20 Z-10 R10', { modo: 'tornio' });
@@ -365,5 +365,36 @@ prova('sequenza: ordine di officina e controlli', () => {
   const due = [ord[0], Object.assign({}, ord[5], { c: Object.assign({}, ord[5].c, { t: 1 }) })];
   assert.strictEqual(O.gcodeSequenza(due, { num: 1 }).righe.filter(l => /^T\d+ M6$/.test(l)).length, 1);
   assert.ok(O.gcodeSequenza([], {}).errore);
+});
+prova('controllo del programma: errori trovati', () => {
+  const bad = '%\nO0001\nG21 G17 G90\nT1\nG0 X0 Y0 Z5\nG1 Z-5\nG0 X50 Y0\nG1 X10 Y10 F99999\nG1 X(10 Y5\n';
+  const r = O.controllaISO(bad);
+  const tipo = (riga, frammento) => r.segnalazioni.find(x => x.riga === riga - 1 && x.testo.includes(frammento));
+  assert.ok(tipo(6, 'senza avanzamento F') && tipo(6, 'mandrino fermo'), 'F e mandrino');
+  assert.strictEqual(tipo(7, 'rapido in X Y sotto Z0').livello, 'errore');
+  assert.ok(tipo(9, 'parentesi') && tipo(4, 'T senza M6') && tipo(8, 'molto alto'));
+  assert.ok(r.segnalazioni.some(x => /fine del programma/.test(x.testo)));
+  assert.strictEqual(r.segnalazioni[0].livello, 'errore');   // prima gli errori
+  const t = O.controllaISO('G18 T0101\nG96 S200 M3\nG0 X40 Z2\nG1 X30 F.2\nM30', { modo: 'tornio' });
+  assert.ok(t.segnalazioni.some(x => /G96.*senza limite/.test(x.testo) && x.livello === 'errore'));
+  // i programmi dell'app passano senza errori ne avvisi
+  const b2 = { n: 3000, f: 600, t: 3, zSic: 50, zR: 2 };
+  [['spianatura', { lx: 100, ly: 60, prof: 2, ap: 1, d: 50 }], ['tasca', { cx: 40, cy: 25, lx: 40, ly: 20, prof: 6, ap: 3, d: 10 }], ['fori', { punti: [[0, 0], [10, 0]], prof: 10, ciclo: 'G83', q: 2 }],
+    ['tascaCircolare', { dt: 40, prof: 6, ap: 3, d: 10 }], ['asola', { x2: 40, w: 14, prof: 6, ap: 3, d: 10 }], ['filettoFresa', { D: 20, p: 2.5, prof: 15, d: 12 }]].forEach(([op, x]) => {
+    const g = O.gcodeFresa(op, Object.assign({}, b2, x));
+    assert.deepStrictEqual(O.controllaISO(g.righe.join('\n')).segnalazioni.filter(q => q.livello !== 'nota'), [], op);
+  });
+  [['sgrossatura', { dg: 40, df: 30, l: 50, ap: 2, finitura: true, smusso: 1 }], ['filetto', { dg: 20, d: 20, p: 2.5, l: 30, n: 6, giri: 600, metodo: 'ciclo' }], ['troncatura', { dg: 40, zt: -30, w: 3 }]].forEach(([op, x]) => {
+    const g = O.gcodeTornio(op, Object.assign({}, base, x));
+    assert.deepStrictEqual(O.controllaISO(g.righe.join('\n')).segnalazioni.filter(q => q.livello !== 'nota'), [], op);
+  });
+});
+prova('lettura da foto: pulizia del testo', () => {
+  const p = O.pulisciLettura('12  G0l X1O.5 Y-2,5 Z5\n13 GO1 Z-S.0 F2OO\nMenu Edit Program\n14 G01 X 10 . 5 Y20\n(COMMENTO O1)\nM3O\nO0001 (PEZZO)\nT1 M6');
+  assert.deepStrictEqual(p.testo.split('\n'), ['G01 X10.5 Y-2.5 Z5', 'G01 Z-5.0 F200', 'G01 X10.5 Y20', '(COMMENTO O1)', 'M30', 'O0001 (PEZZO)', 'T1 M6']);
+  assert.strictEqual(p.tolte, 1);
+  // un programma gia pulito resta uguale
+  const g = O.gcodeFresa('tasca', { n: 3000, f: 600, t: 3, zSic: 50, zR: 2, cx: 40, cy: 25, lx: 40, ly: 20, prof: 6, ap: 3, d: 10 });
+  assert.strictEqual(O.pulisciLettura(g.righe.join('\n')).testo, g.righe.join('\n'));
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');
