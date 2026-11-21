@@ -202,7 +202,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi,
-    schermi: {}, param: {}, VERSIONE: '2.2.0'
+    schermi: {}, param: {}, VERSIONE: '2.3.0'
   };
   window.App = App;
 

@@ -79,21 +79,24 @@ prova('filetto', () => {
   assert.ok(g33.righe.some(l => l.startsWith('G33 Z-30.')));
 });
 
-prova('materiali del programma parametrico', () => {
+prova('materiali: stessi nomi del programma parametrico, valori per il metallo duro', () => {
   assert.strictEqual(O.MATERIALI.length, 20);
   const c40 = O.MATERIALI.find(m => m.n === 'C40');
-  assert.deepStrictEqual([c40.vc, c40.fz, c40.dvc, c40.dfn, c40.tvc, c40.rvc, c40.rfn, c40.bvc, c40.bfn], [170, .05, 30, .15, 12, 15, .22, 150, .09]);
+  assert.deepStrictEqual([c40.vc, c40.fz, c40.dvc, c40.dfn, c40.ivc, c40.tvc, c40.rvc, c40.rfn, c40.bvc, c40.bfn], [180, .055, 90, .18, 200, 15, 50, .22, 180, .09]);
+  O.MATERIALI.filter(m => m.n !== 'Legno').forEach(m => ['fvc', 'ffz', 'ivc', 'ifn', 'lvc', 'lf'].forEach(k => assert.ok(m[k] > 0, m.n + ' ' + k)));
+  O.MATERIALI.forEach(m => { assert.ok(m.fvc >= m.vc, m.n + ' finitura'); assert.ok(m.dvc < m.vc, m.n + ' punta'); });
   O.MATERIALI.forEach(m => ['vc', 'fz', 'ap', 'ae', 'dvc', 'dfn', 'tvc', 'rvc', 'rfn', 'bvc', 'bfn', 'rho'].forEach(k => assert.ok(m[k] > 0, m.n + ' ' + k)));
 });
 prova('dati di taglio come nel programma parametrico', () => {
   const m = O.MATERIALI.find(x => x.n === 'C40');
   const fr = O.datiTaglio(m, { tipo: 'fresa', d: 10, z: 4 });
-  assert.strictEqual(fr.n, 5410); assert.strictEqual(fr.f, Math.round(.05 * 4 * 5410));
+  assert.strictEqual(fr.n, 5730); assert.strictEqual(fr.f, Math.round(.055 * 4 * 5730));
   const p = O.datiTaglio(m, { tipo: 'puntaMD', d: 8.5 });
-  vicino(p.fn, .15 * .85); assert.strictEqual(p.n, 1120);
+  vicino(p.fn, .18 * .85); assert.strictEqual(p.n, 3370);
   const ins = O.datiTaglio(Object.assign({}, m, { ivc: 200, ifn: .1 }), { tipo: 'puntaIns', d: 20 });
   assert.strictEqual(ins.vc, 200); vicino(ins.fn, .2);
-  assert.strictEqual(O.datiTaglio(m, { tipo: 'puntaIns', d: 20 }).vc, 30);   // senza dati: quelli della punta
+  assert.strictEqual(O.datiTaglio(m, { tipo: 'puntaIns', d: 20 }).vc, 200);
+  assert.strictEqual(O.datiTaglio(Object.assign({}, m, { ivc: undefined, ifn: undefined }), { tipo: 'puntaIns', d: 20 }).vc, 90);   // senza dati: quelli della punta
   vicino(O.datiTaglio(m, { tipo: 'alesatore', d: 40 }).fn, .22 * 2);
   vicino(O.datiTaglio(m, { tipo: 'bareno', d: 10 }).fn, .09);
   assert.strictEqual(O.datiTaglio(m, { tipo: 'maschio', d: 10, passo: 1.5 }).f, Math.round(1.5 * O.datiTaglio(m, { tipo: 'maschio', d: 10 }).n));
@@ -166,8 +169,8 @@ prova('importa materiali da Hich-CAM', () => {
   assert.ok(!r.errore, r.errore);
   assert.strictEqual(r.materiali.length, 2);
   assert.strictEqual(r.materiali[0].dvc, 80); assert.strictEqual(r.materiali[0].ivc, 160);
-  assert.strictEqual(r.materiali[0].lvc, 220);   // tornitura di serie con lo stesso nome
-  assert.strictEqual(r.materiali[1].lvc, 250);   // ... o dello stesso gruppo
+  assert.strictEqual(r.materiali[0].lvc, 240);   // tornitura di serie con lo stesso nome
+  assert.strictEqual(r.materiali[1].lvc, 280);   // ... o dello stesso gruppo
   assert.strictEqual(O.datiTaglio(r.materiali[0], { tipo: 'puntaIns', d: 20 }).vc, 160);
   assert.ok(O.leggiMateriali('{ rotto').errore);
   assert.ok(O.leggiMateriali('{"materiali":[{"n":"X","vc":100}]}').errore);

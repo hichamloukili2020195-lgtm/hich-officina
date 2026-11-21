@@ -21,8 +21,9 @@ Sito: https://hichamloukili2020195-lgtm.github.io/hich-officina/
   scanalatura) e macro personali con parametri. Chiamata `G65 P....` con argomenti a lettere (A = #1, B = #2, ...).
 - **Galleria esempi**, **Tabelle** (filetti, tolleranze, rugosita, pollici, codici G e M), **Preferiti**,
   **Impostazioni** (tema, giri massimi, quote di sicurezza, codici del tornio, numeri di riga).
-- **Materiali**: gli stessi del programma parametrico, con gli stessi valori e le stesse regole (in officina solo
-  metallo duro: le Vc si usano cosi come sono). Tornitura e densita sono aggiunte qui. Si possono modificare
+- **Materiali**: gli stessi nomi e campi del programma parametrico, con valori di partenza per utensili in metallo duro
+  rivestito (fresa di sgrossatura e di finitura, punta in metallo duro, punta a inserti, alesatore, bareno, inserto da
+  tornio; maschi in acciaio super rapido da polveri rivestito). Le Vc si usano cosi come sono. Si possono modificare
   oppure **importare** la propria tabella: in Hich-CAM, Libreria materiali, pulsante JSON, si copia il testo e lo si
   incolla (o si sceglie il file) in Materiali > Importa la mia tabella materiali.
 

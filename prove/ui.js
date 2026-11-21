@@ -97,7 +97,7 @@ const server = http.createServer((q, r) => {
   }
   await pg.click('.chips .chip[data-id="fresa"]');
   await pg.selectOption('#f-mat', { label: 'Alluminio' });
-  ok(await pg.inputValue('#f-vc') === '400', 'materiale non applicato');
+  ok(await pg.inputValue('#f-vc') === '500', 'materiale non applicato');
   await foto('04-calcoli');
 
   // utensili

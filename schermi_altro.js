@@ -162,7 +162,7 @@
         if (!b.dataset.conf) { b.dataset.conf = '1'; b.textContent = 'Premi ancora: le modifiche si perdono'; return; }
         delete A.mem.materiali; A.salva(); A.ridisegna(); A.avviso('Materiali di serie');
       } })]));
-      m.appendChild(A.info('Gli stessi materiali e valori del programma parametrico (in officina solo metallo duro: le Vc si usano cosi come sono). La tornitura e la densita sono aggiunte qui e sono indicative.'));
+      m.appendChild(A.info('Valori di partenza per utensili in metallo duro rivestito (maschi in acciaio super rapido da polveri rivestito): sono medie tipiche, da adattare alla macchina e al fissaggio. Per usare i tuoi valori: Importa la mia tabella materiali.'));
     }
   };
   A.schermi.materialiImporta = {
