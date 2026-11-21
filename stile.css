@@ -189,6 +189,14 @@ td.fuori{color:var(--errore);font-weight:600}
 .par-riga.mis{grid-template-columns:minmax(0,1fr) 84px 92px 36px}
 .par-riga.mis input:first-child{text-transform:none;text-align:left;font-family:inherit}
 .anteprima-foglio{width:100%;height:60vh;border:1px solid var(--bordo);border-radius:12px;background:#fff}
+.punto-riga{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr);gap:5px;align-items:center;margin-top:6px}
+.punto-riga.sec{margin-top:3px;padding-bottom:6px;border-bottom:1px solid var(--bordo)}
+.punto-riga input,.punto-riga select{width:100%;min-width:0;background:var(--campo);border:1px solid var(--bordo);border-radius:8px;color:var(--testo);font-size:15px;padding:7px 6px}
+.punto-riga b{font-size:13px;color:var(--tenue)}
+.elem.fase{cursor:default}
+.cerca-home{margin:0 0 12px;padding-left:10px;background:var(--riga)}
+.cerca-home span svg{width:20px;height:20px;color:var(--tenue)}
+.cerca-home input{font-size:16px}
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--testo);color:var(--fondo);
   padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
 .toast.vedi{opacity:1}

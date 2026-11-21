@@ -107,6 +107,7 @@
       const M = [['M0 / M1', 'Arresto / arresto facoltativo'], ['M3 / M4 / M5', 'Mandrino orario / antiorario / fermo'], ['M6', 'Cambio utensile'], ['M8 / M9', 'Refrigerante si / no'],
         ['M30', 'Fine programma e ritorno all\'inizio'], ['M98 / M99', 'Chiamata / fine sottoprogramma']];
       const t = L => '<div class="pannello" style="padding:4px 8px"><table>' + L.map(([c, d]) => '<tr><td style="white-space:nowrap"><b>' + c + '</b></td><td>' + d + '</td></tr>').join('') + '</table></div>';
+      A.CODICI = G.concat(M);
       return '<div class="sez">Codici G piu usati</div>' + t(G) + '<div class="sez">Codici M</div>' + t(M) + '<p class="leggenda" style="margin-top:8px">Il significato puo cambiare da una macchina all\'altra: vale il manuale della macchina.</p>';
     }
   };
@@ -292,4 +293,5 @@
       m.appendChild(A.info('Hich-Officina ' + A.VERSIONE + ' · funziona anche senza rete. I dati restano su questo telefono. I valori di taglio sono di partenza: controlla sempre i programmi prima di lavorare.'));
     }
   };
+  try { TAB.codici(); } catch (e) { /* niente */ }
 })();

@@ -7,12 +7,20 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
 
 ## Cosa fa
 - **Nuovo programma ISO** con anteprima del percorso:
-  - fresatura: spianatura, contornatura esterna con finitura, tasca rettangolare con discesa a rampa;
-  - foratura: centrino, punta in metallo duro, punta a inserti, alesatore, bareno, maschio, lamatore; fori su
-    circonferenza, a griglia o da elenco; ciclo automatico (G81, G82, G83, G84, G85) o scelto a mano;
-  - tornitura: sgrossatura esterna e interna con finitura e smusso, sfacciatura, gola, foratura in asse,
-    filetto esterno e interno.
+  - fresatura: spianatura, contornatura esterna, tasca rettangolare con rampa, **profilo libero** (rette, archi,
+    raccordi, smussi) con G41/G42 e entrata/uscita, **tasca circolare** a elica, **asola**, **filetto a fresa**
+    (interno ed esterno, destro, concorde);
+  - foratura: centrino, punte, alesatore, bareno, maschio, lamatore, smussatore; fori su circonferenza, a griglia o da
+    elenco; **Foro completo**: centrino, punta (preforo giusto), smusso, maschio o alesatore sugli stessi fori;
+  - tornitura: sgrossatura esterna e interna, **profilo libero** con finitura G42, sfacciatura, gola, **troncatura**,
+    foratura in asse, filetto esterno (metrico, **trapezio**, **conico**) e interno; **a passate o con i cicli fissi**
+    (G71/G70, G75, G74, G76);
+  - **Sequenza**: piu lavorazioni in un programma, nell'ordine di officina (spianatura, centrini, punte a inserti,
+    forature, lamature, fori a fresa, alesature, smusso d'imbocco e maschiatura, smussi, profili), senza cambio per lo
+    stesso utensile di seguito; un ordine impossibile (maschio prima del preforo) non si accetta.
   Il listato si copia, si condivide, si salva come `.nc` o si tiene in **Programmi salvati**.
+- **Ricerca veloce dalla home**: M10 (filetto e preforo), H7 25 (tolleranza), 316 (materiale), G83 (codice), T5
+  (utensile), nomi di pezzi, programmi e macro.
 - **Calcolatrice di taglio**: fresatura, tornitura, foratura, maschiatura, filettatura al tornio, cono, fori su
   cerchio, peso del grezzo, triangolo rettangolo, rugosita e avanzamento, pollici e millimetri.
 - **Utensili e dati di taglio**: giri e avanzamenti per ogni tipo di utensile nel materiale scelto.
@@ -22,7 +30,8 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
   con parametri, da simulare con i valori scritti. Chiamata `G65 P....` con argomenti a lettere (A = #1, B = #2, ...).
 - **Apri e simula un programma**: un programma ISO incollato o da file (anche fatto da altri) diventa un percorso con
   simulazione animata passo per passo (3D, dall'alto, di fronte, sezione del tornio), quote massime di lavoro,
-  utensili con giri e avanzamenti, tempo stimato. Legge anche le macro (variabili, IF, WHILE, G65, M98).
+  utensili con giri e avanzamenti, tempo stimato. Legge anche le macro (variabili, IF, WHILE, G65, M98) e i cicli
+  del tornio G71/G70, G74, G75, G76.
 - **Listato**: ricerca, modifica, simulazione, file `.nc`, "Salva in..." (anche cartelle offerte da altre app),
   **invio alla macchina via FTP** (solo nell'APK), foglio di attrezzaggio.
 - **Post-processor**: il programma nasce in ISO e si traduce nel linguaggio della macchina (Impostazioni, o al volo nel
@@ -71,7 +80,8 @@ Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i fil
 
 ## File
 - `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
-- `programmi.js`: programmi della fresatrice, schemi dei fori, macro.
+- `programmi.js`: programmi della fresatrice, sequenza, schemi dei fori, macro.
+- `profilo.js`: profili liberi (raccordi, smussi, archi), percorso con G41/G42, sgrossatura dei profili da tornio.
 - `post.js`: post-processor verso gli altri linguaggi delle macchine.
 - `iso.js`: lettura ed esecuzione dei programmi ISO e delle macro (per simulazione, apertura, foglio di attrezzaggio).
 - `app.js`: base dell'interfaccia (schermate, memoria, moduli). `schermi_*.js`: le schermate. `stile.css`: aspetto.

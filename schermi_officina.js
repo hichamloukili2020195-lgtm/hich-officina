@@ -366,4 +366,59 @@
       } })]));
     }
   };
+
+  // ----- ricerca veloce dalla home -----
+  /** Risultati per un testo: [{titolo, sotto, vai()}]. */
+  A.cerca = function (q) {
+    const t = String(q || '').trim();
+    if (t.length < 2) return [];
+    const T = t.toUpperCase().replace(',', '.'), out = [];
+    const metti = (titolo, sotto, fn) => out.push({ titolo, sotto, vai: fn });
+    // filetti: M10, M10x1, M10 x 1.25
+    let m = /^M\s*(\d+(?:\.\d+)?)(?:\s*X\s*(\d+(?:\.\d+)?))?$/.exec(T);
+    if (m) {
+      const d = Number(m[1]);
+      const lista = O.FILETTI_GROSSI.filter(f => f[0] === d).concat(O.FILETTI_FINI.filter(f => f[0] === d)).filter(f => !m[2] || Math.abs(f[1] - Number(m[2])) < 1e-9);
+      lista.forEach(([dd, p]) => {
+        const f = O.filetto(dd, p);
+        metti('M' + fmt(dd) + ' x ' + fmt(p), 'Preforo ' + fmt(f.preforo, 2) + ' · nocciolo D1 ' + fmt(f.nocciolo, 3) + ' · medio ' + fmt(f.medio, 3), () => {
+          const val = A.sezione('valori'); val.maschio = Object.assign(val.maschio || {}, { fil: dd + 'x' + p, d: String(dd), p: String(p) }); A.mem.calc = 'maschio'; A.salva(); A.vai('calcoli');
+        });
+      });
+    }
+    // tolleranze: H7, g6, H7 25, 25 H7
+    m = /^(?:(\d+(?:\.\d+)?)\s+)?(JS|[A-Z])(\d{1,2})(?:\s+(\d+(?:\.\d+)?))?$/i.exec(t.replace(',', '.'));
+    if (m && !/^M$/i.test(m[2]) && !/^[GT]$/i.test(m[2])) {
+      const campo = (/^[A-Z]/.test(t.replace(/^[\d.,\s]+/, '')[0]) ? m[2].toUpperCase() : m[2].toLowerCase()) + m[3];
+      const d = Number(m[1] || m[4]) || 0;
+      const r = O.tolleranza(d > 0 ? d : 25, campo);
+      if (!r.errore) metti('Tolleranza ' + campo + (d > 0 ? ' su D' + fmt(d) : ''), d > 0 ? fmt(r.min, 3) + ' … ' + fmt(r.max, 3) + ' mm (' + (r.inf > 0 ? '+' : '') + fmt(r.inf, 1) + ' / ' + (r.sup > 0 ? '+' : '') + fmt(r.sup, 1) + ' µm)' : 'Scrivi anche il diametro, es. "' + campo + ' 25"', () => {
+        const v = A.sezione('tolleranze'); v.libero = campo; if (d > 0) v.d = String(d); A.salva(); A.vai('tolleranze');
+      });
+    }
+    // codici G e M
+    if (/^[GM]\d{1,3}$/.test(T) && A.CODICI) {
+      const n = Number(T.slice(1)), L = T[0];
+      A.CODICI.filter(([c]) => c.split(/[/…]/).map(x => x.trim()).some(x => x === L + n || (x.includes('…') ? false : false)) || (c === 'G54…G59' && L === 'G' && n >= 54 && n <= 59))
+        .forEach(([c, d]) => metti(c, d, () => { A.sezione('tabelleVista').tab = 'codici'; A.salva(); A.vai('tabelle'); }));
+    }
+    const qq = t.toLowerCase();
+    // materiali
+    A.materiali().forEach((x, i) => {
+      if (x.n.toLowerCase().includes(qq) || String(x.g).toLowerCase().includes(qq)) metti(x.n, 'Fresa ' + x.vc + ' · Punta ' + x.dvc + ' · Maschio ' + x.tvc + (x.lvc ? ' · Tornio ' + x.lvc : '') + ' m/min', () => { A.param.materiale = i; A.vai('materiale'); });
+    });
+    // utensili della tabella: T5 oppure il nome
+    utensili().forEach(u => {
+      if (T === 'T' + u.t || A.descrUt(u).toLowerCase().includes(qq)) metti('T' + u.t + ' ' + A.descrUt(u), u.note || 'Tabella utensili', () => { A.param.utensile = u.id; A.vai('utensile'); });
+    });
+    // schermate e calcolatori
+    A.MENU.forEach(([id, , tt, sotto]) => { if ((tt + ' ' + sotto).toLowerCase().includes(qq)) metti(tt, sotto, () => A.vai(id)); });
+    (A.CALC || []).forEach(c => { if (c.t.toLowerCase().includes(qq)) metti('Calcolatrice: ' + c.t, 'Calcolatrice di taglio', () => { A.mem.calc = c.id; A.salva(); A.vai('calcoli'); }); });
+    // programmi, pezzi, macro
+    (A.mem.salvati || []).forEach(p => { if ((p.nome + ' ' + (p.titolo || '')).toLowerCase().includes(qq)) metti(p.nome + ' ' + (p.titolo || ''), 'Programma salvato · ' + p.data, () => { A.param.listato = { righe: p.righe, nome: p.nome, tipo: p.tipo, idSalvato: p.id, iso: p.iso || null, ling: p.ling || 'iso' }; A.vai('listato'); }); });
+    pezzi().forEach(p => { if ((p.nome + ' ' + (p.disegno || '') + ' ' + (p.materiale || '')).toLowerCase().includes(qq)) metti(p.nome, 'Pezzo' + (p.disegno ? ' · ' + p.disegno : ''), () => { A.param.pezzo = p.id; A.vai('pezzo'); }); });
+    (A.mem.macro || []).forEach((mc, i) => { if ((mc.nome + ' ' + mc.num).toLowerCase().includes(qq)) metti(mc.nome, 'Macro O' + mc.num, () => { A.param.macro = { i }; A.vai('macroModifica'); }); });
+    O.MACRO_MODELLI.forEach(mc => { if ((mc.nome + ' ' + mc.num).toLowerCase().includes(qq)) metti(mc.nome, 'Modello di macro O' + mc.num, () => { A.param.macro = { modello: mc.id }; A.vai('macroModifica'); }); });
+    return out.slice(0, 15);
+  };
 })();

@@ -80,7 +80,7 @@
   const UTENSILI = [
     ['fresa', 'Fresa metallo duro (sgrossatura)'], ['fresaFin', 'Fresa metallo duro (finitura)'],
     ['puntaMD', 'Punta in metallo duro'], ['puntaIns', 'Punta a inserti'], ['centrino', 'Centrino'],
-    ['alesatore', 'Alesatore'], ['bareno', 'Bareno'], ['maschio', 'Maschio'], ['lamatore', 'Lamatore'],
+    ['alesatore', 'Alesatore'], ['bareno', 'Bareno'], ['maschio', 'Maschio'], ['lamatore', 'Lamatore'], ['smussatore', 'Smussatore 90°'],
     ['filettaFresa', 'Fresa per filettare'], ['inserto', 'Inserto da tornio']
   ];
   const giriArrot = (vc, d, nmax) => Math.min(nmax || 24000, Math.max(100, Math.round(1000 * vc / (Math.PI * d) / 10) * 10));
@@ -106,6 +106,8 @@
         return perGiro(m.rvc, Math.max(0.02, m.rfn * Math.sqrt(d / 10)), 'fn adattato alla radice del diametro');
       case 'bareno':
         return perGiro(m.bvc, Math.max(0.02, m.bfn * Math.sqrt(d / 10)), 'fn adattato alla radice del diametro');
+      case 'smussatore':
+        return perGiro(m.dvc, Math.max(0.02, m.dfn * Math.min(1.5, d / 10) * 0.5), 'Vc della punta, avanzamento x0,5');
       case 'lamatore':
         return perGiro(m.dvc, Math.max(0.02, m.dfn * Math.min(1.5, d / 10) * 0.7), 'Vc della punta, avanzamento x0,7');
       case 'inserto':
@@ -355,6 +357,73 @@
     R.push('T' + pad2(c.t || 1) + pad2(c.t || 1));
     const refrig = c.refrig === false ? '' : ' M8';
 
+    /** Esegue fn tenendo il percorso ma togliendo le righe: per mostrare i cicli fissi nell'anteprima. */
+    const soloPercorso = fn => { const k = R.length; fn(); R.length = k; };
+    /** Un tratto di profilo (in Z e raggio) come riga G1/G2/G3 con il percorso spezzato. */
+    const tratto = (t, extraPrimo) => {
+      if (t.tipo === 'L') { va(t.q.b * 2, t.q.a, false, extraPrimo); return; }
+      R.push((t.cw ? 'G2' : 'G3') + ' X' + gc(t.q.b * 2) + ' Z' + gc(t.q.a) + ' R' + gc(t.r) + (extraPrimo ? ' ' + extraPrimo : ''));
+      const a0 = Math.atan2(t.p.b - t.c.b, t.p.a - t.c.a), a1 = Math.atan2(t.q.b - t.c.b, t.q.a - t.c.a), rr = Math.hypot(t.p.a - t.c.a, t.p.b - t.c.b);
+      let d = a1 - a0;
+      if (t.cw) { while (d > 1e-9) d -= 2 * Math.PI; } else { while (d < -1e-9) d += 2 * Math.PI; }
+      const k = Math.max(4, Math.ceil(Math.abs(d) * rr / 0.5));
+      for (let i = 1; i <= k; i++) {
+        const an = a0 + d * i / k, nz = i === k ? t.q.a : t.c.a + rr * Math.cos(an), nx = i === k ? t.q.b * 2 : 2 * (t.c.b + rr * Math.sin(an));
+        P.push({ x0, z0, x: nx, z: nz, rapido: false }); x0 = nx; z0 = nz;
+      }
+    };
+    /** Sgrossatura e finitura di un profilo esterno (a passate o con i cicli G71/G70). */
+    const profiloEsterno = (punti, o) => {
+      if (!Officina.trattiTornio) return 'Profili non disponibili.';
+      const g = Officina.trattiTornio(punti);
+      if (g.errore) return g.errore;
+      avvisi.push(...g.avvisi);
+      const tr = g.tratti, p0 = tr[0].p, zIn = p0.a + 2, ff = pos(o.ff) ? o.ff : c.f / 2;
+      const ultimo = tr[tr.length - 1].q;
+      if (ultimo.b * 2 > o.dg + 1e-6) return 'Il profilo esce dal grezzo (D' + gc(ultimo.b * 2) + ' oltre D' + gc(o.dg) + ').';
+      const poli = Officina.polilineaProfilo(tr, 0.3);
+      const sg = Officina.sgrossaTornio(poli, o.dg, o.ap, o.sx || 0, o.sz || 0, zIn, p0.a + (o.sz || 0));
+      if (!sg.monotono) avvisi.push('ATTENZIONE: il profilo ha gole o sottosquadri: la sgrossatura non li scava e la finitura li farebbe in una passata sola. Toglili dal profilo e fai la gola a parte.');
+      const corpo = () => {
+        sg.passate.forEach(pa => {
+          va(pa.x, null, true);
+          va(null, pa.z1, false, 'F' + gc(c.f));
+          va(pa.x + 1, pa.z1 + 0.5, false);
+          va(null, zIn, true);
+        });
+        // passata sul profilo con il sovrametallo, per togliere gli scalini
+        if (sg.passate.length && ((o.sx || 0) > 0 || (o.sz || 0) > 0)) {
+          const sp = poli.map(q => ({ x: 2 * (q.b + (o.sx || 0) / 2), z: q.a + (o.sz || 0) }));
+          va(sp[0].x, zIn, true);
+          sp.forEach(q => va(q.x, Math.min(q.z, zIn), false));
+          va(o.dg + 2, null, false);
+          va(null, zIn, true);
+        }
+      };
+      const fin = () => {
+        va(p0.b * 2, zIn, true);
+        va(null, p0.a, false, 'F' + gc(ff));
+        R[R.length - 1] = R[R.length - 1].replace(/^G1/, 'G1 G42');
+        tr.forEach(t => tratto(t));
+        if (ultimo.b * 2 < o.dg + 2) va(o.dg + 2, null, false);
+        R.push('G40'); va(null, zIn, true);
+      };
+      if (o.metodo === 'ciclo') {
+        soloPercorso(() => { corpo(); if (o.finitura) fin(); });
+        R.push('G71 U' + gc(o.ap) + ' R0.5');
+        R.push('G71 P100 Q200 U' + gc(o.sx || 0) + ' W' + gc(o.sz || 0) + ' F' + gc(c.f));
+        R.push('N100 G0 G42 X' + gc(p0.b * 2));
+        R.push('G1 Z' + gc(p0.a) + ' F' + gc(ff));
+        tr.forEach(t => R.push(t.tipo === 'L' ? 'G1 X' + gc(t.q.b * 2) + ' Z' + gc(t.q.a) : (t.cw ? 'G2' : 'G3') + ' X' + gc(t.q.b * 2) + ' Z' + gc(t.q.a) + ' R' + gc(t.r)));
+        R.push('N200 G1 X' + gc(o.dg + 2));
+        if (o.finitura) R.push('G70 P100 Q200');
+        R.push('G40');
+        x0 = o.dg + 2; z0 = zIn;
+        avvisi.push('Cicli fissi G71 (sgrossatura) e G70 (finitura) con il profilo da N100 a N200.');
+      } else { corpo(); if (o.finitura) { R.push('(FINITURA)'); fin(); } }
+      avvisi.push(sg.passate.length + ' passate di sgrossatura. Finitura con G42: nel correttore il raggio della punta e il suo quadrante.');
+      return null;
+    };
     const avvioG96 = () => {
       R.push((c.codLimite || 'G50') + ' S' + Math.round(c.nmax));
       R.push('G96 S' + Math.round(c.vc) + ' M3');
@@ -367,6 +436,14 @@
       if (!pos(l)) return err('Lunghezza mancante.');
       if (!pos(ap)) return err('Profondita di passata mancante.');
       if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
+      if (c.metodo === 'ciclo') {
+        avvioG96();
+        va(sic, 2, true, refrig.trim());
+        const pt = smusso > 0 ? [{ x: df - 2 * smusso, z: 0 }, { x: df, z: -smusso }] : [{ x: df, z: 0 }];
+        pt.push({ x: df, z: -l }, { x: dg, z: -l });
+        const e = profiloEsterno(pt, { dg, ap, sx, sz, ff: c.ff, finitura: c.finitura, metodo: 'ciclo' });
+        if (e) return err(e);
+      } else {
       avvioG96();
       va(sic, zSic, true, refrig.trim());
       const xFin = df + sx, zFin = -(l - sz);
@@ -402,6 +479,7 @@
       }
       avvisi.push(passate + ' passate di sgrossatura.');
       avvisi.push('Senza compensazione del raggio della punta: su smussi e coni la quota esce spostata del raggio.');
+      }
     } else if (op === 'sfacciatura') {
       const { dg, s, ap } = c;
       if (!pos(s) || !pos(ap)) return err('Sovrametallo e profondita mancanti.');
@@ -431,11 +509,14 @@
       const zz = [];
       for (let z = zg; z > zUltima + 1e-9; z -= passo) zz.push(z);
       zz.push(zUltima);
-      for (const z of zz) {
-        va(null, z, true);
-        va(dfondo, null, false, 'F' + gc(c.f));
-        va(dg + 1, null, true);
-      }
+      const affonda = () => { for (const z of zz) { va(null, z, true); va(dfondo, null, false, 'F' + gc(c.f)); va(dg + 1, null, true); } };
+      if (c.metodo === 'ciclo') {
+        va(null, zg, true);
+        soloPercorso(affonda);
+        R.push('G75 R0.5');
+        R.push('G75 X' + gc(dfondo) + ' Z' + gc(zUltima) + ' P' + Math.round((pos(c.q) ? c.q : (dg - dfondo) / 2) * 1000) + ' Q' + Math.round(passo * 1000) + ' F' + gc(c.f));
+        avvisi.push('Ciclo fisso G75 (P e Q in millesimi di mm).');
+      } else affonda();
       va(sic, null, true);
       va(null, zSic, true);
       avvisi.push(zz.length + ' affondamenti. Z riferita al fianco DESTRO dell\'utensile.');
@@ -446,21 +527,32 @@
       const giriF = Math.round(c.giri || 0);
       if (!pos(giriF)) return err('Giri al minuto mancanti.');
       if (giriF > c.nmax) return err('I giri superano il massimo impostato.');
-      const h = 0.613343 * p;
-      R.push('G97 S' + giriF + ' M3');
+      const trap = c.tipoFil === 'trapezio';
+      const h = trap ? 0.5 * p + (p <= 1.5 ? 0.15 : p <= 5 ? 0.25 : p <= 12 ? 0.5 : 1) : 0.613343 * p;
+      const d2 = pos(c.d2) ? c.d2 : d;            // diametro alla fine: diverso = filetto conico
       const zA = Math.max(3 * p, 3);
-      va(d + 2, zA, true, refrig.trim());
+      const dIn = d - (d2 - d) * zA / l;          // diametro allungato fino al punto di partenza
+      R.push('G97 S' + giriF + ' M3');
+      va(Math.max(dIn, d2) + 2, zA, true, refrig.trim());
       const prof = passateFiletto(h, np);
       prof.push(h);   // passata a vuoto
-      prof.forEach((pr, i) => {
+      const passate = () => prof.forEach((pr, i) => {
         if (i === np) R.push('(PASSATA A VUOTO)');
-        va(d - 2 * pr, null, true);
-        va(null, -l, false, 'F' + gc(p));
+        va(dIn - 2 * pr, null, true);
+        va(d2 - 2 * pr, -l, false, 'F' + gc(p));
         R[R.length - 1] = R[R.length - 1].replace(/^G1/, c.codFiletto || 'G32');
-        va(d + 2, null, true);
+        va(Math.max(dIn, d2) + 2, null, true);
         va(null, zA, true);
       });
-      avvisi.push('Profondita radiale ' + gc(h) + ' mm in ' + np + ' passate + 1 a vuoto. Diametro di fondo ' + gc(d - 2 * h) + '.');
+      if (c.metodo === 'ciclo') {
+        soloPercorso(passate);
+        const conico = Math.abs(d2 - d) > 1e-9;
+        R.push('G76 P01' + '00' + (trap ? '30' : '60') + ' Q50 R0.02');
+        R.push('G76 X' + gc(d2 - 2 * h) + ' Z' + gc(-l) + (conico ? ' R' + gc((dIn - d2) / 2) : '') + ' P' + Math.round(h * 1000) + ' Q' + Math.round(h / Math.sqrt(np) * 1000) + ' F' + gc(p));
+        avvisi.push('Ciclo fisso G76 (P e Q in millesimi di mm, una passata di finitura, angolo ' + (trap ? 30 : 60) + '°).');
+      } else passate();
+      avvisi.push((trap ? 'Trapezio' : 'Metrico') + (Math.abs(d2 - d) > 1e-9 ? ' conico (D' + gc(d) + ' a Z0, D' + gc(d2) + ' a Z' + gc(-l) + ')' : '') + ': profondita radiale ' + gc(h) + ' mm in ' + np + ' passate + 1 a vuoto.');
+      if (trap) avvisi.push('Trapezio: inserto con il profilo a 30°, passate leggere; con passi grandi meglio l\'entrata sul fianco.');
       avvisi.push('Lascia una gola di scarico o tieni conto della rampa di uscita del filetto.');
     } else if (op === 'interna') {
       const { dp, di, l, ap, sx = 0, sz = 0, smusso = 0 } = c;
@@ -507,14 +599,23 @@
       R.push('G97 S' + giriF + ' M3');
       va(0, zSic, true, refrig.trim());
       const passo = pos(q) ? q : prof;
-      let z = 0, beccate = 0;
-      while (z > -prof + 1e-9 && beccate < 500) {
-        const zN = Math.max(z - passo, -prof);
-        if (z < 0) va(null, z + 0.5, true);
-        va(null, zN, false, 'F' + gc(c.f));
-        va(null, zSic, true);
-        z = zN; beccate++;
-      }
+      let beccate = 0;
+      const fora = () => {
+        let z = 0; beccate = 0;
+        while (z > -prof + 1e-9 && beccate < 500) {
+          const zN = Math.max(z - passo, -prof);
+          if (z < 0) va(null, z + 0.5, true);
+          va(null, zN, false, 'F' + gc(c.f));
+          va(null, zSic, true);
+          z = zN; beccate++;
+        }
+      };
+      if (c.metodo === 'ciclo') {
+        soloPercorso(fora);
+        R.push('G74 R0.5');
+        R.push('G74 Z' + gc(-prof) + ' Q' + Math.round(passo * 1000) + ' F' + gc(c.f));
+        avvisi.push('Ciclo fisso G74 (Q in millesimi di mm).');
+      } else fora();
       avvisi.push(beccate + ' beccate fino a Z' + gc(-prof) + ' (profondita della punta, cono compreso).');
     } else if (op === 'filettoInt') {
       const { d, p, l, n } = c;
@@ -539,6 +640,37 @@
         va(null, zA, true);
       });
       avvisi.push('Si parte dal nocciolo D1 ' + gc(d1) + ' fino al diametro ' + gc(d) + ', ' + np + ' passate + 1 a vuoto.');
+    } else if (op === 'profilo') {
+      if (!pos(c.ap)) return err('Profondita di passata mancante.');
+      if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
+      if (!Array.isArray(c.punti) || c.punti.length < 2) return err('Scrivi almeno due punti del profilo.');
+      avvioG96();
+      va(sic, Number(c.punti[0].z) + 2, true, refrig.trim());
+      const e = profiloEsterno(c.punti, { dg: c.dg, ap: c.ap, sx: c.sx, sz: c.sz, ff: c.ff, finitura: c.finitura, metodo: c.metodo });
+      if (e) return err(e);
+    } else if (op === 'troncatura') {
+      const { dg, zt, w } = c;
+      const dfin = pos(c.dfin) ? c.dfin : 0;
+      if (!pos(w)) return err('Larghezza della lama mancante.');
+      if (!(zt <= 0)) return err('La Z del taglio deve essere 0 o negativa.');
+      if (dfin >= dg) return err('Il diametro finale deve essere minore del grezzo.');
+      if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
+      avvioG96();
+      va(dg + 2, zSic, true, refrig.trim());
+      va(null, zt, true);
+      const q = pos(c.q) ? c.q : 3;
+      const fine = dfin > 0 ? dfin : -1;
+      let x = dg + 1, k = 0;
+      va(x, null, true);
+      while (x > fine + 1e-9 && k++ < 1000) {
+        const xn = Math.max(x - 2 * q, fine);
+        va(xn, null, false, 'F' + gc(c.f));
+        if (xn > fine + 1e-9) { va(xn + 1, null, true); va(xn, null, true); }
+        x = xn;
+      }
+      va(dg + 2, null, true);
+      va(null, zSic, true);
+      avvisi.push('Troncatura a Z' + gc(zt) + ' (fianco DESTRO della lama), beccate di ' + gc(q) + ' mm sul raggio fino a ' + (dfin > 0 ? 'D' + gc(dfin) : 'oltre il centro') + '. Vicino al centro i giri arrivano al massimo: tieni basso il limite.');
     } else {
       return err('Lavorazione sconosciuta.');
     }

@@ -68,6 +68,27 @@
       for (let i = 1; i <= n; i++) L.push(-prof * i / n);   // passate uguali
       return L;
     };
+    /** Arco G2/G3 nel piano XY (anche elica con z), con I J dal punto di partenza; l'anteprima lo spezza. */
+    const arco = (cw, x, y, z, cx, cy, f, extra) => {
+      const p = [cw ? 'G2' : 'G3', 'X' + gc(x), 'Y' + gc(y)];
+      if (z !== null && z !== undefined && z !== Z) p.push('Z' + gc(z));
+      p.push('I' + gc(cx - X), 'J' + gc(cy - Y));
+      if (f && f !== fUltimo) { p.push('F' + Math.round(f)); fUltimo = f; }
+      if (extra) p.push(extra);
+      R.push(p.join(' '));
+      const z1 = z === null || z === undefined ? Z : z;
+      const r0 = Math.hypot(X - cx, Y - cy);
+      let a0 = Math.atan2(Y - cy, X - cx), a1 = Math.atan2(y - cy, x - cx), d = a1 - a0;
+      if (cw) { while (d >= -1e-9) d -= 2 * Math.PI; } else { while (d <= 1e-9) d += 2 * Math.PI; }
+      const k = Math.max(6, Math.ceil(Math.abs(d) * r0 / 1.5));
+      let px = X, py = Y, pz = Z;
+      for (let i = 1; i <= k; i++) {
+        const a = a0 + d * i / k, nx = i === k ? x : cx + r0 * Math.cos(a), ny = i === k ? y : cy + r0 * Math.sin(a), nz = Z + (z1 - Z) * i / k;
+        P.push({ x0: px, y0: py, z0: pz, x: nx, y: ny, z: nz, rapido: false });
+        px = nx; py = ny; pz = nz;
+      }
+      X = x; Y = y; Z = z1;
+    };
     let pezzo = null;
 
     if (op === 'spianatura') {
@@ -210,6 +231,143 @@
       pezzo = { x0: Math.min(...xs) - m, y0: Math.min(...ys) - m, x1: Math.max(...xs) + m, y1: Math.max(...ys) + m, z0: Math.min(pz - 5, -10), z1: 0 };
       avvisi.push(pti.length + ' fori con ' + ciclo + ', piano R' + gc(zR) + ', ritorno al piano iniziale (G98).');
       if (ciclo === 'G84') avvisi.push('Maschiatura: avanzamento = passo x giri. Su alcune macchine serve la maschiatura rigida prima del ciclo.');
+    } else if (op === 'profilo') {
+      if (!O.percorsoFresaProfilo) return err('Profili non disponibili.');
+      if (!pos(c.prof) || !pos(c.ap)) return err('Profondita e profondita di passata mancanti.');
+      const pr = O.percorsoFresaProfilo(Object.assign({}, c, { f: c.f, fp, zR, t }));
+      if (pr.errore) return err(pr.errore);
+      testa();
+      const m0 = pr.mosse[0];
+      avvicina(m0.x, m0.y);
+      for (const m of pr.mosse) {
+        if (m.g === 0) rap(m.x === undefined ? null : m.x, m.y === undefined ? null : m.y, m.z === undefined ? null : m.z);
+        else if (m.g === 1) {
+          if (m.extra) { const prima = R.length; lav(m.x === undefined ? null : m.x, m.y === undefined ? null : m.y, m.z === undefined ? null : m.z, m.f); if (R.length > prima) R[R.length - 1] = R[R.length - 1].replace(/^G1/, 'G1 ' + m.extra); }
+          else lav(m.x === undefined ? null : m.x, m.y === undefined ? null : m.y, m.z === undefined ? null : m.z, m.f);
+        } else arco(m.g === 2, m.x, m.y, null, m.cx, m.cy, m.f);
+      }
+      coda();
+      const xs = [], ys = [];
+      P.forEach(s => { if (!s.rapido) { xs.push(s.x); ys.push(s.y); } });
+      pezzo = { x0: Math.min(...xs) - 5, y0: Math.min(...ys) - 5, x1: Math.max(...xs) + 5, y1: Math.max(...ys) + 5, z0: -c.prof - 5, z1: 0 };
+      avvisi.push(...pr.avvisi);
+      avvisi.unshift(pr.livelli + ' passate in Z, ' + pr.tratti.length + ' tratti.');
+    } else if (op === 'tascaCircolare') {
+      const { cx = 0, cy = 0, dt, prof, ap, d } = c;
+      if (!pos(dt) || !pos(d)) return err('Diametro della tasca e della fresa mancanti.');
+      if (!pos(prof) || !pos(ap)) return err('Profondita e passata mancanti.');
+      const s = c.sovra > 0 ? c.sovra : 0;
+      const rf = dt / 2 - d / 2;
+      if (rf <= 0.05) return err('La fresa e troppo grande per la tasca.');
+      const rr = Math.max(rf - s, 0.05);
+      const step = d * Math.min(0.9, Math.max(0.1, (c.ae > 0 ? c.ae : 40) / 100));
+      const re = Math.min(rr, d * 0.25);                 // raggio dell'elica di discesa
+      const passoElica = Math.max(0.1, 2 * Math.PI * re * Math.tan(3 * Math.PI / 180));
+      testa();
+      avvicina(cx, cy);
+      rap(null, null, zR);
+      let zPrima = 0;
+      for (const z of livelli(prof, ap)) {
+        // dal centro, perpendicolare, all'inizio dell'elica; giu a elica fino al livello; un giro in piano
+        lav(cx + re, cy, zPrima + 0.2, fp);
+        let zz = zPrima + 0.2;
+        while (zz > z + 1e-9) { const zn = Math.max(zz - passoElica, z); arco(false, cx + re, cy, zn, cx, cy, fp); zz = zn; }
+        arco(false, cx + re, cy, null, cx, cy, c.f);
+        // cerchi verso fuori
+        let r = re;
+        while (r < rr - 1e-9) { r = Math.min(r + step, rr); lav(cx + r, cy, null, c.f); arco(false, cx + r, cy, null, cx, cy, c.f); }
+        lav(cx, cy, null, c.f);   // si torna al centro, perpendicolare
+        zPrima = z;
+      }
+      if (s > 0 && c.finitura) {
+        R.push('(FINITURA)');
+        lav(cx + rf, cy, null, c.f);
+        arco(false, cx + rf, cy, null, cx, cy, c.f);
+        lav(cx, cy, null, c.f);
+      }
+      rap(null, null, zR);
+      coda();
+      pezzo = { x0: cx - dt / 2 - 10, y0: cy - dt / 2 - 10, x1: cx + dt / 2 + 10, y1: cy + dt / 2 + 10, z0: -prof - 8, z1: 0 };
+      avvisi.push('Discesa a elica (3°) dal centro, cerchi verso fuori, uscita al centro.');
+    } else if (op === 'asola') {
+      const { x1 = 0, y1 = 0, x2, y2 = 0, w, prof, ap, d } = c;
+      if (!isFinite(x2) || !pos(w) || !pos(d)) return err('Punti dell\'asola, larghezza e fresa mancanti.');
+      if (!pos(prof) || !pos(ap)) return err('Profondita e passata mancanti.');
+      if (w < d - 1e-9) return err('L\'asola e piu stretta della fresa.');
+      const L = Math.hypot(x2 - x1, y2 - y1);
+      if (L < 1e-6) return err('I due centri dell\'asola coincidono: e un foro, usa la tasca circolare.');
+      const ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+      const off = (w - d) / 2;
+      const giri = [];
+      if (off > 1e-6) { const passo = d * 0.8; for (let o = Math.min(passo, off); ; o = Math.min(o + passo, off)) { giri.push(o); if (o >= off - 1e-9) break; } }
+      testa();
+      avvicina(x1, y1);
+      rap(null, null, zR);
+      let zPrima = 0;
+      const dz = L * Math.tan(3 * Math.PI / 180);
+      for (const z of livelli(prof, ap)) {
+        // rampa avanti e indietro sulla linea di mezzo
+        let zz = zPrima + 0.2, avanti = true;
+        lav(null, null, zz, fp);
+        while (zz > z + 1e-9) { zz = Math.max(zz - dz, z); lav(avanti ? x2 : x1, avanti ? y2 : y1, zz, fp); avanti = !avanti; }
+        lav(avanti ? x2 : x1, avanti ? y2 : y1, null, c.f);
+        if (!avanti) lav(x1, y1, null, c.f);
+        for (const o of giri) {
+          // giro antiorario (concorde dentro l'asola)
+          const nx = uy * o, ny = -ux * o;   // a destra della direzione 1 -> 2
+          lav(x1 + nx, y1 + ny, null, c.f);
+          lav(x2 + nx, y2 + ny, null, c.f);
+          arco(false, x2 - nx, y2 - ny, null, x2, y2, c.f);
+          lav(x1 - nx, y1 - ny, null, c.f);
+          arco(false, x1 + nx, y1 + ny, null, x1, y1, c.f);
+          lav(x1, y1, null, c.f);
+        }
+        zPrima = z;
+      }
+      rap(null, null, zR);
+      coda();
+      pezzo = { x0: Math.min(x1, x2) - w - 5, y0: Math.min(y1, y2) - w - 5, x1: Math.max(x1, x2) + w + 5, y1: Math.max(y1, y2) + w + 5, z0: -prof - 5, z1: 0 };
+      avvisi.push('Asola lunga ' + gc(L + w) + ' e larga ' + gc(w) + ': discesa a rampa sulla linea di mezzo' + (giri.length ? ', ' + giri.length + ' giri sul bordo.' : '.'));
+    } else if (op === 'filettoFresa') {
+      const { cx = 0, cy = 0, D, p, prof, d } = c;
+      const interno = c.tipoFil !== 'esterno';
+      if (!pos(D) || !pos(p) || !pos(prof) || !pos(d)) return err('Diametro, passo, lunghezza del filetto e fresa mancanti.');
+      const f = O.filetto(D, p);
+      const np = Math.max(1, Math.round(c.np || 1));
+      // raggio del centro fresa: all'esterno del profilo per l'interno, verso il pezzo per l'esterno
+      const rFin = interno ? D / 2 - d / 2 : D / 2 - f.hEsterno + d / 2;
+      const rIni = interno ? f.nocciolo / 2 - d / 2 + 0.05 : D / 2 + d / 2 + 0.05;
+      if (interno && d >= f.nocciolo - 0.2) return err('La fresa (D' + gc(d) + ') non entra nel preforo D' + gc(f.nocciolo) + '.');
+      if (interno && rFin <= 0) return err('Fresa troppo grande per il filetto.');
+      const giriElica = Math.ceil(prof / p) + 1;
+      testa();
+      if (interno) {
+        avvicina(cx, cy);
+        rap(null, null, zR);
+        for (let k = 1; k <= np; k++) {
+          const rc = rIni + (rFin - rIni) * k / np;
+          lav(null, null, -prof - p / 2, fp);
+          lav(cx + rc, cy, null, c.f);                          // entrata perpendicolare dal centro
+          for (let g = 1; g <= giriElica; g++) arco(false, cx + rc, cy, -prof - p / 2 + p * g, cx, cy, c.f);   // G3 in salita: destro, concorde
+          lav(cx, cy, null, c.f);                               // uscita al centro
+        }
+      } else {
+        const rFuori = rIni + 2;
+        avvicina(cx + rFuori, cy);
+        rap(null, null, zR);
+        for (let k = 1; k <= np; k++) {
+          const rc = rIni + (rFin - rIni) * k / np;
+          lav(null, null, p / 2, fp);
+          lav(cx + rc, cy, null, c.f);
+          for (let g = 1; g <= giriElica; g++) arco(true, cx + rc, cy, p / 2 - p * g, cx, cy, c.f);       // G2 in discesa: destro, concorde
+          lav(cx + rFuori, cy, null, c.f);
+          rap(null, null, zR);
+        }
+      }
+      rap(null, null, zR);
+      coda();
+      pezzo = { x0: cx - D, y0: cy - D, x1: cx + D, y1: cy + D, z0: -prof - 5, z1: 0, tasca: interno ? { x0: cx - f.nocciolo / 2, y0: cy - f.nocciolo / 2, x1: cx + f.nocciolo / 2, y1: cy + f.nocciolo / 2 } : null };
+      avvisi.push('Filetto M' + String(D).replace('.', ',') + 'x' + String(p).replace('.', ',') + (interno ? ' interno' : ' esterno') + ' destro, ' + np + ' passate radiali, ' + giriElica + ' giri d\'elica. Fresa a un profilo con passo ' + gc(p) + '; centro a raggio ' + gc(rFin) + ': correggi con il raggio nel correttore se serve.');
     } else {
       return err('Lavorazione sconosciuta.');
     }
@@ -217,8 +375,82 @@
     let righe = R;
     if (c.numerare) {
       let k = 0;
-      righe = R.map(l => (/^(%|O\d)/.test(l) ? l : 'N' + (k += 10) + ' ' + l));
+      righe = R.map(l => (/^(%|O\d|N\d)/.test(l) ? l : 'N' + (k += 10) + ' ' + l));
     }
+    return { righe, percorso: P, pezzo, avvisi };
+  }
+
+  // ----- piu lavorazioni nello stesso programma -----
+  // Ordine di officina (lo stesso di serie del programma parametrico): spianatura, centrini, punte a inserti, forature,
+  // lamature, fori a fresa, alesature, smusso d'imbocco e maschiatura, smussi, profili. Lo stesso utensile di seguito
+  // non fa il cambio; un ordine che non si puo lavorare non si accetta.
+  const ORDINE = { spianatura: 0, centrino: 1, puntaIns: 2, puntaMD: 3, lamatore: 4, tascaCircolare: 5, alesatore: 6, bareno: 6,
+    smussoMaschio: 7, maschio: 7.5, filettoFresa: 7.5, smussatore: 8, contorno: 9, profilo: 9, tasca: 9, asola: 9 };
+  const NOME_FASE = { spianatura: 'Spianatura', centrino: 'Centrinatura', puntaIns: 'Punta a inserti', puntaMD: 'Foratura', lamatore: 'Lamatura',
+    tascaCircolare: 'Tasca circolare', alesatore: 'Alesatura', bareno: 'Barenatura', smussoMaschio: 'Smusso d\'imbocco', maschio: 'Maschiatura',
+    filettoFresa: 'Filetto a fresa', smussatore: 'Smusso', contorno: 'Contornatura', profilo: 'Profilo', tasca: 'Tasca', asola: 'Asola' };
+  const PREFORO = ['puntaMD', 'puntaIns', 'tascaCircolare'];
+  const DOPO_PREFORO = ['maschio', 'alesatore', 'bareno', 'filettoFresa', 'smussoMaschio'];
+  /** Chiave dei punti di una fase (per sapere se due fasi lavorano gli stessi fori). */
+  const chiavePunti = f => {
+    const pts = f.op === 'fori' ? (f.c.punti || []) : (f.op === 'tascaCircolare' || f.op === 'filettoFresa') ? [[f.c.cx || 0, f.c.cy || 0]] : null;
+    return pts ? pts.map(p => p.map(v => Math.round(v * 100) / 100).join(',')).sort().join(';') : null;
+  };
+  /** Il tipo di una fase per l'ordine: l'utensile per i fori, la lavorazione per il resto. */
+  function tipoFase(f, fasi) {
+    if (f.op !== 'fori') return f.op;
+    const t = f.tipoUt || 'puntaMD';
+    if (t === 'smussatore') {
+      const k = chiavePunti(f);
+      if ((fasi || []).some(g => g !== f && (g.tipoUt === 'maschio' || g.op === 'filettoFresa') && chiavePunti(g) === k)) return 'smussoMaschio';
+    }
+    return t;
+  }
+  function ordinaFasi(fasi) {
+    return fasi.map((f, i) => ({ f, i, k: ORDINE[tipoFase(f, fasi)] !== undefined ? ORDINE[tipoFase(f, fasi)] : 9 }))
+      .sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.f);
+  }
+  /** Errori di un ordine che non si puo lavorare. */
+  function controllaFasi(fasi) {
+    const errori = [];
+    fasi.forEach((f, i) => {
+      const tipo = tipoFase(f, fasi);
+      if (!DOPO_PREFORO.includes(tipo)) return;
+      const k = chiavePunti(f);
+      const dopo = fasi.findIndex((g, j) => j > i && PREFORO.includes(tipoFase(g, fasi)) && chiavePunti(g) === k);
+      if (dopo >= 0) errori.push('Fase ' + (i + 1) + ' (' + NOME_FASE[tipo] + ' T' + f.c.t + ') viene prima del suo preforo (fase ' + (dopo + 1) + ').');
+    });
+    return errori;
+  }
+  /** Un programma solo con tutte le fasi: fasi = [{op, c, titolo, tipoUt}], comuni = {num, nome, numerare}. */
+  function gcodeSequenza(fasi, comuni) {
+    const err = e => ({ errore: e, righe: [], percorso: [], avvisi: [] });
+    if (!fasi.length) return err('La sequenza e vuota: aggiungi le lavorazioni.');
+    const errori = controllaFasi(fasi);
+    if (errori.length) return err(errori.join(' '));
+    const R = [], P = [], avvisi = [];
+    let pezzo = null, tPrima = null;
+    for (let i = 0; i < fasi.length; i++) {
+      const f = fasi[i];
+      const r = gcodeFresa(f.op, Object.assign({}, f.c, { numerare: false, num: comuni.num, nome: comuni.nome }));
+      if (r.errore) return err('Fase ' + (i + 1) + ' (' + (f.titolo || f.op) + '): ' + r.errore);
+      const iT = r.righe.findIndex(l => /^T\d+ M6$/.test(l));
+      const iFine = r.righe.lastIndexOf('M30');
+      if (!R.length) R.push(...r.righe.slice(0, iT), 'G54');
+      R.push('(FASE ' + (i + 1) + ': ' + String(f.titolo || NOME_FASE[tipoFase(f, fasi)] || f.op).toUpperCase().replace(/[()']/g, ' ') + ')');
+      r.righe.slice(iT, iFine).forEach(l => {
+        if (l === 'G54') return;
+        if (/^T\d+ M6$/.test(l) && Number(l.slice(1).split(' ')[0]) === tPrima) return;   // stesso utensile: niente cambio
+        R.push(l);
+      });
+      tPrima = Number(f.c.t);
+      P.push(...r.percorso);
+      r.avvisi.forEach(a => avvisi.push('Fase ' + (i + 1) + ': ' + a));
+      if (r.pezzo) pezzo = pezzo ? { x0: Math.min(pezzo.x0, r.pezzo.x0), y0: Math.min(pezzo.y0, r.pezzo.y0), x1: Math.max(pezzo.x1, r.pezzo.x1), y1: Math.max(pezzo.y1, r.pezzo.y1), z0: Math.min(pezzo.z0, r.pezzo.z0), z1: 0 } : Object.assign({}, r.pezzo, { tasca: null });
+    }
+    R.push('M30', '%');
+    let righe = R;
+    if (comuni.numerare) { let k = 0; righe = R.map(l => (/^(%|O\d|N\d)/.test(l) ? l : 'N' + (k += 10) + ' ' + l)); }
     return { righe, percorso: P, pezzo, avvisi };
   }
 
@@ -479,7 +711,7 @@
     return { errori, chiamata, sotto };
   }
 
-  const Prog = { gcodeFresa, schemaFori, MACRO_MODELLI, LETTERE_VAR, scriviMacro };
+  const Prog = { gcodeFresa, gcodeSequenza, ordinaFasi, controllaFasi, tipoFase, NOME_FASE, ORDINE_FASI: ORDINE, schemaFori, MACRO_MODELLI, LETTERE_VAR, scriviMacro };
   Object.assign(O, Prog);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

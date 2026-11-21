@@ -288,7 +288,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.6.0'
+    schermi: {}, param: {}, VERSIONE: '2.7.0'
   };
   window.App = App;
 
@@ -380,9 +380,20 @@
     titolo: 'Hich-Officina', preferibile: false,
     render(m) {
       m.appendChild(el('div', { class: 'eroe', html: SCENA + '<div class="marchio">' + MARCHIO + '<div><b>Hich-Officina</b><small>Calcoli e programmi CNC</small></div></div>' }));
+      const cerca = el('input', { id: 'f-cerca-home', type: 'search', placeholder: 'Cerca: M10, H7 25, 316, G83, T5...', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search' });
+      const risultati = el('div', { class: 'menu', hidden: true });
       const menu = el('div', { class: 'menu' });
       MENU.forEach(v => menu.appendChild(voceMenu(v)));
-      m.appendChild(menu);
+      m.append(el('div', { class: 'ctrl cerca-home' }, [el('span', { html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>' }), cerca]), risultati, menu);
+      cerca.addEventListener('input', () => {
+        const q = cerca.value.trim();
+        const L = App.cerca ? App.cerca(q) : [];
+        risultati.innerHTML = '';
+        risultati.hidden = q.length < 2; menu.hidden = q.length >= 2;
+        if (q.length < 2) return;
+        if (!L.length) risultati.appendChild(el('div', { class: 'vuoto', testo: 'Niente per "' + q + '". Prova M10, H7 25, 316, G83, T5 o il nome di un pezzo.' }));
+        L.forEach(r => risultati.appendChild(el('button', { class: 'voce', onclick: r.vai }, [el('span', { class: 't' }, [el('b', { testo: r.titolo }), el('small', { testo: r.sotto })]), el('span', { html: icona('avanti', 'freccia') })])));
+      });
     }
   };
 

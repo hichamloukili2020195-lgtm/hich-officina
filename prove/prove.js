@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('assert');
 const O = require('../programmi.js');   // carica anche calcoli.js
+require('../profilo.js');
 require('../iso.js');
 require('../post.js');
 let n = 0;
@@ -261,5 +262,108 @@ prova('post-processor: dialogo a testo', () => {
   assert.deepStrictEqual(rc.avvisi, []);
   assert.ok(O.postProcessor(O.gcodeTornio('sfacciatura', Object.assign({ dg: 40, s: 2, ap: 1 }, base)).righe, { linguaggio: 'dialogo', modo: 'tornio' }).errore);
   assert.ok(O.postProcessor(['G65 P9001 A1'], { linguaggio: 'cicli' }).errore);
+});
+prova('profilo: raccordi, smussi, archi', () => {
+  const g = O.costruisciProfilo([{ a: 0, b: 0 }, { a: 80, b: 0 }, { a: 80, b: 50, raccordo: 10 }, { a: 0, b: 50, smusso: 5 }], true);
+  assert.strictEqual(g.errore, null);
+  const arco = g.tratti.find(t => t.tipo === 'A');
+  vicino(arco.c.a, 70); vicino(arco.c.b, 40); vicino(arco.p.a, 80); vicino(arco.p.b, 40); vicino(arco.q.a, 70); vicino(arco.q.b, 50);
+  assert.strictEqual(arco.cw, false);   // antiorario: il giro 0,0 -> 80,0 -> 80,50 e antiorario
+  assert.ok(g.tratti.some(t => t.tipo === 'L' && Math.abs(t.p.a - 5) < 1e-9 && Math.abs(t.q.b - 45) < 1e-9));
+  assert.ok(O.costruisciProfilo([{ a: 0, b: 0 }, { a: 10, b: 0, raccordo: 20 }, { a: 10, b: 10 }], false).errore.includes('troppo grande'));
+  assert.ok(O.costruisciProfilo([{ a: 0, b: 0 }, { a: 10, b: 0, tratto: 'cw', r: 2 }], false).errore.includes('raggio'));
+  const c = O.centroArco({ a: 0, b: 0 }, { a: 10, b: 10 }, 10, false);
+  vicino(c.a, 0); vicino(c.b, 10);
+});
+prova('fresa: profilo con G41/G42', () => {
+  const b2 = { n: 3000, f: 600, t: 3, zSic: 50, zR: 2 };
+  const r = O.gcodeFresa('profilo', Object.assign({ punti: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 50, raccordo: 10 }, { x: 0, y: 50, smusso: 5 }], chiuso: true, lato: 'esterno', prof: 10, ap: 5, d: 10 }, b2));
+  assert.ok(!r.errore, r.errore);
+  assert.strictEqual(r.righe.filter(l => /G41 D3/.test(l)).length, 2);
+  assert.strictEqual(r.righe.filter(l => /^G1 G40/.test(l)).length, 2);
+  assert.ok(r.righe.includes('G2 X80. Y40. I0. J-10.'));   // esterno in senso orario: concorde
+  const s2 = O.eseguiISO(r.righe.join('\n'));
+  assert.strictEqual(s2.errore, null); vicino(s2.limiti.z.minLavoro, -10);
+  const t = O.gcodeFresa('profilo', Object.assign({ punti: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 50 }, { x: 0, y: 50 }], chiuso: true, lato: 'interno', prof: 5, ap: 5, d: 10 }, b2));
+  assert.ok(t.righe.some(l => /^G1 G41/.test(l)));
+  const a = O.gcodeFresa('profilo', Object.assign({ punti: [{ x: 0, y: 0 }, { x: 50, y: 0 }], chiuso: false, lato: 'destra', prof: 2, ap: 2, d: 10 }, b2));
+  assert.ok(a.righe.some(l => /G42 D3/.test(l)));
+  assert.ok(O.gcodeFresa('profilo', Object.assign({ punti: [{ x: 0, y: 0 }, { x: 50, y: 0 }], chiuso: false, lato: 'esterno', prof: 2, ap: 2, d: 10 }, b2)).errore);
+});
+prova('fresa: tasca circolare, asola, filetto a fresa', () => {
+  const b2 = { n: 3000, f: 600, t: 3, zSic: 50, zR: 2 };
+  const tc = O.gcodeFresa('tascaCircolare', Object.assign({ cx: 10, cy: 5, dt: 40, prof: 6, ap: 3, d: 10, sovra: .2, finitura: true }, b2));
+  const s1 = O.eseguiISO(tc.righe.join('\n'));
+  assert.strictEqual(s1.errore, null); assert.deepStrictEqual(s1.avvisi, []);
+  vicino(s1.limiti.x.maxLavoro, 25, 1e-6); vicino(s1.limiti.x.minLavoro, -5, 0.01); vicino(s1.limiti.z.minLavoro, -6);
+  // parte e finisce al centro (regola di officina)
+  const lav = s1.segmenti.filter(x => !x.rapido);
+  vicino(lav[lav.length - 1].x, 10); vicino(lav[lav.length - 1].y, 5);
+  assert.ok(O.gcodeFresa('tascaCircolare', Object.assign({ dt: 10, prof: 6, ap: 3, d: 10 }, b2)).errore);
+  const as = O.gcodeFresa('asola', Object.assign({ x1: 0, y1: 0, x2: 40, y2: 0, w: 14, prof: 6, ap: 3, d: 10 }, b2));
+  const s2 = O.eseguiISO(as.righe.join('\n'));
+  assert.strictEqual(s2.errore, null); vicino(s2.limiti.y.maxLavoro, 2, 0.05); vicino(s2.limiti.x.maxLavoro, 42, 0.05);
+  const fi = O.gcodeFresa('filettoFresa', Object.assign({ cx: 0, cy: 0, D: 20, p: 2.5, prof: 15, d: 12, np: 2 }, b2));
+  const s3 = O.eseguiISO(fi.righe.join('\n'));
+  assert.strictEqual(s3.errore, null); vicino(s3.limiti.x.maxLavoro, 4, 1e-6);
+  assert.ok(fi.righe.some(l => /^G3 .*Z-/.test(l)), 'interno destro: G3 in salita');
+  assert.ok(O.gcodeFresa('filettoFresa', Object.assign({ D: 10, p: 1.5, prof: 10, d: 10 }, b2)).errore.includes('non entra'));
+  const fe = O.gcodeFresa('filettoFresa', Object.assign({ D: 20, p: 2.5, prof: 15, d: 12, tipoFil: 'esterno' }, b2));
+  assert.ok(fe.righe.some(l => /^G2 /.test(l)), 'esterno destro: G2 in discesa');
+});
+prova('tornio: profilo, cicli fissi e simulazione dei cicli', () => {
+  const pts = [{ x: 0, z: 0 }, { x: 16, z: 0 }, { x: 20, z: -2 }, { x: 20, z: -20 }, { x: 30, z: -25, tratto: 'ccw', r: 5 }, { x: 30, z: -40 }, { x: 40, z: -40 }];
+  const p1 = O.gcodeTornio('profilo', Object.assign({}, base, { dg: 40, punti: pts, ap: 2, sx: .4, sz: .1, ff: .1, finitura: true, metodo: 'passate' }));
+  const p2 = O.gcodeTornio('profilo', Object.assign({}, base, { dg: 40, punti: pts, ap: 2, sx: .4, sz: .1, ff: .1, finitura: true, metodo: 'ciclo' }));
+  assert.ok(!p1.errore && !p2.errore);
+  assert.ok(p2.righe.includes('G71 U2. R0.5') && p2.righe.includes('G71 P100 Q200 U0.4 W0.1 F0.25') && p2.righe.includes('G70 P100 Q200'));
+  assert.ok(p2.righe.includes('G3 X30. Z-25. R5.'));
+  // nessuna passata di lavoro sotto il profilo (sgrossatura sopra il sovrametallo)
+  const prof = z => (z > -2 ? 16 + (-z) * 2 : z >= -20 ? 20 : z >= -25 ? 20 + 2 * (5 - Math.sqrt(Math.max(0, 25 - (z + 20) * (z + 20)))) : 30);
+  p1.percorso.filter(q => !q.rapido && q.z < -0.5 && q.z > -39.5).forEach(q => assert.ok(q.x >= prof(q.z) - 0.02, 'X' + q.x + ' Z' + q.z));
+  const s1 = O.eseguiISO(p1.righe.join('\n')), s2 = O.eseguiISO(p2.righe.join('\n'));
+  assert.strictEqual(s2.errore, null);
+  vicino(s2.limiti.x.minLavoro, 0); vicino(s2.limiti.z.minLavoro, -40);
+  assert.ok(s2.segmenti.filter(q => !q.rapido).length > 30, 'il G71 si simula');
+  assert.ok(s1.segmenti.length > 0);
+  const g76 = O.gcodeTornio('filetto', Object.assign({}, base, { dg: 20, d: 20, p: 2.5, l: 30, n: 6, giri: 600, metodo: 'ciclo' }));
+  assert.ok(g76.righe.includes('G76 P010060 Q50 R0.02') && g76.righe.includes('G76 X16.933 Z-30. P1533 Q626 F2.5'));
+  const s3 = O.eseguiISO(g76.righe.join('\n')); vicino(s3.limiti.x.minLavoro, 16.933, 1e-3);
+  const g74 = O.gcodeTornio('foratura', Object.assign({}, base, { dg: 50, dpunta: 20, prof: 40, q: 10, giri: 800, metodo: 'ciclo' }));
+  vicino(O.eseguiISO(g74.righe.join('\n')).limiti.z.minLavoro, -40);
+  const g75 = O.gcodeTornio('gola', Object.assign({}, base, { dg: 40, dfondo: 34, zg: -20, b: 8, w: 3, metodo: 'ciclo' }));
+  const s5 = O.eseguiISO(g75.righe.join('\n')); vicino(s5.limiti.x.minLavoro, 34); vicino(s5.limiti.z.minLavoro, -25);
+  const con = O.gcodeTornio('filetto', Object.assign({}, base, { dg: 22, d: 20, d2: 22, p: 2, l: 30, n: 4, giri: 600 }));
+  assert.ok(con.righe.some(l => /^G32 X\d.* Z-30\. F2\.$/.test(l)), 'conico: G32 con X e Z');
+  const tr = O.gcodeTornio('filetto', Object.assign({}, base, { dg: 30, d: 30, p: 6, l: 40, n: 12, giri: 300, tipoFil: 'trapezio' }));
+  assert.ok(tr.avvisi.join().includes('3.5'));
+  const tro = O.gcodeTornio('troncatura', Object.assign({}, base, { dg: 40, zt: -30, w: 3, q: 3 }));
+  assert.ok(!tro.errore); assert.ok(tro.righe.includes('G1 X-1. F0.25'));
+  const sg = O.gcodeTornio('sgrossatura', Object.assign({}, base, { dg: 40, df: 30, l: 50, ap: 2, sx: .4, sz: .1, finitura: true, smusso: 1, metodo: 'ciclo' }));
+  assert.ok(sg.righe.includes('N100 G0 G42 X28.'));
+});
+prova('sequenza: ordine di officina e controlli', () => {
+  const b2 = { zSic: 50, zR: 2 }, pts = O.schemaFori({ tipo: 'cerchio', dc: 60, n: 4 });
+  const F = [
+    { op: 'fori', tipoUt: 'maschio', c: Object.assign({}, b2, { t: 6, n: 400, f: 500, punti: pts, prof: 15, ciclo: 'G84' }) },
+    { op: 'contorno', c: Object.assign({}, b2, { t: 1, n: 3000, f: 600, lx: 100, ly: 80, prof: 10, ap: 5, d: 10 }) },
+    { op: 'fori', tipoUt: 'puntaMD', c: Object.assign({}, b2, { t: 3, n: 2000, f: 300, punti: pts, prof: 20, ciclo: 'G83', q: 5 }) },
+    { op: 'spianatura', c: Object.assign({}, b2, { t: 1, n: 3000, f: 800, lx: 100, ly: 80, prof: 1, ap: 1, d: 50 }) },
+    { op: 'fori', tipoUt: 'centrino', c: Object.assign({}, b2, { t: 2, n: 2500, f: 200, punti: pts, prof: 2, ciclo: 'G81' }) },
+    { op: 'fori', tipoUt: 'smussatore', c: Object.assign({}, b2, { t: 5, n: 1500, f: 150, punti: pts, prof: 4.4, ciclo: 'G82' }) }];
+  assert.ok(O.gcodeSequenza(F, { num: 7, nome: 'x' }).errore.includes('prima del suo preforo'));
+  const ord = O.ordinaFasi(F);
+  assert.deepStrictEqual(ord.map(f => O.tipoFase(f, ord)), ['spianatura', 'centrino', 'puntaMD', 'smussoMaschio', 'maschio', 'contorno']);
+  const r = O.gcodeSequenza(ord, { num: 7, nome: 'flangia' });
+  assert.ok(!r.errore);
+  assert.strictEqual(r.righe.filter(l => /^T\d+ M6$/.test(l)).length, 6);
+  assert.strictEqual(r.righe.filter(l => l === 'M30').length, 1);
+  assert.strictEqual(r.righe.filter(l => l === 'G54').length, 1);
+  const s = O.eseguiISO(r.righe.join('\n'));
+  assert.strictEqual(s.errore, null); assert.deepStrictEqual(s.utensili.map(u => u.t), [1, 2, 3, 5, 6]);
+  // stesso utensile di seguito: niente cambio
+  const due = [ord[0], Object.assign({}, ord[5], { c: Object.assign({}, ord[5].c, { t: 1 }) })];
+  assert.strictEqual(O.gcodeSequenza(due, { num: 1 }).righe.filter(l => /^T\d+ M6$/.test(l)).length, 1);
+  assert.ok(O.gcodeSequenza([], {}).errore);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

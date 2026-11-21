@@ -284,6 +284,118 @@
       return out;
     }
 
+    // ----- cicli fissi del tornio (forma a due blocchi: il primo con U/R o P/Q/R, il secondo con i dati) -----
+    const cicli = {};
+    let g70 = null;   // {fine: riga di Q, ritorno}
+    function profiloPQ(nP, nQ, riga) {
+      const kP = etichetta(nP, riga), kQ = etichetta(nQ, riga);
+      if (kP < 0 || kQ < 0 || kQ < kP) return null;
+      const pts = [{ a: st.z, b: st.x / 2 }];
+      let x = st.x, z = st.z, g = 0;
+      for (let k = kP; k <= kQ; k++) {
+        const t = pulisci(P.righe[k]).testo;
+        if (!t) continue;
+        const w = parole(t, k), sc = scala();
+        w.G.forEach(v => { const gg = Math.round(v); if ([0, 1, 2, 3].includes(gg)) g = gg; });
+        let xn = x, zn = z;
+        if (w.X !== undefined) xn = w.X * sc; if (w.Z !== undefined) zn = w.Z * sc;
+        if (w.U !== undefined) xn = x + w.U * sc; if (w.W !== undefined) zn = z + w.W * sc;
+        if (xn === x && zn === z) continue;
+        if ((g === 2 || g === 3) && w.R !== undefined && O.centroArco) {
+          const p0 = { a: z, b: x / 2 }, p1 = { a: zn, b: xn / 2 };
+          const c = O.centroArco(p0, p1, w.R * sc, g === 2);
+          if (c) {
+            const a0 = Math.atan2(p0.b - c.b, p0.a - c.a), a1 = Math.atan2(p1.b - c.b, p1.a - c.a), rr = Math.hypot(p0.a - c.a, p0.b - c.b);
+            let d = a1 - a0; if (g === 2) { while (d > 1e-9) d -= 2 * Math.PI; } else { while (d < -1e-9) d += 2 * Math.PI; }
+            const n = Math.max(4, Math.ceil(Math.abs(d) * rr / 0.3));
+            for (let i = 1; i < n; i++) { const an = a0 + d * i / n; pts.push({ a: c.a + rr * Math.cos(an), b: c.b + rr * Math.sin(an) }); }
+          }
+        }
+        pts.push({ a: zn, b: xn / 2 });
+        x = xn; z = zn;
+      }
+      return { pts, kQ };
+    }
+    function cicloTornio(gg, w, riga) {
+      const sc = scala();
+      if (gg === 70) {
+        if (w.P === undefined || w.Q === undefined) return false;
+        const kP = etichetta(Math.round(w.P), riga), kQ = etichetta(Math.round(w.Q), riga);
+        if (kP < 0 || kQ < 0) return false;
+        g70 = { fine: kQ, ritorno: pc, x: st.x, z: st.z };
+        pc = kP;
+        return true;
+      }
+      const datiCiclo = gg === 71 ? (w.P !== undefined && w.Q !== undefined) : gg === 74 ? w.Z !== undefined : (w.X !== undefined || w.Z !== undefined);
+      if (!datiCiclo) {
+        // primo blocco: i dati del ciclo
+        cicli[gg] = Object.assign({}, w);
+        return true;
+      }
+      const x0 = st.x, z0 = st.z;
+      if (gg === 71) {
+        const prima = cicli[71] || {};
+        const ap = (prima.U !== undefined ? prima.U : 1) * sc;
+        const pr = profiloPQ(Math.round(w.P), Math.round(w.Q), riga);
+        if (!pr || !O.sgrossaTornio) return false;
+        const zLim = pr.pts.length > 1 && Math.abs(pr.pts[1].b - pr.pts[0].b) < 1e-9 ? pr.pts[1].a : pr.pts[0].a;
+        const sg = O.sgrossaTornio(pr.pts.slice(1), x0, ap, (w.U || 0) * sc, (w.W || 0) * sc, z0, zLim + (w.W || 0) * sc);
+        if (w.F !== undefined) st.f = w.F;
+        sg.passate.forEach(pa => {
+          muovi(pa.x, st.y, z0, true, riga);
+          muovi(pa.x, st.y, pa.z1, false, riga, true);
+          muovi(pa.x + 1, st.y, pa.z1 + 0.5, false, riga, true);
+          muovi(pa.x + 1, st.y, z0, true, riga);
+        });
+        // passata sul profilo con il sovrametallo
+        if (sg.passate.length) {
+          const sx = (w.U || 0) * sc, sz = (w.W || 0) * sc;
+          pr.pts.slice(1).forEach((q, i) => muovi(2 * q.b + sx, st.y, Math.min(q.a + sz, z0), i === 0, riga, i > 0));
+        }
+        muovi(x0, st.y, st.z, true, riga);
+        muovi(x0, st.y, z0, true, riga);
+        if (!sg.monotono) avvisa('profilo del G71 con gole: la simulazione non le scava', riga);
+        pc = pr.kQ + 1;
+        return true;
+      }
+      if (gg === 74) {
+        const zf = w.Z * sc, q = (w.Q || 0) / 1000 * sc || Math.abs(zf - z0);
+        if (w.F !== undefined) st.f = w.F;
+        let z = z0, k = 0;
+        while (z > zf + 1e-9 && k++ < 2000) { const zn = Math.max(z - q, zf); muovi(st.x, st.y, zn, false, riga, true); muovi(st.x, st.y, zn + 0.5, true, riga); z = zn; }
+        muovi(st.x, st.y, z0, true, riga);
+        return true;
+      }
+      if (gg === 75) {
+        const xf = w.X * sc, zf = w.Z !== undefined ? w.Z * sc : z0, dq = (w.Q || 0) / 1000 * sc;
+        if (w.F !== undefined) st.f = w.F;
+        const zz = [];
+        if (dq > 0) { for (let z = z0; z > zf + 1e-9; z -= dq) zz.push(z); }
+        zz.push(zf);
+        zz.forEach(z => { muovi(x0, st.y, z, true, riga); muovi(xf, st.y, z, false, riga, true); muovi(x0, st.y, z, true, riga); });
+        muovi(x0, st.y, z0, true, riga);
+        return true;
+      }
+      if (gg === 76) {
+        const prima = cicli[76] || {};
+        const h = (w.P || 0) / 1000 * sc, d1 = (w.Q || 0) / 1000 * sc, xf = w.X * sc, zf = w.Z * sc, i = (w.R || 0) * sc * 2;
+        if (!(h > 0) || !(d1 > 0)) return false;
+        const fin = prima.P !== undefined ? Math.floor(Math.round(prima.P) / 10000) : 1;
+        if (w.F !== undefined) st.f = w.F;
+        const xs = xf + 2 * h + i;    // diametro della cresta all'inizio
+        const prof = [];
+        for (let k = 1; prof.length < 500; k++) { const p = Math.min(d1 * Math.sqrt(k), h); prof.push(p); if (p >= h - 1e-9) break; }
+        for (let k = 0; k < fin; k++) prof.push(h);
+        prof.forEach(p => {
+          muovi(xs - 2 * p, st.y, z0, true, riga);
+          muovi(xf + 2 * h - 2 * p, st.y, zf, false, riga, true);
+          muovi(x0, st.y, zf, true, riga);
+          muovi(x0, st.y, z0, true, riga);
+        });
+        return true;
+      }
+      return false;
+    }
     const passiMax = opz.maxPassi || 200000;
     let pc = 0, passi = 0;
     // si parte dalla prima riga dopo l'intestazione del primo programma
@@ -300,6 +412,7 @@
     try {
       while (pc < P.righe.length && !st.finito) {
         if (++passi > passiMax) { avvisa('troppi blocchi eseguiti: forse un ciclo infinito. Mi fermo.'); break; }
+        if (g70 && pc === g70.fine + 1) { pc = g70.ritorno; g70 = null; }   // finitura G70 finita: si torna dopo il G70
         const riga = pc;
         const raw = P.righe[pc];
         pc++;
@@ -389,7 +502,8 @@
             st.ciclo = gg; st.zIniz = st.z;
             if (gg === 76 || gg === 87 || gg === 88) avvisa('ciclo G' + gg + ' simulato come foratura semplice', riga);
           }
-          else if (tornio && [70, 71, 72, 73, 74, 75, 76, 90, 92, 94].includes(gg)) { avvisa('ciclo fisso del tornio G' + gg + ': non simulato, il percorso manca', riga); senzaAssi = true; }
+          else if (tornio && [70, 71, 74, 75, 76].includes(gg)) { if (!cicloTornio(gg, w, riga)) avvisa('ciclo G' + gg + ' scritto in un modo che non simulo: il percorso manca', riga); senzaAssi = true; numG = 'ciclo'; }
+          else if (tornio && [72, 73, 90, 92, 94].includes(gg)) { avvisa('ciclo fisso del tornio G' + gg + ': non simulato, il percorso manca', riga); senzaAssi = true; }
           else if (gg === 65) numG = 65;
           else if (gg === 28 || gg === 30 || gg === 53) { numG = gg; }
           else if (gg === 31) { st.moto = 31; mossa = 31; }

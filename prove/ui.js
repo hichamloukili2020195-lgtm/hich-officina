@@ -300,6 +300,59 @@ const server = http.createServer((q, r) => {
   ok(!(await pg.$('#schermo .errore')), 'simulazione di un programma tradotto');
   await vai('impostazioni'); await pg.selectOption('#f-postFresa', 'iso');
 
+  // ===== 2.7.0 =====
+  // profilo libero in fresa: editor dei punti
+  await vai('programma'); await pg.click('.schede button[data-id="fresa"]');
+  await pg.selectOption('#f-op', 'profilo'); await pg.waitForTimeout(60);
+  ok((await pg.$$eval('.punto-riga', x => x.length)) === 8, 'editor del profilo: 4 punti');
+  ok(!(await pg.$('#schermo .errore')), 'profilo fresa con errore: ' + ((await pg.$('#schermo .errore')) ? await pg.textContent('#schermo .errore') : ''));
+  await pg.click('text=Aggiungi punto');
+  ok((await pg.$$eval('.punto-riga', x => x.length)) === 10, 'aggiungi punto');
+  await pg.click('[aria-label="Togli il punto 5"]');
+  await foto('17-profilo-fresa');
+  await pg.click('text=Aggiungi alla sequenza'); await pg.waitForTimeout(40);
+  // tornio: profilo a ciclo fisso
+  await pg.click('.schede button[data-id="tornio"]');
+  await pg.selectOption('#f-op', 'profilo'); await pg.waitForTimeout(60);
+  await pg.selectOption('#f-metodo', 'ciclo'); await pg.waitForTimeout(40);
+  await foto('18-profilo-tornio');
+  await pg.click('text=Genera programma ISO'); await pg.waitForTimeout(80);
+  ok((await pg.textContent('.listato')).includes('G71 P100 Q200'), 'profilo tornio con G71');
+  await pg.click('text=Simula'); await pg.waitForTimeout(200);
+  ok((await pg.$eval('#f-passo', e => Number(e.max))) > 30, 'simulazione del G71');
+  // foro completo M10 e sequenza
+  await vai('programma'); await pg.click('.schede button[data-id="fori"]');
+  await pg.selectOption('#f-tipoUt', 'maschio'); await pg.fill('#f-d', '10'); await pg.fill('#f-passo', '1,5');
+  await pg.click('text=Foro completo'); await pg.waitForTimeout(40);
+  await pg.click('.schede button[data-id="seq"]'); await pg.waitForTimeout(60);
+  ok((await pg.$$eval('.elem.fase', x => x.length)) === 5, 'sequenza: profilo + 4 fasi del foro');
+  await pg.click('text=Ordina come in officina'); await pg.waitForTimeout(40);
+  const ordine = await pg.$$eval('.elem.fase b', x => x.map(e => e.textContent));
+  ok(/^Centrino/.test(ordine[0]) && /^Punta/.test(ordine[1]) && /^Smusso/.test(ordine[2]) && /^Maschio/.test(ordine[3]) && /^Profilo/.test(ordine[4]), 'ordine di officina: ' + ordine.join(' | '));
+  ok((await pg.textContent('.elem.fase:nth-child(2) b')).includes('8,5'), 'preforo del M10');
+  await foto('19-sequenza');
+  // maschio prima della punta: non si accetta
+  await pg.click('.elem.fase:nth-child(4) [aria-label="Su"]'); await pg.click('.elem.fase:nth-child(3) [aria-label="Su"]');
+  ok((await pg.textContent('#schermo .errore')).includes('prima del suo preforo'), 'ordine impossibile accettato');
+  await pg.click('text=Ordina come in officina'); await pg.waitForTimeout(40);
+  await pg.click('text=Genera programma ISO'); await pg.waitForTimeout(80);
+  const seq = await pg.textContent('.listato');
+  ok(seq.includes('(FASE 5') && seq.includes('G84') && seq.includes('G41'), 'programma della sequenza');
+  // ricerca dalla home
+  await vai('home');
+  const cercaH = async (q, atteso) => { await pg.fill('#f-cerca-home', q); await pg.waitForTimeout(40); const t = await pg.textContent('#schermo'); ok(t.includes(atteso), 'ricerca "' + q + '": manca "' + atteso + '"'); };
+  await cercaH('M10', 'Preforo 8,5');
+  await cercaH('h7 25', '24,979');
+  await cercaH('H7 25', '25,021');
+  await cercaH('acciaio off', 'Acciaio officina');   // a questo punto della prova ci sono i materiali importati
+  await cercaH('G83', 'beccate');
+  await cercaH('flangia', 'Flangia prova');
+  await foto('20-ricerca');
+  await pg.fill('#f-cerca-home', 'M10'); await pg.waitForTimeout(40);
+  await pg.click('text=M10 x 1,5'); await pg.waitForTimeout(80);
+  ok((await pg.inputValue('#f-d')) === '10' && (await pg.inputValue('#f-p')) === '1.5', 'ricerca M10 apre la maschiatura');
+  await largo('fine 2.7.0');
+
   // impostazioni: tema chiaro
   await vai('impostazioni');
   await pg.selectOption('#f-tema', 'chiaro');
