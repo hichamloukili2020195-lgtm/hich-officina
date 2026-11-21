@@ -1,16 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1f2a36"/>
+  <rect width="512" height="512" rx="96" fill="#0b1220"/>
   <g transform="translate(256 256)">
-    <circle r="150" fill="none" stroke="#f0913a" stroke-width="34"/>
-    <g fill="#f0913a">
-      <rect x="-22" y="-205" width="44" height="70" rx="8"/>
-      <rect x="-22" y="-205" width="44" height="70" rx="8" transform="rotate(60)"/>
-      <rect x="-22" y="-205" width="44" height="70" rx="8" transform="rotate(120)"/>
-      <rect x="-22" y="-205" width="44" height="70" rx="8" transform="rotate(180)"/>
-      <rect x="-22" y="-205" width="44" height="70" rx="8" transform="rotate(240)"/>
-      <rect x="-22" y="-205" width="44" height="70" rx="8" transform="rotate(300)"/>
+    <g fill="#1f7aff">
+      <rect x="-40" y="-218" width="80" height="80" rx="14"/>
+      <rect x="-40" y="-218" width="80" height="80" rx="14" transform="rotate(45)"/>
+      <rect x="-40" y="-218" width="80" height="80" rx="14" transform="rotate(90)"/>
+      <rect x="-40" y="-218" width="80" height="80" rx="14" transform="rotate(135)"/>
+      <rect x="-40" y="-218" width="80" height="80" rx="14" transform="rotate(180)"/>
+      <rect x="-40" y="-218" width="80" height="80" rx="14" transform="rotate(225)"/>
+      <rect x="-40" y="-218" width="80" height="80" rx="14" transform="rotate(270)"/>
+      <rect x="-40" y="-218" width="80" height="80" rx="14" transform="rotate(315)"/>
     </g>
-    <circle r="58" fill="#e6ebf0"/>
-    <circle r="24" fill="#1f2a36"/>
+    <circle r="160" fill="#1f7aff"/>
+    <circle r="112" fill="#0b1220"/>
+    <path d="M-48 48L48 -48" stroke="#fff" stroke-width="30" stroke-linecap="round"/>
+    <circle r="28" fill="#fff"/>
   </g>
 </svg>

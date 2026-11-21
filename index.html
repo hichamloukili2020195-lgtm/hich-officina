@@ -4,140 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hich-Officina</title>
-<meta name="description" content="Calcolatori di officina, G-code per tornio e tabelle per fresatori e tornitori.">
-<meta name="theme-color" content="#1f2a36">
+<meta name="description" content="Calcoli di taglio, programmi ISO per fresa e tornio, macro e tabelle per l'officina meccanica.">
+<meta name="theme-color" content="#0b1220">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone/icona.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icone/icona-192.png">
-<style>
-:root{
-  --sfondo:#eef1f4; --carta:#ffffff; --testo:#17202a; --tenue:#5b6875; --bordo:#d3d9df;
-  --accento:#d9741c; --accento-testo:#ffffff; --barra:#1f2a36; --barra-testo:#e8edf2;
-  --ok:#1d7a46; --avviso:#a35a00; --campo:#f7f9fa; --codice:#f2f4f6;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --sfondo:#11161c; --carta:#1a222b; --testo:#e6ebf0; --tenue:#9aa7b4; --bordo:#2d3945;
-    --accento:#f0913a; --accento-testo:#1a1206; --barra:#0b0f13; --barra-testo:#e6ebf0;
-    --ok:#5cc48a; --avviso:#f0b35a; --campo:#121920; --codice:#0f151b;
-  }
-}
-:root[data-theme="dark"]{
-  --sfondo:#11161c; --carta:#1a222b; --testo:#e6ebf0; --tenue:#9aa7b4; --bordo:#2d3945;
-  --accento:#f0913a; --accento-testo:#1a1206; --barra:#0b0f13; --barra-testo:#e6ebf0;
-  --ok:#5cc48a; --avviso:#f0b35a; --campo:#121920; --codice:#0f151b;
-}
-*{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{background:var(--sfondo);color:var(--testo);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  padding-bottom:calc(72px + env(safe-area-inset-bottom));-webkit-tap-highlight-color:transparent}
-header{background:var(--barra);color:var(--barra-testo);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
-  position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px}
-header img{width:28px;height:28px}
-header h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.2px}
-header small{color:#9fb0c0;font-size:12px;margin-left:auto}
-main{max-width:760px;min-width:0;margin:0 auto;padding:12px 16px}
-.pagina{display:none}.pagina.attiva{display:block}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{flex:0 0 auto;border:1px solid var(--bordo);background:var(--carta);color:var(--testo);border-radius:999px;
-  padding:8px 14px;font-size:14px;cursor:pointer}
-.chip.attiva{background:var(--accento);border-color:var(--accento);color:var(--accento-testo);font-weight:600}
-.carta{background:var(--carta);border:1px solid var(--bordo);border-radius:12px;padding:14px;margin-bottom:12px}
-.carta h2{font-size:16px;margin:0 0 10px}
-.carta h3{font-size:14px;margin:14px 0 8px;color:var(--tenue);text-transform:uppercase;letter-spacing:.5px}
-.griglia{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
-@media (max-width:360px){.griglia{grid-template-columns:minmax(0,1fr)}}
-label.campo{min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--tenue)}
-label.campo.largo{grid-column:1/-1}
-.ingresso{display:flex;align-items:center;background:var(--campo);border:1px solid var(--bordo);border-radius:8px}
-.ingresso:focus-within{border-color:var(--accento)}
-.ingresso input,.ingresso select{flex:1;min-width:0;width:100%;border:0;background:transparent;color:var(--testo);font-size:17px;padding:10px;outline:none}
-.ingresso select{appearance:auto}
-.ingresso span{padding-right:10px;font-size:13px;color:var(--tenue);white-space:nowrap}
-.risultati{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:12px}
-.ris{background:var(--campo);border-radius:8px;padding:10px;border-left:4px solid var(--accento)}
-.ris b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
-.ris small{color:var(--tenue);font-size:12px}
-.nota{font-size:13px;color:var(--tenue);margin:10px 0 0}
-.avviso{color:var(--avviso)}
-.errore{color:#d33;font-weight:600}
-table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bordo)}
-th{color:var(--tenue);font-weight:600;font-size:12px;text-transform:uppercase}
-.scorri{overflow-x:auto}
-pre.codice{background:var(--codice);border:1px solid var(--bordo);border-radius:8px;padding:10px;max-height:340px;
-  overflow:auto;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;margin:10px 0 0;white-space:pre}
-.pulsanti{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-button.pul{border:0;border-radius:8px;padding:11px 16px;font-size:15px;font-weight:600;cursor:pointer;
-  background:var(--accento);color:var(--accento-testo)}
-button.pul.sec{background:transparent;color:var(--testo);border:1px solid var(--bordo)}
-canvas{width:100%;height:220px;display:block;background:var(--campo);border:1px solid var(--bordo);border-radius:8px;margin-top:10px}
-.spunta{display:flex;align-items:center;gap:8px;font-size:14px;grid-column:1/-1}
-.spunta input{width:20px;height:20px}
-nav{position:fixed;left:0;right:0;bottom:0;background:var(--barra);display:flex;
-  padding-bottom:env(safe-area-inset-bottom);z-index:6}
-nav button{flex:1;background:none;border:0;color:#9fb0c0;padding:10px 0 12px;font-size:12px;display:flex;
-  flex-direction:column;align-items:center;gap:3px;cursor:pointer}
-nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8}
-nav button.attiva{color:var(--accento)}
-.mat{border-bottom:1px solid var(--bordo);padding:10px 0}
-.mat:last-child{border-bottom:0}
-.mat b{font-size:15px}.mat small{color:var(--tenue)}
-.mat .valori{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;margin-top:4px;font-variant-numeric:tabular-nums}
-.carta summary{font-weight:600;cursor:pointer;padding:2px 0}
-.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--barra);color:var(--barra-testo);
-  padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
-.toast.vedi{opacity:1}
-</style>
+<link rel="stylesheet" href="stile.css">
 </head>
 <body>
-<header>
-  <img src="icone/icona.svg" alt="">
-  <h1>Hich-Officina</h1>
-  <small id="stato-rete"></small>
+<header id="testata">
+  <button id="b-indietro" class="icona-pul" aria-label="Indietro" hidden></button>
+  <h1 id="titolo">Hich-Officina</h1>
+  <div id="azioni"></div>
 </header>
-
-<main>
-  <section class="pagina attiva" id="p-calcoli">
-    <div class="chips" id="chips-calcoli"></div>
-    <div id="calcolatore"></div>
-  </section>
-
-  <section class="pagina" id="p-tornio">
-    <div class="chips" id="chips-tornio"></div>
-    <div class="carta">
-      <h2 id="tornio-titolo">Programma</h2>
-      <div class="griglia" id="tornio-campi"></div>
-      <div class="pulsanti">
-        <button class="pul" id="b-copia">Copia</button>
-        <button class="pul sec" id="b-salva">Salva file .nc</button>
-      </div>
-      <p class="nota" id="tornio-avvisi"></p>
-      <canvas id="anteprima" aria-label="Anteprima del percorso"></canvas>
-      <p class="nota">Arancione: lavoro. Tratteggio: rapido. Grigio: grezzo (vista del mezzo pezzo, X in alto).</p>
-      <pre class="codice" id="codice"></pre>
-    </div>
-    <details class="carta" id="comuni-box">
-      <summary>Impostazioni comuni (utensile, Vc, avanzamento, giri, codici)</summary>
-      <div class="griglia" id="tornio-comuni" style="margin-top:12px"></div>
-    </details>
-  </section>
-
-  <section class="pagina" id="p-tabelle">
-    <div class="chips" id="chips-tabelle"></div>
-    <div id="tabella"></div>
-  </section>
-</main>
-
-<nav>
-  <button data-p="calcoli" class="attiva"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M12 11h2M16 11h0M8 15h2M12 15h2M8 18h2M12 18h2M16 15v3"/></svg>Calcoli</button>
-  <button data-p="tornio"><svg viewBox="0 0 24 24"><path d="M3 9h5v6H3zM8 10h7v4H8zM15 11h4v2h-4zM19 12h2"/></svg>G-code tornio</button>
-  <button data-p="tabelle"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/></svg>Tabelle</button>
+<main id="schermo"></main>
+<nav id="barra">
+  <button data-vai="home"><span data-ic="home"></span>Home</button>
+  <button data-vai="preferiti"><span data-ic="stella"></span>Preferiti</button>
+  <button data-vai="impostazioni"><span data-ic="ingranaggio"></span>Impostazioni</button>
 </nav>
-<div class="toast" id="toast"></div>
-
+<div class="toast" id="toast" role="status"></div>
 <script src="calcoli.js"></script>
+<script src="programmi.js"></script>
 <script src="app.js"></script>
+<script src="schermi_calcoli.js"></script>
+<script src="schermi_programma.js"></script>
+<script src="schermi_macro.js"></script>
+<script src="schermi_altro.js"></script>
 </body>
 </html>

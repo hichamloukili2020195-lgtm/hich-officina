@@ -1,14 +1,14 @@
 {
   "name": "Hich-Officina",
   "short_name": "Officina",
-  "description": "Calcolatori di officina, G-code per tornio e tabelle per fresatori e tornitori.",
+  "description": "Calcoli di taglio, programmi ISO per fresa e tornio, macro e tabelle per l'officina meccanica.",
   "lang": "it",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#11161c",
-  "theme_color": "#1f2a36",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
   "icons": [
     { "src": "icone/icona-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icone/icona-512.png", "sizes": "512x512", "type": "image/png" },

@@ -12,26 +12,32 @@
   }
 
   // ----- materiali -----
-  // vc fresa (m/min, metallo duro), fz (mm/dente per D10), dvc/dfn punta HSS-E (m/min, mm/giro per D10),
-  // tvc maschio (m/min), lvc/lf tornitura con inserto (m/min, mm/giro in sgrossatura).
+  // Materiali del programma parametrico (stessi nomi e stessi valori). In officina solo metallo duro: le Vc si usano cosi
+  // come sono. vc/fz fresa sgrossatura (fz per D10), ap in volte D, ae in % di D, dvc/dfn punta in metallo duro (fn per D10),
+  // tvc maschio, rvc/rfn alesatore, bvc/bfn bareno. Campi facoltativi: ivc/ifn punta a inserti, fvc/ffz fresa di finitura
+  // (vuoti = quelli della punta in metallo duro / della fresa di sgrossatura).
+  // Aggiunti qui: lvc/lf tornitura con inserto (m/min, mm/giro in sgrossatura) e rho densita (kg/dm3), INDICATIVI.
   const MATERIALI = [
-    { n: 'Alluminio', g: 'Alluminio e leghe leggere', vc: 400, fz: .06, dvc: 90, dfn: .20, tvc: 25, lvc: 500, lf: .25, note: 'Lubrificazione abbondante o nebbia; utensili lucidati.' },
-    { n: 'Ottone', g: 'Rame e leghe', vc: 300, fz: .06, dvc: 70, dfn: .18, tvc: 25, lvc: 300, lf: .20, note: 'A secco o con poca emulsione; punte con angolo di spoglia ridotto.' },
-    { n: 'Bronzo', g: 'Rame e leghe', vc: 180, fz: .05, dvc: 40, dfn: .15, tvc: 15, lvc: 200, lf: .20, note: 'Bronzo all\'alluminio piu duro: scendi del 30%.' },
-    { n: 'Ferro (Fe360)', g: 'Acciai al carbonio', vc: 200, fz: .06, dvc: 35, dfn: .18, tvc: 14, lvc: 250, lf: .30, note: 'Acciaio dolce: il truciolo si incolla, usa emulsione.' },
-    { n: 'C40', g: 'Acciai al carbonio', vc: 170, fz: .05, dvc: 30, dfn: .15, tvc: 12, lvc: 220, lf: .25, note: 'Acciaio da bonifica non bonificato (circa 200 HB).' },
-    { n: 'Bonificato (30-40 HRC)', g: 'Acciai al carbonio', vc: 110, fz: .04, dvc: 20, dfn: .12, tvc: 8, lvc: 160, lf: .20, note: 'Meno profondita, emulsione abbondante.' },
-    { n: 'Temprato (45-55 HRC)', g: 'Acciai temprati', vc: 60, fz: .02, dvc: 8, dfn: .05, tvc: 3, lvc: 80, lf: .10, note: 'Solo metallo duro rivestito, passate leggere. Foratura e maschiatura sconsigliate.' },
-    { n: 'AISI 303', g: 'Inox', vc: 150, fz: .05, dvc: 25, dfn: .15, tvc: 9, lvc: 200, lf: .20, note: 'Inox automatico (solforato).' },
-    { n: 'AISI 304/304L', g: 'Inox', vc: 120, fz: .04, dvc: 15, dfn: .12, tvc: 6, lvc: 170, lf: .20, note: 'Si incrudisce: non fermare l\'utensile nel taglio e non strisciare.' },
-    { n: 'AISI 316/316L', g: 'Inox', vc: 100, fz: .035, dvc: 12, dfn: .10, tvc: 5, lvc: 150, lf: .20, note: 'Piu duro da lavorare del 304.' },
-    { n: 'AISI 420', g: 'Inox', vc: 130, fz: .04, dvc: 20, dfn: .12, tvc: 8, lvc: 180, lf: .20, note: 'Martensitico ricotto; se temprato usa "Temprato".' },
-    { n: 'AISI 17-4 PH', g: 'Inox', vc: 85, fz: .035, dvc: 12, dfn: .10, tvc: 6, lvc: 130, lf: .15, note: 'Valori per stato solubilizzato.' },
-    { n: 'Duplex', g: 'Inox duplex', vc: 70, fz: .03, dvc: 10, dfn: .08, tvc: 4, lvc: 100, lf: .15, note: 'Forze di taglio alte: attrezzatura rigida e refrigerazione abbondante.' },
-    { n: 'Lega di nichel', g: 'Superleghe', vc: 30, fz: .02, dvc: 5, dfn: .05, tvc: 2, lvc: 50, lf: .12, note: 'Refrigerazione ad alta pressione, usura rapida.' },
-    { n: 'Acciaio per utensili ricotto', g: 'Acciai per utensili', vc: 95, fz: .04, dvc: 14, dfn: .10, tvc: 7, lvc: 150, lf: .20, note: 'Circa 250 HB. Se temprato usa "Temprato".' },
-    { n: 'Ghisa grigia', g: 'Ghise', vc: 180, fz: .07, dvc: 30, dfn: .20, tvc: 10, lvc: 220, lf: .30, note: 'A secco, aspirazione della polvere.' },
-    { n: 'Plastica', g: 'Altri', vc: 300, fz: .1, dvc: 60, dfn: .20, tvc: 25, lvc: 300, lf: .20, note: 'Evita il surriscaldamento: aria compressa, utensili ben affilati.' }
+    {n: "Alluminio", g: "Alluminio e leghe leggere", vc: 400, fz: 0.06, ap: 1, ae: 50, dvc: 90, dfn: 0.2, tvc: 25, rvc: 60, rfn: 0.3, bvc: 300, bfn: 0.08, lvc: 500, lf: 0.25, rho: 2.7, note: "Lubrificazione abbondante o nebbia; fresa a 2-3 taglienti lucidata."},
+    {n: "Ottone", g: "Rame e leghe", vc: 300, fz: 0.06, ap: 1, ae: 50, dvc: 70, dfn: 0.18, tvc: 25, rvc: 50, rfn: 0.25, bvc: 220, bfn: 0.08, lvc: 300, lf: 0.2, rho: 8.5, note: "Ottone automatico: a secco o con poca emulsione; punte con angolo di spoglia ridotto."},
+    {n: "Bronzo", g: "Rame e leghe", vc: 180, fz: 0.05, ap: 0.8, ae: 40, dvc: 40, dfn: 0.15, tvc: 15, rvc: 25, rfn: 0.2, bvc: 150, bfn: 0.07, lvc: 200, lf: 0.2, rho: 8.8, note: "Bronzi al piombo piu facili; bronzo all'alluminio piu duro: scendi del 30%."},
+    {n: "Ferro (Fe360)", g: "Acciai al carbonio", vc: 200, fz: 0.06, ap: 0.8, ae: 45, dvc: 35, dfn: 0.18, tvc: 14, rvc: 18, rfn: 0.25, bvc: 180, bfn: 0.1, lvc: 250, lf: 0.3, rho: 7.85, note: "Acciaio dolce S235/Fe360: attenzione al truciolo che si incolla, usa emulsione."},
+    {n: "C40", g: "Acciai al carbonio", vc: 170, fz: 0.05, ap: 0.7, ae: 40, dvc: 30, dfn: 0.15, tvc: 12, rvc: 15, rfn: 0.22, bvc: 150, bfn: 0.09, lvc: 220, lf: 0.25, rho: 7.85, note: "Acciaio da bonifica non bonificato (circa 200 HB)."},
+    {n: "TR bonificato (30-40 HRC)", g: "Acciai al carbonio", vc: 110, fz: 0.04, ap: 0.5, ae: 30, dvc: 20, dfn: 0.12, tvc: 8, rvc: 10, rfn: 0.18, bvc: 100, bfn: 0.08, lvc: 160, lf: 0.2, rho: 7.85, note: "Acciaio bonificato (42CrMo4, 39NiCrMo3): meno profondita, emulsione abbondante."},
+    {n: "Temprato (45-55 HRC)", g: "Acciai temprati", vc: 60, fz: 0.02, ap: 0.15, ae: 10, dvc: 8, dfn: 0.05, tvc: 3, rvc: 5, rfn: 0.08, bvc: 60, bfn: 0.05, nohss: true, lvc: 80, lf: 0.1, rho: 7.85, note: "Solo metallo duro con rivestimento TiAlN, profondita e passo laterale piccoli. Foratura e maschiatura sconsigliate: meglio eroditura o preforo prima della tempra."},
+    {n: "AISI 303", g: "Inox", vc: 150, fz: 0.05, ap: 0.6, ae: 35, dvc: 25, dfn: 0.15, tvc: 9, rvc: 10, rfn: 0.2, bvc: 130, bfn: 0.08, lvc: 200, lf: 0.2, rho: 7.9, note: "Inox automatico (solforato)."},
+    {n: "AISI 304/304L", g: "Inox", vc: 120, fz: 0.04, ap: 0.5, ae: 30, dvc: 15, dfn: 0.12, tvc: 6, rvc: 8, rfn: 0.18, bvc: 100, bfn: 0.07, lvc: 170, lf: 0.2, rho: 7.9, note: "Austenitico: si incrudisce, non fermare l'utensile nel taglio e non strisciare."},
+    {n: "AISI 316/316L", g: "Inox", vc: 100, fz: 0.035, ap: 0.4, ae: 28, dvc: 12, dfn: 0.1, tvc: 5, rvc: 7, rfn: 0.15, bvc: 85, bfn: 0.06, lvc: 150, lf: 0.2, rho: 8, note: "Austenitico al molibdeno: piu duro da lavorare del 304."},
+    {n: "AISI 420", g: "Inox", vc: 130, fz: 0.04, ap: 0.5, ae: 28, dvc: 20, dfn: 0.12, tvc: 8, rvc: 9, rfn: 0.16, bvc: 110, bfn: 0.07, lvc: 180, lf: 0.2, rho: 7.7, note: "Martensitico ricotto; se temprato usa i valori di \"Temprato\"."},
+    {n: "AISI 430", g: "Inox", vc: 140, fz: 0.045, ap: 0.6, ae: 28, dvc: 22, dfn: 0.14, tvc: 9, rvc: 10, rfn: 0.18, bvc: 120, bfn: 0.07, lvc: 180, lf: 0.2, rho: 7.7, note: "Ferritico."},
+    {n: "AISI 17-4 PH", g: "Inox", vc: 85, fz: 0.035, ap: 0.4, ae: 22, dvc: 12, dfn: 0.1, tvc: 6, rvc: 7, rfn: 0.14, bvc: 75, bfn: 0.06, lvc: 130, lf: 0.15, rho: 7.8, note: "Indurente per precipitazione: valori per stato solubilizzato."},
+    {n: "F51 (duplex 2205)", g: "Inox duplex", vc: 70, fz: 0.03, ap: 0.3, ae: 20, dvc: 10, dfn: 0.08, tvc: 4, rvc: 5, rfn: 0.12, bvc: 60, bfn: 0.05, lvc: 100, lf: 0.15, rho: 7.8, note: "Duplex: forze di taglio alte, attrezzatura rigida e refrigerazione abbondante."},
+    {n: "F55 (super duplex 2507)", g: "Inox duplex", vc: 50, fz: 0.025, ap: 0.25, ae: 15, dvc: 7, dfn: 0.07, tvc: 3, rvc: 4, rfn: 0.1, bvc: 45, bfn: 0.04, lvc: 80, lf: 0.15, rho: 7.8, note: "Super duplex: ancora piu severo del F51."},
+    {n: "Lega di nichel 625/718", g: "Superleghe", vc: 30, fz: 0.02, ap: 0.2, ae: 10, dvc: 5, dfn: 0.05, tvc: 2, rvc: 3, rfn: 0.07, bvc: 25, bfn: 0.04, nohss: true, lvc: 50, lf: 0.12, rho: 8.3, note: "Solo metallo duro (meglio ceramica per sgrossare), refrigerazione ad alta pressione, usura rapida: sostituisci presto gli inserti."},
+    {n: "Acciaio X153CrMoV12 (1.2379)", g: "Acciai per utensili", vc: 95, fz: 0.04, ap: 0.4, ae: 25, dvc: 14, dfn: 0.1, tvc: 7, rvc: 8, rfn: 0.15, bvc: 80, bfn: 0.06, lvc: 150, lf: 0.2, rho: 7.7, note: "Acciaio per lavorazioni a freddo ricotto (circa 250 HB). Temprato: vedi \"Temprato\"."},
+    {n: "K12", g: "Acciai per utensili", vc: 95, fz: 0.04, ap: 0.4, ae: 25, dvc: 14, dfn: 0.1, tvc: 7, rvc: 8, rfn: 0.15, bvc: 80, bfn: 0.06, lvc: 150, lf: 0.2, rho: 7.7, note: "DA VERIFICARE: ho usato gli stessi valori dell'acciaio X153CrMoV12 perche non conosco con certezza la designazione. Correggili con i dati della tua scheda materiale."},
+    {n: "Legno", g: "Altri", vc: 600, fz: 0.1, ap: 1, ae: 60, dvc: 150, dfn: 0.3, tvc: 30, rvc: 80, rfn: 0.4, bvc: 400, bfn: 0.1, lvc: null, lf: null, rho: 0.7, note: "Router: fresa a 2 taglienti, aspirazione."},
+    {n: "Plastica", g: "Altri", vc: 300, fz: 0.1, ap: 0.5, ae: 55, dvc: 60, dfn: 0.2, tvc: 25, rvc: 50, rfn: 0.3, bvc: 250, bfn: 0.1, lvc: 300, lf: 0.2, rho: 1.2, note: "Evita il surriscaldamento: aria compressa o poco liquido, utensili ben affilati."}
   ];
 
   // ----- formule di base -----
@@ -66,6 +72,90 @@
   function foratura(p) {
     const n = giri(p.vc, p.d);
     return { n, vf: n * p.f };
+  }
+
+  // ----- dati di taglio per tipo di utensile (stesse regole del programma parametrico) -----
+  const UTENSILI = [
+    ['fresa', 'Fresa metallo duro (sgrossatura)'], ['fresaFin', 'Fresa metallo duro (finitura)'],
+    ['puntaMD', 'Punta in metallo duro'], ['puntaIns', 'Punta a inserti'], ['centrino', 'Centrino'],
+    ['alesatore', 'Alesatore'], ['bareno', 'Bareno'], ['maschio', 'Maschio'], ['lamatore', 'Lamatore'],
+    ['filettaFresa', 'Fresa per filettare'], ['inserto', 'Inserto da tornio']
+  ];
+  const giriArrot = (vc, d, nmax) => Math.min(nmax || 24000, Math.max(100, Math.round(1000 * vc / (Math.PI * d) / 10) * 10));
+  /**
+   * Giri e avanzamenti di partenza per un utensile in un materiale.
+   * p = {tipo, d, z, passo (maschio), nmax}. Ritorna {vc, n, fz|fn, f (mm/min), ap, ae, testo} oppure null.
+   */
+  function datiTaglio(m, p) {
+    const d = p.d, z = p.z || 1;
+    if (!m || !(d > 0)) return null;
+    const r = { tipo: p.tipo };
+    const perGiro = (vc, fn, testo) => {
+      r.vc = vc; r.fn = fn; r.n = giriArrot(vc, d, p.nmax); r.f = Math.round(fn * r.n); r.testo = testo;
+      return r;
+    };
+    switch (p.tipo) {
+      case 'puntaMD': case 'centrino':
+        return perGiro(m.dvc, Math.max(0.02, m.dfn * d / 10), 'Vc della punta in metallo duro, fn per D10 adattato al diametro');
+      case 'puntaIns':
+        return perGiro(m.ivc > 0 ? m.ivc : m.dvc, Math.max(0.02, (m.ifn > 0 ? m.ifn : m.dfn) * d / 10),
+          m.ivc > 0 ? 'Vc della punta a inserti' : 'Senza dati per la punta a inserti: quelli della punta in metallo duro');
+      case 'alesatore':
+        return perGiro(m.rvc, Math.max(0.02, m.rfn * Math.sqrt(d / 10)), 'fn adattato alla radice del diametro');
+      case 'bareno':
+        return perGiro(m.bvc, Math.max(0.02, m.bfn * Math.sqrt(d / 10)), 'fn adattato alla radice del diametro');
+      case 'lamatore':
+        return perGiro(m.dvc, Math.max(0.02, m.dfn * Math.min(1.5, d / 10) * 0.7), 'Vc della punta, avanzamento x0,7');
+      case 'inserto':
+        if (!(m.lvc > 0)) return null;
+        r.vc = m.lvc; r.fn = m.lf; r.n = giriArrot(m.lvc, d, p.nmax); r.f = Math.round(m.lf * r.n); r.testo = 'Sgrossatura con inserto';
+        return r;
+      case 'maschio': {
+        const passo = p.passo > 0 ? p.passo : 1;
+        r.vc = m.tvc; r.fn = passo; r.n = giriArrot(m.tvc, d, p.nmax); r.f = Math.round(passo * r.n); r.testo = 'Avanzamento = passo x giri';
+        return r;
+      }
+      case 'filettaFresa': {
+        const fz = m.fz * 0.5 * Math.min(1, Math.max(0.3, Math.sqrt(d / 10)));
+        r.vc = m.vc; r.fz = fz; r.n = giriArrot(m.vc, d, p.nmax); r.f = Math.max(1, Math.round(fz * z * r.n)); r.testo = 'fz sul filetto';
+        return r;
+      }
+      default: {   // fresa e fresaFin
+        const fin = p.tipo === 'fresaFin';
+        const vc = fin && m.fvc > 0 ? m.fvc : m.vc;
+        const fz = (fin && m.ffz > 0 ? m.ffz : m.fz) * Math.min(1.6, Math.max(0.35, Math.sqrt(d / 10)));
+        r.vc = vc; r.fz = fz; r.n = giriArrot(vc, d, p.nmax); r.f = Math.round(fz * z * r.n);
+        r.ap = m.ap * d; r.ae = m.ae * d / 100;
+        r.testo = fin ? 'Finitura' + (m.fvc > 0 ? '' : ': senza dati, quelli della sgrossatura') : 'Sgrossatura';
+        return r;
+      }
+    }
+  }
+
+  // ----- peso e trigonometria -----
+  /** Peso in kg: forma 'tondo' {d,l}, 'tubo' {d,di,l}, 'piatto' {a,b,l}, 'esagono' {s,l} (s = chiave). mm e kg/dm3. */
+  function peso(forma, q, rho) {
+    let area;   // mm2
+    if (forma === 'tondo') area = Math.PI * q.d * q.d / 4;
+    else if (forma === 'tubo') area = Math.PI * (q.d * q.d - q.di * q.di) / 4;
+    else if (forma === 'piatto') area = q.a * q.b;
+    else if (forma === 'esagono') area = Math.sqrt(3) / 2 * q.s * q.s;
+    else return NaN;
+    return area * q.l * rho / 1e6;
+  }
+  /** Triangolo rettangolo da due dati qualsiasi: a,b cateti, c ipotenusa, A angolo opposto ad a (gradi). */
+  function triangolo(t) {
+    const rad = Math.PI / 180;
+    let { a, b, c, A } = t;
+    const ok = x => x > 0;
+    if (ok(a) && ok(b)) { c = Math.hypot(a, b); A = Math.atan2(a, b) / rad; }
+    else if (ok(a) && ok(c) && c > a) { b = Math.sqrt(c * c - a * a); A = Math.asin(a / c) / rad; }
+    else if (ok(b) && ok(c) && c > b) { a = Math.sqrt(c * c - b * b); A = Math.acos(b / c) / rad; }
+    else if (ok(A) && A < 90 && ok(a)) { b = a / Math.tan(A * rad); c = a / Math.sin(A * rad); }
+    else if (ok(A) && A < 90 && ok(b)) { a = b * Math.tan(A * rad); c = b / Math.cos(A * rad); }
+    else if (ok(A) && A < 90 && ok(c)) { a = c * Math.sin(A * rad); b = c * Math.cos(A * rad); }
+    else return null;
+    return { a, b, c, A, B: 90 - A };
   }
 
   // ----- filetti metrici ISO -----
@@ -335,6 +425,83 @@
       });
       avvisi.push('Profondita radiale ' + gc(h) + ' mm in ' + np + ' passate + 1 a vuoto. Diametro di fondo ' + gc(d - 2 * h) + '.');
       avvisi.push('Lascia una gola di scarico o tieni conto della rampa di uscita del filetto.');
+    } else if (op === 'interna') {
+      const { dp, di, l, ap, sx = 0, sz = 0, smusso = 0 } = c;
+      if (!pos(dp) || !pos(di) || di <= dp) return err('Il diametro finito deve essere maggiore del preforo.');
+      if (!pos(l) || !pos(ap)) return err('Lunghezza e profondita di passata mancanti.');
+      if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
+      avvioG96();
+      const dentro = Math.max(dp - 1, 0);
+      va(dentro, zSic, true, refrig.trim());
+      const xFin = di - sx, zFin = -(l - sz);
+      let x = dp, passate = 0;
+      while (x < xFin - 1e-9 && passate < 500) {
+        const xPrec = x;
+        x = Math.min(x + 2 * ap, xFin);
+        va(x, null, true);
+        va(null, zFin, false, 'F' + gc(c.f));
+        va(x - Math.min(1, x - xPrec), null, false);
+        va(null, zSic, true);
+        va(dentro, null, true);
+        passate++;
+      }
+      if (c.finitura) {
+        const ff = pos(c.ff) ? c.ff : c.f / 2;
+        R.push('(FINITURA)');
+        if (smusso > 0) {
+          va(di + 2 * smusso + 2, 1, true);
+          va(di, -smusso, false, 'F' + gc(ff));
+        } else {
+          va(di, 1, true);
+          va(null, 0, false, 'F' + gc(ff));
+        }
+        va(null, -l, false);
+        va(dentro, null, false);
+        va(null, zSic, true);
+      }
+      avvisi.push(passate + ' passate interne. Controlla che il bareno entri nel preforo e che lo stelo non tocchi.');
+    } else if (op === 'foratura') {
+      const { dpunta, prof, q } = c;
+      if (!pos(dpunta) || !pos(prof)) return err('Diametro della punta e profondita mancanti.');
+      if (!pos(c.f)) return err('Avanzamento mancante.');
+      const giriF = Math.round(c.giri || 0);
+      if (!pos(giriF)) return err('Giri al minuto mancanti.');
+      if (giriF > c.nmax) return err('I giri superano il massimo impostato.');
+      R.push('G97 S' + giriF + ' M3');
+      va(0, zSic, true, refrig.trim());
+      const passo = pos(q) ? q : prof;
+      let z = 0, beccate = 0;
+      while (z > -prof + 1e-9 && beccate < 500) {
+        const zN = Math.max(z - passo, -prof);
+        if (z < 0) va(null, z + 0.5, true);
+        va(null, zN, false, 'F' + gc(c.f));
+        va(null, zSic, true);
+        z = zN; beccate++;
+      }
+      avvisi.push(beccate + ' beccate fino a Z' + gc(-prof) + ' (profondita della punta, cono compreso).');
+    } else if (op === 'filettoInt') {
+      const { d, p, l, n } = c;
+      if (!pos(d) || !pos(p) || !pos(l)) return err('Diametro, passo e lunghezza mancanti.');
+      const np = Math.max(1, Math.round(n || 6));
+      const giriF = Math.round(c.giri || 0);
+      if (!pos(giriF)) return err('Giri al minuto mancanti.');
+      if (giriF > c.nmax) return err('I giri superano il massimo impostato.');
+      const h = 0.541266 * p, d1 = d - 1.082532 * p, dentro = d1 - 1;
+      if (dentro <= 0) return err('Diametro troppo piccolo per filettare all\'interno.');
+      R.push('G97 S' + giriF + ' M3');
+      const zA = Math.max(3 * p, 3);
+      va(dentro, zA, true, refrig.trim());
+      const prof = passateFiletto(h, np);
+      prof.push(h);
+      prof.forEach((pr, i) => {
+        if (i === np) R.push('(PASSATA A VUOTO)');
+        va(d1 + 2 * pr, null, true);
+        va(null, -l, false, 'F' + gc(p));
+        R[R.length - 1] = R[R.length - 1].replace(/^G1/, c.codFiletto || 'G32');
+        va(dentro, null, true);
+        va(null, zA, true);
+      });
+      avvisi.push('Si parte dal nocciolo D1 ' + gc(d1) + ' fino al diametro ' + gc(d) + ', ' + np + ' passate + 1 a vuoto.');
     } else {
       return err('Lavorazione sconosciuta.');
     }
@@ -349,7 +516,7 @@
   }
 
   const Officina = {
-    num, MATERIALI, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
+    num, MATERIALI, UTENSILI, datiTaglio, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
     FILETTI_GROSSI, FILETTI_FINI, filetto, passateFiletto,
     tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT,
     cono, foriSuCerchio, rugositaN, gc, gcodeTornio

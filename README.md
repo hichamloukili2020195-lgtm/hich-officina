@@ -1,33 +1,44 @@
 # Hich-Officina
 
-App per telefono Android (e per qualsiasi browser) per fresatori e tornitori. Funziona anche senza rete,
-non usa librerie esterne: sono solo file HTML e JavaScript.
+App per telefono Android (e per qualsiasi browser) per fresatori e tornitori. Funziona anche senza rete e non usa
+librerie esterne: sono solo file HTML, CSS e JavaScript.
+
+Sito: https://hichamloukili2020195-lgtm.github.io/hich-officina/
 
 ## Cosa fa
-- **Calcoli**: fresatura (giri, avanzamento, truciolo), tornitura (giri con limite, Ra teorica, tempo),
-  foratura, maschiatura (preforo, giri, avanzamento), filettatura al tornio (profondita e passate),
-  tolleranze ISO con accoppiamento foro/albero, cono e smusso, fori su circonferenza, pollici e millimetri.
-- **G-code tornio** (ISO, X in diametro, avanzamento al giro): sgrossatura esterna con finitura e smusso,
-  sfacciatura, gola, filettatura esterna. Anteprima del percorso, copia e salvataggio del file `.nc`.
-  Codice del limite giri (G50/G92) e della filettatura (G32/G33) a scelta.
-- **Tabelle**: materiali e dati di taglio, filetti metrici (grosso e fine), tolleranze, rugosita, frazioni di pollice.
+- **Nuovo programma ISO** con anteprima del percorso:
+  - fresatura: spianatura, contornatura esterna con finitura, tasca rettangolare con discesa a rampa;
+  - foratura: centrino, punta in metallo duro, punta a inserti, alesatore, bareno, maschio, lamatore; fori su
+    circonferenza, a griglia o da elenco; ciclo automatico (G81, G82, G83, G84, G85) o scelto a mano;
+  - tornitura: sgrossatura esterna e interna con finitura e smusso, sfacciatura, gola, foratura in asse,
+    filetto esterno e interno.
+  Il listato si copia, si condivide, si salva come `.nc` o si tiene in **Programmi salvati**.
+- **Calcolatrice di taglio**: fresatura, tornitura, foratura, maschiatura, filettatura al tornio, cono, fori su
+  cerchio, peso del grezzo, triangolo rettangolo, rugosita e avanzamento, pollici e millimetri.
+- **Utensili e dati di taglio**: giri e avanzamenti per ogni tipo di utensile nel materiale scelto.
+- **Tolleranze e accoppiamenti** ISO 286 con disegno delle zone.
+- **Macro CNC**: modelli pronti (foratura profonda, tasca circolare, centraggio, cambio utensile, pausa ogni N pezzi,
+  scanalatura) e macro personali con parametri. Chiamata `G65 P....` con argomenti a lettere (A = #1, B = #2, ...).
+- **Galleria esempi**, **Tabelle** (filetti, tolleranze, rugosita, pollici, codici G e M), **Preferiti**,
+  **Impostazioni** (tema, giri massimi, quote di sicurezza, codici del tornio, numeri di riga).
+- **Materiali**: gli stessi del programma parametrico, con gli stessi valori e le stesse regole (in officina solo
+  metallo duro: le Vc si usano cosi come sono). Tornitura e densita sono aggiunte qui. Si possono modificare.
 
-I dati di taglio sono **indicativi**. Ogni programma va controllato prima di lavorare (simulazione, prova a vuoto).
+I dati di taglio sono **di partenza**. Ogni programma va controllato prima di lavorare (simulazione, prova a vuoto).
 
 ## Installarla sul telefono
-1. Metti la cartella su un sito statico in https (serve https per l'installazione e per il funzionamento senza rete).
-2. Apri l'indirizzo con il browser del telefono e scegli **Installa app** (o **Aggiungi a schermata Home**) dal menu.
-3. L'icona compare tra le app; dopo la prima apertura funziona anche senza rete.
-
-Per provarla sul computer: `npx serve .` oppure `python3 -m http.server` nella cartella, poi apri `http://localhost:...`.
+Apri il sito con il browser del telefono e scegli **Installa app** (o **Aggiungi a schermata Home**) dal menu.
+Dopo la prima apertura funziona anche senza rete.
 
 ## Prove
-- `node prove/prove.js`: calcoli, tolleranze e programmi del tornio.
-- `node prove/ui.js [cartella-schermate]`: interfaccia in un browser a misura di telefono (serve Playwright).
+- `node prove/prove.js`: calcoli, materiali, dati di taglio, programmi di fresa e tornio, macro.
+- `node prove/ui.js [cartella-schermate]`: tutte le schermate in un browser a misura di telefono (serve Playwright).
 
 ## Aggiornare
 Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i file nuovi.
 
 ## File
-- `calcoli.js`: tutte le formule e il generatore G-code (senza interfaccia).
-- `app.js`: interfaccia. `index.html`: pagina e stile. `sw.js`: funzionamento senza rete. `manifest.webmanifest`: installazione.
+- `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
+- `programmi.js`: programmi della fresatrice, schemi dei fori, macro.
+- `app.js`: base dell'interfaccia (schermate, memoria, moduli). `schermi_*.js`: le schermate. `stile.css`: aspetto.
+- `sw.js`: funzionamento senza rete. `manifest.webmanifest`: installazione.
