@@ -10,6 +10,8 @@ android {
         targetSdk 35
         versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
         versionName(System.getenv('VERSIONE_APP') ?: 'prova')
+        // solo i processori dei telefoni: l'APK pesa meno della meta
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
     }
     signingConfigs {
         // Chiave solo per questa app: sempre la stessa, cosi gli aggiornamenti si installano sopra senza perdere i dati.
