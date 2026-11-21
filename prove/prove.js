@@ -2,6 +2,7 @@
 'use strict';
 const assert = require('assert');
 const O = require('../programmi.js');   // carica anche calcoli.js
+require('../iso.js');
 let n = 0;
 const prova = (nome, f) => { try { f(); n++; } catch (e) { console.error('FALLITA: ' + nome + '\n' + e.message); process.exitCode = 1; } };
 const vicino = (a, b, tol = 1e-6) => assert.ok(Math.abs(a - b) <= tol, a + ' invece di ' + b);
@@ -176,5 +177,52 @@ prova('importa materiali da Hich-CAM', () => {
   assert.ok(O.leggiMateriali('{"materiali":[{"n":"X","vc":100}]}').errore);
   assert.ok(O.leggiMateriali(JSON.stringify([{ n: 'A', vc: 1, fz: 1 }])).errore.includes('mancano'));
   assert.ok(!O.leggiMateriali(JSON.stringify([O.MATERIALI[0]])).errore);   // anche la lista semplice
+});
+prova('lettura ISO: fresa, quote e tempo', () => {
+  const f = O.gcodeFresa('tasca', Object.assign({ cx: 40, cy: 25, lx: 40, ly: 20, prof: 6, ap: 3, d: 10, sovra: .2, finitura: true }, bf));
+  const r = O.eseguiISO(f.righe.join('\n'));
+  assert.strictEqual(r.modo, 'fresa'); assert.strictEqual(r.errore, null); assert.deepStrictEqual(r.avvisi, []);
+  vicino(r.limiti.x.minLavoro, 25); vicino(r.limiti.x.maxLavoro, 55); vicino(r.limiti.z.minLavoro, -6);
+  assert.strictEqual(r.utensili.length, 1); assert.strictEqual(r.utensili[0].t, 3);
+  assert.ok(r.tempo > 0.5 && r.tempo < 10, 'tempo ' + r.tempo);
+  // stesso percorso del generatore (i segmenti di lavoro)
+  const lav = r.segmenti.filter(s => !s.rapido).length, lav0 = f.percorso.filter(s => !s.rapido).length;
+  assert.strictEqual(lav, lav0);
+});
+prova('lettura ISO: cicli di foratura e archi', () => {
+  const p = O.schemaFori({ tipo: 'cerchio', dc: 60, n: 4 });
+  const f = O.gcodeFresa('fori', Object.assign({ punti: p, prof: 15, ciclo: 'G83', q: 5 }, bf));
+  const r = O.eseguiISO(f.righe.join('\n'));
+  assert.strictEqual(r.errore, null);
+  const fondi = r.segmenti.filter(s => !s.rapido && Math.abs(s.z + 15) < 1e-9);
+  assert.strictEqual(fondi.length, 4);
+  vicino(r.limiti.x.maxLavoro, 30); vicino(r.limiti.y.minLavoro, -30);
+  const c = O.eseguiISO('G90 G17 G0 X10 Y0 Z0\nG1 F100\nG2 X-10 Y0 I-10 J0\nG2 X10 Y0 R10\nG3 X10 Y0 I-10 J0', { modo: 'fresa' });
+  assert.deepStrictEqual(c.avvisi, []);
+  vicino(c.limiti.y.minLavoro, -10, 0.01); vicino(c.limiti.y.maxLavoro, 10, 0.01);   // primo arco sotto, secondo sopra, cerchio intero
+  const t = O.eseguiISO('G18 G0 X0 Z2\nG1 Z0 F.1\nG3 X20 Z-10 R10', { modo: 'tornio' });
+  const m = t.segmenti.filter(s => s.riga === 2);
+  m.forEach(s => vicino(Math.hypot(s.x / 2, s.z + 10), 10, 1e-6));   // arco convesso con centro in Z-10
+});
+prova('lettura ISO: macro, variabili e salti', () => {
+  O.MACRO_MODELLI.forEach(md => {
+    const mm = O.scriviMacro(md);
+    const r = O.eseguiISO(['%', 'O0001', 'G90 G0 X50 Y50 Z5', mm.chiamata, 'M30', '%'].concat(mm.sotto).join('\n'), { modo: 'fresa' });
+    assert.strictEqual(r.errore, null, md.nome + ': ' + r.errore);
+  });
+  const r = O.eseguiISO('#1=0\n#2=0\nWHILE [#1 LT 5] DO1\n#1=#1+1\n#2=#2+[#1*2]\nEND1\nIF [#2 EQ 30] GOTO 10\n#3=1\nN10 #4=SQRT[16]+ATAN[1]/[1]\nG0 X#4', { modo: 'fresa' });
+  assert.strictEqual(r.errore, null);
+  assert.strictEqual(r.locali[2], 30); assert.strictEqual(r.locali[3], undefined); vicino(r.locali[4], 49);
+  const a = O.eseguiISO('#3000=1 (ROTTO)\nG0 X10', { modo: 'fresa' });
+  assert.strictEqual(a.messaggi[0].tipo, 'allarme'); assert.strictEqual(a.segmenti.length, 0);
+  assert.ok(O.eseguiISO('#1=1/0', { modo: 'fresa' }).errore.includes('zero'));
+  assert.ok(O.eseguiISO('WHILE [1 EQ 1] DO1\nEND1', { modo: 'fresa', maxPassi: 1000 }).avvisi.some(x => /ciclo infinito/.test(x)));
+});
+prova('lettura ISO: tornio dal generatore', () => {
+  const g = O.gcodeTornio('sgrossatura', Object.assign({ dg: 40, df: 30, l: 50, ap: 2, sx: .4, sz: .1, finitura: true, smusso: 1, ff: .1 }, base));
+  const r = O.eseguiISO(g.righe.join('\n'));
+  assert.strictEqual(r.modo, 'tornio'); assert.strictEqual(r.errore, null);
+  vicino(r.limiti.x.minLavoro, 26); vicino(r.limiti.z.minLavoro, -50);   // 26: inizio dello smusso
+  assert.ok(O.indovinaModo('G0 X10 Y10\nT1 M6') === 'fresa');
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

@@ -72,6 +72,11 @@
         uscita.appendChild(el('div', { class: 'pulsanti' }, [
           el('button', { class: 'pul sec', html: A.icona('copia') + 'Chiamata', onclick: () => A.copia(r.chiamata, 'Chiamata') }),
           el('button', { class: 'pul sec', html: A.icona('copia') + 'Sottoprogramma', onclick: () => A.copia(['%'].concat(r.sotto, ['%']).join('\n'), 'Sottoprogramma') })]));
+        uscita.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Simula con questi valori', onclick: () => {
+          if (r.errori.length) { A.avviso('Correggi prima gli errori'); return; }
+          const testo = ['%', 'O0001 (PROVA DELLA MACRO)', 'G90 G17 G0 X0 Y0 Z50', r.chiamata, 'M30', '%'].concat(r.sotto, ['%']).join('\n');
+          A.param.sim = { testo, modo: 'fresa', titolo: 'Macro ' + mc.nome, macro: true }; A.vai('simula');
+        } })]));
         uscita.appendChild(el('div', { class: 'sez', testo: 'Anteprima' }));
         const box = el('div', { class: 'listato', style: 'max-height:320px' });
         box.innerHTML = r.sotto.map((x, i) => '<div><span class="n">' + (i + 1) + '</span><span>' + A.colora(x) + '</span></div>').join('');

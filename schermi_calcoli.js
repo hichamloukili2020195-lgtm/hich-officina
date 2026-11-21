@@ -292,15 +292,24 @@
   const SCELTE_ACC = [['H7/g6', 'H7/g6 con gioco preciso'], ['H7/h6', 'H7/h6 scorrevole'], ['H7/f7', 'H7/f7 girevole'], ['H8/f7', 'H8/f7 girevole largo'],
     ['H7/js6', 'H7/js6 incerto'], ['H7/k6', 'H7/k6 incerto (bloccato)'], ['H7/m6', 'H7/m6 leggermente forzato'], ['H7/n6', 'H7/n6 forzato'], ['H7/p6', 'H7/p6 a pressa'],
     ['H11/d9', 'H11/d9 con molto gioco'], ['', 'Scegli foro e albero']];
+  function esitoMisura(uscita, d, t, campo) {
+    const mis = O.num(v_mis());
+    if (!isFinite(mis)) return;
+    const e = A.esitoMisura(d, { sup: t.sup / 1000, inf: t.inf / 1000 }, mis);
+    uscita.appendChild(el('div', { class: 'esito grande ' + (e.ok ? 'buona' : 'fuori'), testo: campo + ' misurato ' + fmt(mis, 3) + ': ' + e.testo }));
+  }
+  let v_mis = () => '';
   A.schermi.tolleranze = {
     titolo: 'Tolleranze e accoppiamenti',
     render(m) {
       const v = A.sezione('tolleranze');
+      v_mis = () => v.misura;
       const pan = el('div', { class: 'pannello' }), uscita = el('div');
       m.append(pan, uscita);
       const campi = [{ id: 'd', et: 'Diametro nominale', u: 'mm', v: 25 }, { id: 'acc', et: 'Accoppiamento', tipo: 'scelta', scelte: SCELTE_ACC },
         { id: 'foro', et: 'Classe del foro', tipo: 'scelta', scelte: SCELTE_FORI, v: 'H7' }, { id: 'alb', et: 'Classe dell\'albero', tipo: 'scelta', scelte: SCELTE_ALB, v: 'g6' },
-        { id: 'libero', et: 'Altra classe', sub: 'es. H9 o k5: vale questa', tipo: 'testo', v: '' }];
+        { id: 'libero', et: 'Altra classe', sub: 'es. H9 o k5: vale questa', tipo: 'testo', v: '' },
+        { id: 'misura', et: 'Misura presa', sub: 'del foro, o della classe scritta sopra', u: 'mm', v: '' }];
       const aggiorna = id => {
         if (id === 'acc' && v.acc) { const [x, y] = v.acc.split('/'); f.metti('foro', x); f.metti('alb', y); }
         if ((id === 'foro' || id === 'alb') && v.acc !== '') f.metti('acc', SCELTE_ACC.some(s => s[0] === v.foro + '/' + v.alb) ? v.foro + '/' + v.alb : '');
@@ -311,6 +320,7 @@
         if (lib) {
           const t = O.tolleranza(d, lib);
           if (t.errore) { uscita.appendChild(el('p', { class: 'errore', testo: t.errore })); return; }
+          esitoMisura(uscita, d, t, lib);
           uscita.appendChild(A.misuratore('Campo di tolleranza ' + lib, fmt(t.it / 1000, 3), 'mm'));
           uscita.appendChild(A.griglia([['Massimo', fmt(t.max, 4), 'mm'], ['Minimo', fmt(t.min, 4), 'mm'], ['Scostamento superiore', (t.sup > 0 ? '+' : '') + fmt(t.sup, 1), 'µm'], ['Scostamento inferiore', (t.inf > 0 ? '+' : '') + fmt(t.inf, 1), 'µm']]));
           return;
@@ -319,6 +329,7 @@
         if (a.errore || b.errore) { uscita.appendChild(el('p', { class: 'errore', testo: a.errore || b.errore })); return; }
         const gMax = a.sup - b.inf, gMin = a.inf - b.sup;
         const tipo = gMin >= 0 ? 'Gioco' : gMax <= 0 ? 'Interferenza' : 'Incerto';
+        esitoMisura(uscita, d, a, v.foro);
         uscita.appendChild(A.misuratore('Campo di tolleranza del foro', fmt(a.it / 1000, 3), 'mm'));
         uscita.appendChild(A.griglia([['Foro ' + v.foro, fmt(a.min, 3) + ' / ' + fmt(a.max, 3), 'mm'], ['Albero ' + v.alb, fmt(b.min, 3) + ' / ' + fmt(b.max, 3), 'mm'],
           ['Accoppiamento', tipo], [tipo === 'Interferenza' ? 'Interferenza' : 'Gioco', (gMin > 0 ? '+' : '') + fmt(gMin, 1) + ' … ' + (gMax > 0 ? '+' : '') + fmt(gMax, 1), 'µm']]));

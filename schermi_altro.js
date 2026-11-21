@@ -273,6 +273,15 @@
         { id: 'codFiletto', et: 'Filettatura', tipo: 'scelta', scelte: [['G32', 'G32'], ['G33', 'G33']] }, { id: 'xCambio', et: 'X cambio utensile', sub: 'vuoto = grezzo + 22', u: 'mm' },
         { id: 'zCambio', et: 'Z cambio utensile', u: 'mm' }]);
       blocco('Programmi', [{ id: 'numProg', et: 'Numero programma di partenza', u: 'O' }, { id: 'refrig', et: 'Refrigerante M8', tipo: 'spunta' }, { id: 'numerare', et: 'Numeri di riga N10, N20...', tipo: 'spunta' }]);
+      blocco('Macchina in rete (FTP)', [{ id: 'ftpHost', et: 'Indirizzo della macchina', sub: 'es. 192.168.1.50', tipo: 'testo' }, { id: 'ftpPorta', et: 'Porta', v: 21 },
+        { id: 'ftpUtente', et: 'Utente', tipo: 'testo' }, { id: 'ftpPassword', et: 'Password', sub: 'resta scritta su questo telefono', tipo: 'testo' },
+        { id: 'ftpCartella', et: 'Cartella sulla macchina', sub: 'vuoto = quella di partenza', tipo: 'testo' },
+        { id: 'nomeFtp', et: 'Nome del file', tipo: 'scelta', scelte: [['O0001.nc', 'O0001.nc'], ['O0001.NC', 'O0001.NC'], ['O0001', 'O0001 senza estensione']] }]);
+      m.appendChild(A.info('L\'invio diretto funziona dall\'app Android (APK) quando il telefono e nella stessa rete della macchina. Per una cartella condivisa usa "Salva in..." nel programma.'));
+      m.appendChild(el('div', { class: 'sez', testo: 'Copia di sicurezza' }));
+      m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('condividi') + 'Fai la copia', onclick: () => A.copiaSicurezza() }),
+        el('button', { class: 'pul sec', html: A.icona('salvati') + 'Ripristina', onclick: () => A.ripristina() })]));
+      m.appendChild(A.info('La copia contiene programmi, macro, pezzi con foto, utensili, materiali e impostazioni. Mandala su Drive o per posta con Condividi.'));
       m.appendChild(el('div', { class: 'sez', testo: 'Dati' }));
       m.appendChild(el('div', { class: 'menu' }, [A.voceMenu(['materiali', 'materiale', 'Materiali', 'Modifica velocita di taglio e avanzamenti'])]));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salva') + 'Esporta i miei dati', onclick: () => A.condividi('hich-officina-dati.json', JSON.stringify(A.mem, null, 1)) })]));

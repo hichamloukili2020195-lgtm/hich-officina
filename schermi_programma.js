@@ -239,6 +239,7 @@
         let campiTesta, campiLav, campiTaglio;
         if (tab === 'fresa') {
           campiTesta = [MAT, { id: 'op', et: 'Strategia', tipo: 'scelta', scelte: Object.keys(FRESA).map(k => [k, FRESA[k].t]) },
+            { id: 'ut', et: 'Dalla tabella utensili', tipo: 'scelta', scelte: () => A.scelteTabella(['fresa', 'fresaFin']) },
             { id: 'tipoUt', et: 'Utensile', tipo: 'scelta', scelte: [['fresa', 'Fresa metallo duro sgrossatura'], ['fresaFin', 'Fresa metallo duro finitura']] },
             { id: 'd', et: 'Diametro fresa', u: 'mm', v: 10 }, { id: 'z', et: 'Taglienti', u: 'z', v: 3 }];
           campiLav = FRESA[v.op || 'spianatura'] ? FRESA[v.op || 'spianatura'].campi : FRESA.spianatura.campi;
@@ -249,7 +250,8 @@
             { id: 'ae', et: 'Passo laterale ae', sub: dalMat, u: '% D' },
             { id: 't', et: 'Numero utensile T', v: 1 }, { id: 'num', et: 'Numero programma O', v: '', ph: () => A.imp().numProg }, { id: 'nome', et: 'Nome', tipo: 'testo', v: '' }];
         } else if (tab === 'fori') {
-          campiTesta = [MAT, { id: 'tipoUt', et: 'Utensile', tipo: 'scelta', scelte: UT_FORI, v: 'puntaMD' },
+          campiTesta = [MAT, { id: 'ut', et: 'Dalla tabella utensili', tipo: 'scelta', scelte: () => A.scelteTabella(UT_FORI.map(x => x[0])) },
+            { id: 'tipoUt', et: 'Utensile', tipo: 'scelta', scelte: UT_FORI, v: 'puntaMD' },
             { id: 'd', et: 'Diametro', sub: 'nominale per il maschio', u: 'mm', v: 8.5 },
             { id: 'passo', et: 'Passo', u: 'mm', v: 1.5, se: x => x.tipoUt === 'maschio' },
             { id: 'prof', et: 'Profondita', sub: 'parte cilindrica', u: 'mm', v: 20 },
@@ -269,7 +271,8 @@
             { id: 't', et: 'Numero utensile T', v: 1 }, { id: 'num', et: 'Numero programma O', v: '', ph: () => A.imp().numProg }, { id: 'nome', et: 'Nome', tipo: 'testo', v: '' }];
         } else {
           const op = TORNIO[v.op] ? v.op : 'sgrossatura';
-          campiTesta = [MAT, { id: 'op', et: 'Lavorazione', tipo: 'scelta', scelte: Object.keys(TORNIO).map(k => [k, TORNIO[k].t]) }];
+          campiTesta = [MAT, { id: 'op', et: 'Lavorazione', tipo: 'scelta', scelte: Object.keys(TORNIO).map(k => [k, TORNIO[k].t]) },
+            { id: 'ut', et: 'Dalla tabella utensili', tipo: 'scelta', scelte: () => A.scelteTabella(op === 'foratura' ? ['puntaMD', 'puntaIns'] : ['inserto']) }];
           campiLav = TORNIO[op].campi;
           campiTaglio = [
             { id: 'vc', et: 'Velocita di taglio Vc', sub: /filetto/.test(op) ? 'dal materiale, meta della tornitura' : dalMat, u: 'm/min' },
@@ -279,6 +282,15 @@
         }
         let fT, fL, fD, ultimo = null;
         const aggiorna = id => {
+          if (id === 'ut' && v.ut) {
+            const u = A.utensileDa(v.ut);
+            if (u) {
+              fD.metti('t', u.t);
+              if (tab !== 'tornio') { fT.metti('tipoUt', u.tipo); if (u.d) fT.metti('d', u.d); if (u.z && tab === 'fresa') fT.metti('z', u.z); if (u.passo && tab === 'fori') fT.metti('passo', u.passo); }
+              else if (v.op === 'foratura' && u.d) { fL.metti('dpunta', u.d); fL.metti('tipoPunta', u.tipo); }
+              const nuovi = autoTaglio(tab, v); for (const k in nuovi) fD.metti(k, nuovi[k]);
+            }
+          }
           if (id && RIEMPI[tab].includes(id)) {
             const nuovi = autoTaglio(tab, v);
             if (id === 'op') { Object.assign(v, nuovi); A.salva(); apri(); return; }
@@ -339,36 +351,5 @@
       .replace(/\b([TO]\d+)\b/g, '<span class="c-t">$1</span>');
   }
   A.colora = colora;
-  function nomeFile(L) { return (L.nome || 'O0001').replace(/[^A-Za-z0-9_-]/g, '') + '.nc'; }
-  function salvaInArchivio(L) {
-    const arch = A.mem.salvati = A.mem.salvati || [];
-    const titolo = ((L.righe[1] || '').match(/\(([^)]*)\)/) || [])[1] || L.nome;
-    arch.unshift({ id: Date.now(), nome: L.nome, titolo, tipo: L.tipo, data: new Date().toISOString().slice(0, 10), righe: L.righe });
-    if (arch.length > 100) arch.length = 100;
-    A.salva(); A.avviso('Salvato in Programmi salvati');
-  }
-  A.schermi.listato = {
-    titolo: 'Programma ISO', preferibile: false,
-    azioni() {
-      const L = A.param.listato;
-      if (!L) return [];
-      return [el('button', { class: 'icona-pul', 'aria-label': 'Copia', html: A.icona('copia'), onclick: () => A.copia(L.righe.join('\n'), 'Programma') }),
-        el('button', { class: 'icona-pul', 'aria-label': 'Condividi', html: A.icona('condividi'), onclick: () => A.condividi(nomeFile(L), L.righe.join('\r\n') + '\r\n') })];
-    },
-    render(m) {
-      const L = A.param.listato;
-      if (!L) { m.appendChild(el('div', { class: 'vuoto', testo: 'Nessun programma: generane uno da Nuovo programma ISO.' })); return; }
-      if (L.riassunto) m.appendChild(el('div', { class: 'riassunto' }, L.riassunto.map(t => el('span', { testo: t }))));
-      const box = el('div', { class: 'listato' });
-      box.innerHTML = L.righe.map((r, i) => '<div><span class="n">' + (i + 1) + '</span><span>' + colora(r) + '</span></div>').join('');
-      m.appendChild(box);
-      m.appendChild(el('div', { class: 'pulsanti' }, [
-        el('button', { class: 'pul', html: A.icona('copia') + 'Copia negli appunti', onclick: () => A.copia(L.righe.join('\n'), 'Programma') })]));
-      m.appendChild(el('div', { class: 'pulsanti' }, [
-        el('button', { class: 'pul sec', html: A.icona('salva') + 'File .nc', onclick: () => A.scarica(nomeFile(L), L.righe.join('\r\n') + '\r\n') }),
-        el('button', { class: 'pul sec', html: A.icona('salvati') + 'Tieni', onclick: () => salvaInArchivio(L) })]));
-      if (L.avvisi && L.avvisi.length) m.appendChild(A.info(A.esc(L.avvisi.join(' '))));
-      m.appendChild(A.info('Controlla sempre il programma in simulazione o a vuoto prima di lavorare.', 'avviso'));
-    }
-  };
+  // il listato, la simulazione e l'apertura dei programmi stanno in schermi_iso.js
 })();

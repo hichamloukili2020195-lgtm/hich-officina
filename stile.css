@@ -173,6 +173,22 @@ canvas.vista{width:100%;height:210px;display:block;border-radius:12px;background
 .mat .valori b{color:var(--testo)}
 .mat small{color:var(--tenue)}
 
+.listato .trovato{background:color-mix(in srgb,var(--avviso) 18%,transparent)}
+.listato .attuale{background:color-mix(in srgb,var(--avviso) 40%,transparent)}
+.ctrl input[type=search]{font-size:15px}
+.foto-griglia{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.foto-griglia .foto{padding:0;border:1px solid var(--bordo);border-radius:10px;overflow:hidden;background:var(--campo);aspect-ratio:1;cursor:pointer;max-width:100%}
+.foto-griglia img{width:100%;height:100%;object-fit:cover;display:block}
+.velo{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.85);display:flex;flex-direction:column;justify-content:center;
+  padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.velo img{max-width:100%;max-height:75vh;object-fit:contain;margin:0 auto;border-radius:8px}
+.esito{font-size:13px;font-weight:600}
+.esito.buona{color:var(--ok)} .esito.fuori{color:var(--errore)}
+.esito.grande{font-size:15px;padding:12px;border-radius:12px;margin-top:10px;background:var(--riga);border:1px solid var(--bordo)}
+td.fuori{color:var(--errore);font-weight:600}
+.par-riga.mis{grid-template-columns:minmax(0,1fr) 84px 92px 36px}
+.par-riga.mis input:first-child{text-transform:none;text-align:left;font-family:inherit}
+.anteprima-foglio{width:100%;height:60vh;border:1px solid var(--bordo);border-radius:12px;background:#fff}
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--testo);color:var(--fondo);
   padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
 .toast.vedi{opacity:1}

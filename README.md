@@ -18,7 +18,18 @@ Sito: https://hichamloukili2020195-lgtm.github.io/hich-officina/
 - **Utensili e dati di taglio**: giri e avanzamenti per ogni tipo di utensile nel materiale scelto.
 - **Tolleranze e accoppiamenti** ISO 286 con disegno delle zone.
 - **Macro CNC**: modelli pronti (foratura profonda, tasca circolare, centraggio, cambio utensile, pausa ogni N pezzi,
-  scanalatura) e macro personali con parametri. Chiamata `G65 P....` con argomenti a lettere (A = #1, B = #2, ...).
+  scanalatura, misura con tastatore, pezzi in serie con contatore, griglia di pezzi su piu origini) e macro personali
+  con parametri, da simulare con i valori scritti. Chiamata `G65 P....` con argomenti a lettere (A = #1, B = #2, ...).
+- **Apri e simula un programma**: un programma ISO incollato o da file (anche fatto da altri) diventa un percorso con
+  simulazione animata passo per passo (3D, dall'alto, di fronte, sezione del tornio), quote massime di lavoro,
+  utensili con giri e avanzamenti, tempo stimato. Legge anche le macro (variabili, IF, WHILE, G65, M98).
+- **Listato**: ricerca, modifica, simulazione, file `.nc`, "Salva in..." (anche cartelle offerte da altre app),
+  **invio alla macchina via FTP** (solo nell'APK), foglio di attrezzaggio.
+- **Tabella utensili** personale (T, tipo, diametro, lunghezza, taglienti): si sceglie in Nuovo programma ISO.
+- **Pezzi e attrezzaggio**: dati del pezzo, origine, fissaggio, programmi collegati, note, foto, misure da controllare
+  con tolleranze (H7, ±0,05, +0,1 -0,05), controllo delle misure prese con storico, **foglio di attrezzaggio** da
+  stampare, salvare in PDF o condividere.
+- **Copia di sicurezza** di tutti i dati (foto comprese) in un file da mandare su Drive o per posta, e ripristino.
 - **Galleria esempi**, **Tabelle** (filetti, tolleranze, rugosita, pollici, codici G e M), **Preferiti**,
   **Impostazioni** (tema, giri massimi, quote di sicurezza, codici del tornio, numeri di riga).
 - **Materiali**: gli stessi nomi e campi del programma parametrico, con valori di partenza per utensili in metallo duro
@@ -54,5 +65,6 @@ Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i fil
 ## File
 - `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
 - `programmi.js`: programmi della fresatrice, schemi dei fori, macro.
+- `iso.js`: lettura ed esecuzione dei programmi ISO e delle macro (per simulazione, apertura, foglio di attrezzaggio).
 - `app.js`: base dell'interfaccia (schermate, memoria, moduli). `schermi_*.js`: le schermate. `stile.css`: aspetto.
 - `sw.js`: funzionamento senza rete. `manifest.webmanifest`: installazione.

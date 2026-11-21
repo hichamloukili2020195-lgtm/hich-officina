@@ -391,6 +391,65 @@
         'G0 Z2.',
         'M99'
       ]
+    },
+    {
+      id: 'misura', nome: 'Misura con tastatore', num: 9007,
+      desc: 'Tocca in Z al punto X Y attuale, confronta con la quota e la tolleranza, scrive l\'errore nella variabile scelta.',
+      par: [['Z', 'Quota nominale della superficie', 0], ['R', 'Distanza di partenza sopra la quota', 5], ['T', 'Tolleranza piu o meno', 0.05],
+        ['F', 'Avanzamento di tastatura', 100], ['V', 'Variabile del risultato (500-999)', 510]],
+      corpo: [
+        '(MISURA IN Z AL PUNTO X Y ATTUALE)',
+        '(CONTROLLA IL CODICE DI TASTATURA E LE VARIABILI DELLA TUA MACCHINA)',
+        'IF [#20 LE 0] GOTO 90',
+        'G90 G0 Z[#26 + #18]',
+        'G91 G31 Z-[#18 + 5] F#9',
+        '#140 = #5063 (Z TOCCATA)',
+        'G90 G0 Z[#26 + #18]',
+        '#141 = #140 - #26 (ERRORE)',
+        '#[#22] = #141',
+        'IF [ABS[#141] LE #20] GOTO 99',
+        '#3000 = 10 (QUOTA FUORI TOLLERANZA)',
+        'N90 #3000 = 12 (MANCA LA TOLLERANZA)',
+        'N99 M99'
+      ]
+    },
+    {
+      id: 'serie', nome: 'Pezzi in serie con contatore', num: 9008,
+      desc: 'Ripete il programma del pezzo per tutto il lotto, ferma per il cambio pezzo e conta nella variabile scelta.',
+      par: [['C', 'Pezzi del lotto', 10], ['S', 'Numero del programma del pezzo', 1001], ['V', 'Variabile contatore (500-999)', 500]],
+      corpo: [
+        '(LOTTO: RIPETE IL PROGRAMMA DEL PEZZO #3 VOLTE)',
+        'IF [#[#22] EQ #0] THEN #[#22] = 0',
+        'WHILE [#[#22] LT #3] DO1',
+        'M98 P#19',
+        '#[#22] = #[#22] + 1',
+        'M0 (CAMBIA IL PEZZO E PREMI START)',
+        'END1',
+        '#[#22] = 0',
+        '#3006 = 1 (LOTTO FINITO)',
+        'M99'
+      ]
+    },
+    {
+      id: 'origini', nome: 'Griglia di pezzi su piu origini', num: 9009,
+      desc: 'Esegue lo stesso programma su piu pezzi montati, uno per origine da G54 in avanti.',
+      par: [['A', 'Quante origini (da 1 a 6, da G54)', 4], ['S', 'Numero del programma del pezzo', 1001]],
+      corpo: [
+        '(RIPETE IL PROGRAMMA DEL PEZZO SU #1 ORIGINI DA G54)',
+        'IF [#1 LT 1] GOTO 90',
+        'IF [#1 GT 6] GOTO 90',
+        '#150 = 1',
+        'WHILE [#150 LE #1] DO1',
+        '#151 = 53 + #150',
+        'G#151',
+        'M98 P#19',
+        '#150 = #150 + 1',
+        'END1',
+        'G54',
+        'GOTO 99',
+        'N90 #3000 = 11 (ORIGINI DA 1 A 6)',
+        'N99 M99'
+      ]
     }
   ];
 

@@ -72,7 +72,8 @@
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
     tema: 'scuro', nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
-    codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1
+    codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1,
+    ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
   const imp = () => Object.assign({}, IMPOSTAZIONI_SERIE, mem.imp || {});
   function applicaTema() {
@@ -198,11 +199,96 @@
     scarica(nome, testo);
   }
 
+  /** Condivide un file vero (Drive, posta...). */
+  async function condividiFile(nome, testo, tipo) {
+    if (ANDROID && ANDROID.condividiFile) { try { ANDROID.condividiFile(nome, testo, tipo || 'text/plain'); return; } catch (e) { /* sotto */ } }
+    try {
+      const file = new File([testo], nome, { type: tipo || 'text/plain' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: nome }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    scarica(nome, testo);
+  }
+  /** "Salva in...": si sceglie la cartella (nell'APK anche le cartelle offerte dalle altre app). */
+  async function salvaIn(nome, testo) {
+    if (ANDROID && ANDROID.salvaIn) { try { ANDROID.salvaIn(nome, testo); return; } catch (e) { /* sotto */ } }
+    if (window.showSaveFilePicker) {
+      try {
+        const h = await window.showSaveFilePicker({ suggestedName: nome });
+        const w = await h.createWritable(); await w.write(testo); await w.close(); avviso('File salvato'); return;
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    scarica(nome, testo);
+  }
+  /** Stampa (o PDF) di una pagina HTML intera. */
+  function stampa(titolo, html) {
+    if (ANDROID && ANDROID.stampa) { try { ANDROID.stampa(titolo, html); return; } catch (e) { /* sotto */ } }
+    const f = el('iframe', { style: 'position:fixed;right:0;bottom:0;width:0;height:0;border:0', title: titolo });
+    document.body.appendChild(f);
+    const d = f.contentWindow.document; d.open(); d.write(html); d.close();
+    setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { avviso('Stampa non disponibile qui: usa Condividi'); } setTimeout(() => f.remove(), 60000); }, 300);
+  }
+  /** Sceglie un file di testo: nell'APK con Android, nel browser con un input nascosto. */
+  function scegliTesto(cb, accetta) {
+    if (ANDROID && ANDROID.scegliFile) { window.__fileScelto = t => cb(String(t || '')); ANDROID.scegliFile(); return; }
+    const i = el('input', { type: 'file', accept: accetta || '.nc,.txt,.json,.iso,.tap,.min,.mpf,text/plain,application/json', style: 'display:none' });
+    document.body.appendChild(i);
+    i.addEventListener('change', () => {
+      const x = i.files && i.files[0]; i.remove(); if (!x) return;
+      const r = new FileReader(); r.onload = () => cb(String(r.result || '')); r.readAsText(x);
+    });
+    i.click();
+  }
+
+  // ----- foto: IndexedDB, e se manca localStorage -----
+  const Foto = (() => {
+    let db = null;
+    const apri = () => new Promise(ok => {
+      if (db !== null) return ok(db);
+      try {
+        const r = indexedDB.open('hich-officina-foto', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('foto');
+        r.onsuccess = () => { db = r.result; ok(db); };
+        r.onerror = () => { db = false; ok(false); };
+      } catch (e) { db = false; ok(false); }
+    });
+    const tx = (modo, fn) => apri().then(d => new Promise((ok, ko) => {
+      if (!d) return ko(new Error('nodb'));
+      const t = d.transaction('foto', modo), st = t.objectStore('foto');
+      const r = fn(st); t.oncomplete = () => ok(r && r.result); t.onerror = () => ko(t.error);
+    }));
+    const ls = k => 'hich-foto-' + k;
+    return {
+      metti: (id, dato) => tx('readwrite', st => st.put(dato, id)).catch(() => { localStorage.setItem(ls(id), dato); }),
+      prendi: id => tx('readonly', st => st.get(id)).then(v => v || localStorage.getItem(ls(id))).catch(() => { try { return localStorage.getItem(ls(id)); } catch (e) { return null; } }),
+      togli: id => tx('readwrite', st => st.delete(id)).catch(() => { try { localStorage.removeItem(ls(id)); } catch (e) { /* niente */ } })
+    };
+  })();
+  /** Riduce una foto (max 1600 px, JPEG) e la mette da parte. Ritorna l'id. */
+  function riduciFoto(file) {
+    return new Promise((ok, ko) => {
+      const r = new FileReader();
+      r.onerror = () => ko(new Error('foto non leggibile'));
+      r.onload = () => {
+        const img = new Image();
+        img.onerror = () => ko(new Error('foto non leggibile'));
+        img.onload = () => {
+          const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+          const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          const dato = c.toDataURL('image/jpeg', 0.8), id = 'f' + Date.now() + Math.floor(Math.random() * 1000);
+          Foto.metti(id, dato).then(() => ok(id), ko);
+        };
+        img.src = String(r.result);
+      };
+      r.readAsDataURL(file);
+    });
+  }
+
   // ----- schermate -----
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
-    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi,
-    schermi: {}, param: {}, VERSIONE: '2.3.0'
+    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
+    schermi: {}, param: {}, VERSIONE: '2.4.0'
   };
   window.App = App;
 
@@ -277,7 +363,10 @@
     ['tolleranze', 'tolleranza', 'Tolleranze e accoppiamenti', 'ISO 286: fori, alberi, gioco e interferenza'],
     ['macro', 'codice', 'Macro CNC', 'Modelli pronti e macro personali con parametri'],
     ['galleria', 'galleria', 'Galleria esempi', 'Programmi d\'esempio da aprire e modificare'],
+    ['apri', 'codice', 'Apri e simula un programma', 'Percorso, quote massime, utensili e tempo di un programma ISO'],
     ['salvati', 'salvati', 'Programmi salvati', 'I programmi tenuti su questo telefono'],
+    ['pezzi', 'galleria', 'Pezzi e attrezzaggio', 'Foglio di attrezzaggio, note, foto e controllo misure'],
+    ['tabellaUtensili', 'utensile', 'Tabella utensili', 'I tuoi utensili: numero T, diametro, lunghezza, taglienti'],
     ['tabelle', 'tabella', 'Tabelle', 'Filetti, tolleranze, rugosita, pollici'],
     ['materiali', 'materiale', 'Materiali', 'Velocita di taglio e avanzamenti per materiale']
   ];
