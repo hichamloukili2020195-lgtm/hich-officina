@@ -3,7 +3,7 @@
 App per telefono Android (e per qualsiasi browser) per fresatori e tornitori. Funziona anche senza rete e non usa
 librerie esterne: sono solo file HTML, CSS e JavaScript.
 
-Sito: https://hichamloukili2020195-lgtm.github.io/hich-officina/
+Il sito si pubblica da solo dal ramo `main` (pagine del repository).
 
 ## Cosa fa
 - **Nuovo programma ISO** con anteprima del percorso:
@@ -48,8 +48,8 @@ Apri il sito con il browser del telefono e scegli **Installa app** (o **Aggiungi
 Dopo la prima apertura funziona anche senza rete.
 
 ## APK per Android
-A ogni aggiornamento di `main` GitHub costruisce l'APK (lavoro "APK Android") e lo mette nella pagina di download:
-https://github.com/hichamloukili2020195-lgtm/hich-officina/releases/download/apk/Hich-Officina.apk
+A ogni aggiornamento di `main` il lavoro automatico "APK Android" del repository costruisce l'APK e lo mette nella
+pagina di download del repository (versione "apk", file `Hich-Officina.apk`).
 
 Sul telefono: scarica il file, aprilo e consenti l'installazione da questa fonte quando Android lo chiede. Per
 aggiornare si installa sopra quello vecchio: macro, programmi e materiali restano (la chiave di firma e sempre la
@@ -60,7 +60,7 @@ in Download/Hich-Officina, condivide, copia negli appunti e sceglie i file.
 
 ## Prove
 - `node prove/prove.js`: calcoli, materiali, dati di taglio, programmi di fresa e tornio, macro.
-- `node prove/ui.js [cartella-schermate]`: tutte le schermate in un browser a misura di telefono (serve Playwright).
+- `node prove/ui.js [cartella-schermate]`: tutte le schermate in un browser a misura di telefono (serve la libreria di prova del browser gia installata).
 
 ## Aggiornare
 Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i file nuovi.
