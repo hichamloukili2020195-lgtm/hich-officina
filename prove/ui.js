@@ -38,7 +38,7 @@ const server = http.createServer((q, r) => {
   await vai('home');
   await foto('01-home');
   const voci = await pg.$$eval('.menu .voce', x => x.length);
-  ok(voci === 12, 'voci del menu: ' + voci);
+  ok(voci === 11, 'voci del menu: ' + voci);
   await largo('home');
 
   // tutte le schermate si aprono
@@ -110,6 +110,11 @@ const server = http.createServer((q, r) => {
   ok(await pg.inputValue('#f-vc') === '500', 'materiale non applicato');
   await foto('04-calcoli');
 
+  // un posto solo per le velocita: "Utensili e dati di taglio" porta alla Calcolatrice, scheda Per utensile
+  await vai('utensili'); await pg.waitForTimeout(80);
+  ok((await pg.evaluate(() => location.hash)) === '#calcoli', 'utensili non porta alla calcolatrice');
+  ok(await pg.$eval('.chips .chip.attiva', b => b.dataset.id === 'utensile'), 'scheda Per utensile non attiva');
+  ok(!(await pg.evaluate(() => App.MENU.map(v => v[0]))).includes('utensili'), 'voce doppia nel menu');
   // utensili
   await vai('utensili');
   for (const t of ['puntaMD', 'puntaIns', 'alesatore', 'bareno', 'maschio', 'inserto']) {

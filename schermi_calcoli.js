@@ -7,6 +7,7 @@
   // ----- calcolatori -----
   // calc(v numeri, grezzi) -> {gauge:[et,val,u], ris:[[et,val,u]], avviso, html, errore} | null
   const CALC = [
+    { id: 'utensile', t: 'Per utensile', speciale: m => renderUtensile(m) },
     {
       id: 'fresa', t: 'Fresatura',
       campi: [selMat, { id: 'd', et: 'Diametro fresa', u: 'mm', v: 10 }, { id: 'z', et: 'Taglienti', u: 'z', v: 3 },
@@ -217,19 +218,19 @@
         A.mem.calc = c.id; A.salva();
         chips.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === c.id));
         corpo.innerHTML = '';
-        calcolatore(corpo, c);
+        if (c.speciale) c.speciale(corpo); else calcolatore(corpo, c);
       };
       CALC.forEach(c => chips.appendChild(el('button', { class: 'chip', 'data-id': c.id, testo: c.t, onclick: () => apri(c.id) })));
-      apri(A.mem.calc || 'fresa');
+      apri(A.mem.calc || 'utensile');
       const att = chips.querySelector('.attiva'); if (att && att.scrollIntoView) try { att.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) { /* niente */ }
     }
   };
   A.CALC = CALC;
 
   // ----- utensili e dati di taglio -----
-  A.schermi.utensili = {
-    titolo: 'Utensili e dati di taglio',
-    render(m) {
+  // (2.6.0) "Utensili e dati di taglio" e diventata la prima scheda della Calcolatrice: un posto solo per le velocita
+  function renderUtensile(m) {
+    {
       const v = A.sezione('utensili');
       const pan = el('div', { class: 'pannello' }), uscita = el('div'), tabella = el('div');
       m.append(pan, uscita, tabella);
@@ -270,7 +271,8 @@
       const f = A.modulo(pan, campi, v, aggiorna);
       aggiorna();
     }
-  };
+  }
+  A.schermi.utensili = { titolo: 'Calcolatrice di taglio', preferibile: false, render() { A.mem.calc = 'utensile'; A.salva(); location.replace('#calcoli'); } };
 
   // ----- tolleranze e accoppiamenti -----
   function disegnoAccoppiamento(a, b, foro, alb) {

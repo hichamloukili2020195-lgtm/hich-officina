@@ -288,7 +288,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.5.1'
+    schermi: {}, param: {}, VERSIONE: '2.6.0'
   };
   window.App = App;
 
@@ -358,8 +358,7 @@
 
   const MENU = [
     ['programma', 'nuovo', 'Nuovo programma ISO', 'Fresatura, foratura e tornitura con anteprima'],
-    ['calcoli', 'calcolo', 'Calcolatrice di taglio', 'Giri, avanzamenti, filetti, coni, peso...'],
-    ['utensili', 'utensile', 'Utensili e dati di taglio', 'Punte, inserti, alesatori, bareni, maschi, frese'],
+    ['calcoli', 'calcolo', 'Calcolatrice di taglio', 'Giri e avanzamenti per utensile e materiale, filetti, peso...'],
     ['tolleranze', 'tolleranza', 'Tolleranze e accoppiamenti', 'ISO 286: fori, alberi, gioco e interferenza'],
     ['macro', 'codice', 'Macro CNC', 'Modelli pronti e macro personali con parametri'],
     ['galleria', 'galleria', 'Galleria esempi', 'Programmi d\'esempio da aprire e modificare'],
