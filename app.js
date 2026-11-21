@@ -197,7 +197,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, misuratore, griglia, info, copia, scarica, condividi,
-    schermi: {}, param: {}
+    schermi: {}, param: {}, VERSIONE: '2.1.0'
   };
   window.App = App;
 
@@ -302,7 +302,17 @@
     document.querySelectorAll('#barra button').forEach(b => b.addEventListener('click', () => App.vai(b.dataset.vai)));
     mostra();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-      try { navigator.serviceWorker.register('sw.js').catch(() => { /* senza cache funziona lo stesso in linea */ }); } catch (e) { /* niente */ }
+      try {
+        // quando arriva una versione nuova: la pagina si ricarica una volta da sola
+        const avevaControllo = !!navigator.serviceWorker.controller;
+        let ricaricata = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => { if (avevaControllo && !ricaricata) { ricaricata = true; location.reload(); } });
+        navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => { /* senza cache funziona lo stesso in linea */ });
+      } catch (e) { /* niente */ }
+    }
+    if (mem.versione !== App.VERSIONE) {
+      if (mem.versione) setTimeout(() => avviso('App aggiornata alla versione ' + App.VERSIONE), 400);
+      mem.versione = App.VERSIONE; salva();
     }
   });
 })();
