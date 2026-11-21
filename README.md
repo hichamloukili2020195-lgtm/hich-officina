@@ -26,8 +26,12 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
 - **Listato**: ricerca, modifica, simulazione, file `.nc`, "Salva in..." (anche cartelle offerte da altre app),
   **invio alla macchina via FTP** (solo nell'APK), foglio di attrezzaggio.
 - **Post-processor**: il programma nasce in ISO e si traduce nel linguaggio della macchina (Impostazioni, o al volo nel
-  listato): ISO con codici G e M; ISO con cicli a nome (CYCLE81..., MCALL, LIMS, G33 K) per fresa e tornio; dialogo a
-  testo con righe numerate (TOOL CALL, L, CYCL DEF con parametri Q) per la fresa. La simulazione legge sempre l'ISO.
+  listato). I nomi delle marche dicono solo con quali controlli e compatibile il programma:
+  - ISO con codici G e M: compatibile con controlli Fanuc e simili (fresa e tornio);
+  - cicli a nome (CYCLE81..., MCALL, LIMS, G33 K): compatibile con controlli Siemens Sinumerik (fresa e tornio);
+  - dialogo a testo con righe numerate (TOOL CALL, L, CYCL DEF con parametri Q): compatibile con controlli Heidenhain
+    (fresa).
+  La simulazione legge sempre l'ISO.
 - **Tabella utensili** personale (T, tipo, diametro, lunghezza, taglienti): si sceglie in Nuovo programma ISO.
 - **Pezzi e attrezzaggio**: dati del pezzo, origine, fissaggio, programmi collegati, note, foto, misure da controllare
   con tolleranze (H7, ±0,05, +0,1 -0,05), controllo delle misure prese con storico, **foglio di attrezzaggio** da

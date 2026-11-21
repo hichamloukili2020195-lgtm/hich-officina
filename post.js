@@ -1,17 +1,20 @@
 // ===== Hich-Officina: post-processor (dal programma ISO dell'app ai linguaggi delle macchine) =====
 // I programmi dell'app nascono in ISO; qui si traducono. Linguaggi:
-//   iso      ISO con codici G e M e cicli G81-G89 (come esce dall'app)
-//   cicli    ISO con cicli a nome e parametri (CYCLE81..., MCALL, LIMS, G33 K), commenti con ;   fresa e tornio
-//   dialogo  dialogo a testo con righe numerate (L, TOOL CALL, CYCL DEF con parametri Q)          solo fresa
+//   iso      ISO con codici G e M e cicli G81-G89 (come esce dall'app): controlli Fanuc e simili
+//   cicli    ISO con cicli a nome e parametri (CYCLE81..., MCALL, LIMS, G33 K), commenti con ;   fresa e tornio:
+//            controlli Siemens Sinumerik
+//   dialogo  dialogo a testo con righe numerate (L, TOOL CALL, CYCL DEF con parametri Q)          solo fresa:
+//            controlli Heidenhain
 // Si traducono i programmi generati dall'app (non le macro e non programmi qualsiasi). Sempre da provare a vuoto.
 (function (radice) {
   'use strict';
   const O = typeof module !== 'undefined' && module.exports ? require('./calcoli.js') : radice.Officina;
 
+  // Il nome della marca serve solo a dire con quali controlli e compatibile il programma (regola dell'utente).
   const LINGUAGGI = {
-    iso: { nome: 'ISO (codici G e M, cicli G81-G89)', fresa: true, tornio: true },
-    cicli: { nome: 'ISO con cicli a nome (CYCLE81, MCALL, LIMS)', fresa: true, tornio: true, estensione: '.MPF' },
-    dialogo: { nome: 'Dialogo a testo (TOOL CALL, L, CYCL DEF)', fresa: true, tornio: false, estensione: '.H' }
+    iso: { nome: 'ISO - compatibile con controlli Fanuc e simili', fresa: true, tornio: true },
+    cicli: { nome: 'Cicli a nome - compatibile con controlli Siemens Sinumerik', fresa: true, tornio: true, estensione: '.MPF' },
+    dialogo: { nome: 'Dialogo a testo - compatibile con controlli Heidenhain', fresa: true, tornio: false, estensione: '.H' }
   };
 
   const numero = v => { const s = O.gc(v); return s.endsWith('.') ? s.slice(0, -1) : s; };
