@@ -32,6 +32,17 @@ I dati di taglio sono **di partenza**. Ogni programma va controllato prima di la
 Apri il sito con il browser del telefono e scegli **Installa app** (o **Aggiungi a schermata Home**) dal menu.
 Dopo la prima apertura funziona anche senza rete.
 
+## APK per Android
+A ogni aggiornamento di `main` GitHub costruisce l'APK (lavoro "APK Android") e lo mette nella pagina di download:
+https://github.com/hichamloukili2020195-lgtm/hich-officina/releases/download/apk/Hich-Officina.apk
+
+Sul telefono: scarica il file, aprilo e consenti l'installazione da questa fonte quando Android lo chiede. Per
+aggiornare si installa sopra quello vecchio: macro, programmi e materiali restano (la chiave di firma e sempre la
+stessa, in `android/firma`; serve solo a questa app).
+
+Il progetto Android (`android/`) e una WebView che apre le stesse pagine del sito, copiate negli asset; salva i file
+in Download/Hich-Officina, condivide, copia negli appunti e sceglie i file.
+
 ## Prove
 - `node prove/prove.js`: calcoli, materiali, dati di taglio, programmi di fresa e tornio, macro.
 - `node prove/ui.js [cartella-schermate]`: tutte le schermate in un browser a misura di telefono (serve Playwright).

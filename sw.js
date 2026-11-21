@@ -1,5 +1,5 @@
 // Cache per usare l'app senza rete. Cambia VERSIONE a ogni aggiornamento dei file.
-const VERSIONE = 'hich-officina-2.1.0';
+const VERSIONE = 'hich-officina-2.2.0';
 const FILE = ['./', './index.html', './stile.css', './calcoli.js', './programmi.js', './app.js', './schermi_calcoli.js',
   './schermi_programma.js', './schermi_macro.js', './schermi_altro.js', './manifest.webmanifest',
   './icone/icona.svg', './icone/icona-192.png', './icone/icona-512.png'];

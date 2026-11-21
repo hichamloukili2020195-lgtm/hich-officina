@@ -1,0 +1,33 @@
+// L'app Android apre le pagine di Hich-Officina (copiate in assets/www dal lavoro automatico) in una WebView.
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'it.hich.officina'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'it.hich.officina'
+        minSdk 24
+        targetSdk 35
+        versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
+        versionName(System.getenv('VERSIONE_APP') ?: 'prova')
+    }
+    signingConfigs {
+        // Chiave solo per questa app: sempre la stessa, cosi gli aggiornamenti si installano sopra senza perdere i dati.
+        officina {
+            storeFile file('../firma/hich-officina.jks')
+            storePassword 'hichofficina'
+            keyAlias 'hich'
+            keyPassword 'hichofficina'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.officina
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

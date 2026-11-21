@@ -1,2 +1,8 @@
 node_modules/
 *.zip
+android/.gradle/
+android/build/
+android/app/build/
+android/app/src/main/assets/
+android/local.properties
+Hich-Officina.apk

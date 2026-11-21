@@ -174,7 +174,7 @@
         'Sono gli stessi valori che usa il programma parametrico quando prendi i materiali da Hich-CAM.'));
       const file = el('input', { type: 'file', accept: '.json,.txt,application/json,text/plain', id: 'f-file', style: 'display:none' });
       const pan = el('div', { class: 'pannello' }), esito = el('div');
-      m.append(file, el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salvati') + 'Scegli un file', onclick: () => file.click() })]), pan, esito);
+      m.append(file, el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salvati') + 'Scegli un file', onclick: () => { if (A.ANDROID && A.ANDROID.scegliFile) A.ANDROID.scegliFile(); else file.click(); } })]), pan, esito);
       let letti = null;
       const prova = () => {
         esito.innerHTML = ''; letti = null;
@@ -191,6 +191,7 @@
         esito.appendChild(A.info('I materiali di adesso vengono sostituiti. Tornitura e densita, se mancano, restano quelle di serie.'));
       };
       const f = A.modulo(pan, [{ id: 'testo', et: 'Testo JSON dei materiali', tipo: 'area', mono: true, righe: 8 }], v, prova);
+      window.__fileScelto = testo => { f.metti('testo', String(testo || '')); prova(); };
       file.addEventListener('change', () => {
         const x = file.files && file.files[0]; if (!x) return;
         const rd = new FileReader();
@@ -275,7 +276,7 @@
       m.appendChild(el('div', { class: 'sez', testo: 'Dati' }));
       m.appendChild(el('div', { class: 'menu' }, [A.voceMenu(['materiali', 'materiale', 'Materiali', 'Modifica velocita di taglio e avanzamenti'])]));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salva') + 'Esporta i miei dati', onclick: () => A.condividi('hich-officina-dati.json', JSON.stringify(A.mem, null, 1)) })]));
-      m.appendChild(A.info('Hich-Officina 2.1.0 · funziona anche senza rete. I dati restano su questo telefono. I valori di taglio sono di partenza: controlla sempre i programmi prima di lavorare.'));
+      m.appendChild(A.info('Hich-Officina ' + A.VERSIONE + ' · funziona anche senza rete. I dati restano su questo telefono. I valori di taglio sono di partenza: controlla sempre i programmi prima di lavorare.'));
     }
   };
 })();

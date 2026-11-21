@@ -170,7 +170,10 @@
   }
 
   // ----- copia, salva, condividi -----
+  // Nell'APK la pagina ha window.Android: salva, condividi, appunti e scelta dei file passano da li.
+  const ANDROID = window.Android || null;
   async function copia(testo, cosa) {
+    if (ANDROID) { try { if (ANDROID.copia(testo)) { avviso((cosa || 'Testo') + ' copiato'); return true; } } catch (e) { /* sotto */ } }
     try { await navigator.clipboard.writeText(testo); avviso((cosa || 'Testo') + ' copiato'); return true; } catch (e) {
       const t = el('textarea', { style: 'position:fixed;opacity:0' }); t.value = testo; document.body.appendChild(t); t.select();
       let ok = false; try { ok = document.execCommand('copy'); } catch (x) { ok = false; }
@@ -178,6 +181,7 @@
     }
   }
   function scarica(nome, testo) {
+    if (ANDROID) { try { avviso(ANDROID.salvaFile(nome, testo)); return; } catch (e) { /* sotto */ } }
     const blob = new Blob([testo], { type: 'text/plain' });
     const a = el('a', { href: URL.createObjectURL(blob), download: nome });
     document.body.appendChild(a); a.click(); a.remove();
@@ -185,6 +189,7 @@
     avviso('Salvato ' + nome);
   }
   async function condividi(nome, testo) {
+    if (ANDROID) { try { ANDROID.condividi(nome, testo); return; } catch (e) { /* sotto */ } }
     try {
       const file = new File([testo], nome, { type: 'text/plain' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: nome }); return; }
@@ -196,8 +201,8 @@
   // ----- schermate -----
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
-    avviso, modulo, numeri, misuratore, griglia, info, copia, scarica, condividi,
-    schermi: {}, param: {}, VERSIONE: '2.1.0'
+    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi,
+    schermi: {}, param: {}, VERSIONE: '2.2.0'
   };
   window.App = App;
 
