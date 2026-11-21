@@ -244,6 +244,9 @@
   }
   const pad = t => String(Math.max(0, Math.round(t))).padStart(2, '0');
 
+  A.disegnaIso = (cv, r) => disegnaIso(cv, r);
+  A.disegnaTornio = (cv, r, v, interno) => disegnaTornio(cv, r, v, interno);
+
   // ----- editor dei punti del profilo -----
   const PROFILO_FRESA = [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 50, raccordo: 10 }, { x: 0, y: 50, smusso: 5 }];
   const PROFILO_TORNIO = [{ x: 0, z: 0 }, { x: 16, z: 0 }, { x: 20, z: -2 }, { x: 20, z: -20 }, { x: 30, z: -25, tratto: 'ccw', r: 5 }, { x: 30, z: -40 }, { x: 40, z: -40 }];

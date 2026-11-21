@@ -234,6 +234,9 @@ canvas.disegno-tela{height:330px;touch-action:none}
 .controllo-voce.errore{border-left-color:var(--errore)} .controllo-voce.avviso{border-left-color:var(--avviso)}
 .controllo-riga{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:2px}
 .controllo-riga code{font:12.5px var(--mono);color:var(--tenue);overflow-wrap:anywhere}
+.riga-titolo{display:flex;align-items:center;justify-content:space-between}
+.chips.quote{flex-wrap:wrap;overflow:visible}
+.chip.quota-diametro{border-color:var(--accento2)} .chip.quota-filetto,.chip.quota-fori{border-color:var(--ok)} .chip.quota-tolleranza{border-color:var(--avviso)}
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--testo);color:var(--fondo);
   padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
 .toast.vedi{opacity:1}

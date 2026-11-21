@@ -103,7 +103,9 @@
       const xA = -d / 2 - 3, xB = lx + d / 2 + 3;
       testa();
       avvicina(xA, ys[0]);
-      for (const z of livelli(prof, ap)) {
+      const zTop = c.zTop > 0 ? c.zTop : 0;   // sopra del grezzo (Z0 sulla faccia finita): si spiana da zTop a zTop - prof
+      for (const z0 of livelli(prof, ap)) {
+        const z = z0 + zTop;
         rap(xA, ys[0], null); rap(null, null, z + zR);
         lav(null, null, z, fp);
         ys.forEach((yy, i) => {
@@ -113,7 +115,7 @@
         rap(null, null, zR);
       }
       coda();
-      pezzo = { x0: 0, y0: 0, x1: lx, y1: ly, z0: -Math.max(prof * 3, 5), z1: 0 };
+      pezzo = { x0: 0, y0: 0, x1: lx, y1: ly, z0: -Math.max(prof * 3, 5), z1: zTop };
       avvisi.push(ys.length + ' passate per livello, passo laterale ' + gc(step) + ' mm. Origine nello spigolo in basso a sinistra.');
     } else if (op === 'contorno') {
       const { lx, ly, prof, ap, d } = c;

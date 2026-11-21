@@ -288,7 +288,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.9.0'
+    schermi: {}, param: {}, VERSIONE: '2.10.0'
   };
   window.App = App;
 
@@ -362,6 +362,7 @@
     ['tolleranze', 'tolleranza', 'Tolleranze e accoppiamenti', 'ISO 286: fori, alberi, gioco e interferenza'],
     ['macro', 'codice', 'Macro CNC', 'Modelli pronti e macro personali con parametri'],
     ['galleria', 'galleria', 'Galleria esempi', 'Programmi d\'esempio da aprire e modificare'],
+    ['ciclo', 'tabella', 'Ciclo di lavoro proposto', 'Dal pezzo (o dalle quote di un disegno) alla lavorazione completa'],
     ['disegno', 'tornio', 'Disegna un profilo (tornio)', 'Col dito sullo schermo, con la vista 3D del pezzo'],
     ['apri', 'codice', 'Controlla e simula un programma', 'Da una foto dello schermo, da un file o incollato: errori, percorso, tempo'],
     ['salvati', 'salvati', 'Programmi salvati', 'I programmi tenuti su questo telefono'],

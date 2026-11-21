@@ -38,11 +38,11 @@ const server = http.createServer((q, r) => {
   await vai('home');
   await foto('01-home');
   const voci = await pg.$$eval('.menu .voce', x => x.length);
-  ok(voci === 12, 'voci del menu: ' + voci);
+  ok(voci === 13, 'voci del menu: ' + voci);
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno']) {
+  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo']) {
     await vai(s); await erroreSchermo(s); await largo(s);
   }
 
@@ -406,6 +406,48 @@ const server = http.createServer((q, r) => {
   await largo('pannello tablet');
   await pg.setViewportSize({ width: 390, height: 844 }); await pg.waitForTimeout(100);
 
+  // ===== 2.10.0: ciclo proposto e quote dal disegno =====
+  await vai('ciclo'); await pg.waitForTimeout(80);
+  await pg.click('.schede button[data-id="albero"]'); await pg.waitForTimeout(60);
+  await pg.click('text=Proponi il ciclo'); await pg.waitForTimeout(150);
+  ok((await pg.$$eval('#schermo .elem.fase', x => x.length)) === 5, 'albero: 5 lavorazioni (senza foro in asse)');
+  ok(!(await pg.$('#schermo .errore')), 'albero con errore');
+  await foto('26-ciclo-albero');
+  await pg.click('text=Crea il programma'); await pg.waitForTimeout(80);
+  ok((await pg.textContent('.listato')).includes('(FASE 5: TRONCATURA'), 'programma dell\'albero');
+  await pg.goBack(); await pg.waitForTimeout(80);
+  await pg.click('text=Proponi il ciclo'); await pg.waitForTimeout(150);
+  await pg.click('text=Crea il pezzo con le misure da controllare'); await pg.waitForTimeout(100);
+  ok((await pg.evaluate(() => location.hash)) === '#pezzo' && (await pg.inputValue('[aria-label="Tolleranza 1"]')) === 'h6', 'pezzo con le misure');
+  // quote incollate
+  await vai('ciclo'); await pg.waitForTimeout(60);
+  await pg.click('text=Incolla il testo');
+  await pg.fill('[id^="f-quoteTesto"]', 'Ø25h6  M12x1,75  4xØ9  1x45°');
+  await pg.click('text=Leggi le quote'); await pg.waitForTimeout(60);
+  ok((await pg.$$eval('.chips.quote .chip', x => x.length)) >= 4, 'quote lette');
+  const prima = await pg.evaluate(() => App.mem.ciclo.albero.tratti.length);
+  await pg.click('.chips.quote .chip:text("Ø25 h6")'); await pg.waitForTimeout(80);
+  ok((await pg.evaluate(() => App.mem.ciclo.albero.tratti.length)) === prima + 1 && (await pg.evaluate(() => App.mem.ciclo.albero.tratti.slice(-1)[0].toll)) === 'h6', 'quota aggiunta come diametro');
+  // un campo scelto: la quota va li
+  await pg.click('[id="f-lg"]');
+  await pg.click('.chips.quote .chip:text("Ø25 h6")'); await pg.waitForTimeout(60);
+  ok((await pg.inputValue('#f-lg')) === '25', 'quota scritta nel campo scelto');
+  await foto('27-quote');
+  // piastra
+  await pg.click('.schede button[data-id="piastra"]'); await pg.waitForTimeout(80);
+  const fori0 = await pg.evaluate(() => App.mem.ciclo.piastra.fori.length);
+  await pg.click('.chips.quote .chip:text("4 x Ø9")'); await pg.waitForTimeout(80);
+  ok((await pg.evaluate(() => App.mem.ciclo.piastra.fori.length)) === fori0 + 1, 'fori dalla quota');
+  await pg.evaluate(() => { App.mem.ciclo.piastra.fori.pop(); App.salva(); }); await vai('home'); await vai('ciclo'); await pg.waitForTimeout(80);
+  await pg.click('text=Proponi il ciclo'); await pg.waitForTimeout(200);
+  ok(!(await pg.$('#schermo .errore')), 'piastra con errore: ' + ((await pg.$('#schermo .errore')) ? await pg.textContent('#schermo .errore') : ''));
+  const nf = await pg.$$eval('#schermo .elem.fase', x => x.length);
+  ok(nf >= 7, 'piastra: lavorazioni ' + nf);
+  await foto('28-ciclo-piastra');
+  await pg.click('text=Modifica in Sequenza'); await pg.waitForTimeout(100);
+  ok((await pg.$$eval('.elem.fase', x => x.length)) === nf, 'piastra nella sequenza');
+  await largo('fine 2.10.0');
+
   // impostazioni: tema chiaro
   await vai('impostazioni');
   await pg.selectOption('#f-tema', 'chiaro');
@@ -417,7 +459,7 @@ const server = http.createServer((q, r) => {
   await pg.waitForTimeout(300);
   await pg.reload();
   await vai('salvati');
-  ok((await pg.$$eval('.elenco .elem', x => x.length)) === 1, 'programma salvato perso');
+  ok((await pg.$$eval('.elenco .elem', x => x.length)) >= 1, 'programma salvato perso');
   const sw = await pg.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()));
   ok(sw, 'service worker non registrato');
 

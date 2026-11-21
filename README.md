@@ -19,6 +19,16 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
     forature, lamature, fori a fresa, alesature, smusso d'imbocco e maschiatura, smussi, profili), senza cambio per lo
     stesso utensile di seguito; un ordine impossibile (maschio prima del preforo) non si accetta.
   Il listato si copia, si condivide, si salva come `.nc` o si tiene in **Programmi salvati**.
+- **Ciclo di lavoro proposto**: descrivi il pezzo a misure e l'app propone la lavorazione completa da controllare:
+  - albero da tornio (diametri dalla testa con tolleranze e filetti, foro in asse, troncatura): sfacciatura, foro,
+    profilo con finitura al centro della tolleranza, gole di scarico, filetti, troncatura;
+  - piastra da fresa (grezzo e finito, fori lisci, filettati o alesati su cerchio, griglia o elenco, tasche):
+    spianatura, centrini, preforature giuste, smussi, maschi, alesatori, fori grandi a fresa, tasche, contornatura,
+    nell'ordine di officina.
+  Utensili dalla tabella (se mancano, numeri proposti da controllare), dati di taglio dal materiale, controllo del
+  programma; poi il programma, la Sequenza da modificare o il pezzo con le misure da controllare.
+  **Quote da una foto del disegno** (nell'APK) o dal testo incollato: Ø con tolleranze, filetti, fori ripetuti
+  (4xØ9, 6xM8), smussi, raggi, lunghezze diventano bottoni da toccare per riempire i campi.
 - **Disegna un profilo (tornio)** col dito: a punti o a mano libera (il tratto diventa rette), aggancio alla griglia e
   alle rette orizzontali e verticali, punti da trascinare, quote, raccordi e smussi da scrivere, **vista 3D del pezzo
   tornito** da girare col dito; poi diventa il profilo libero di Nuovo programma ISO.
@@ -90,6 +100,7 @@ Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i fil
 ## File
 - `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
 - `programmi.js`: programmi della fresatrice, sequenza, schemi dei fori, macro.
+- `ciclo.js`: ciclo di lavoro proposto (albero e piastra), quote lette da un disegno, programma del tornio a piu fasi.
 - `schermi_disegno.js`: disegno del profilo col dito e vista 3D del pezzo tornito.
 - `profilo.js`: profili liberi (raccordi, smussi, archi), percorso con G41/G42, sgrossatura dei profili da tornio.
 - `post.js`: post-processor verso gli altri linguaggi delle macchine.

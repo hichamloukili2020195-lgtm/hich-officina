@@ -5,6 +5,7 @@ const O = require('../programmi.js');   // carica anche calcoli.js
 require('../profilo.js');
 require('../iso.js');
 require('../post.js');
+require('../ciclo.js');
 let n = 0;
 const prova = (nome, f) => { try { f(); n++; } catch (e) { console.error('FALLITA: ' + nome + '\n' + e.message); process.exitCode = 1; } };
 const vicino = (a, b, tol = 1e-6) => assert.ok(Math.abs(a - b) <= tol, a + ' invece di ' + b);
@@ -396,5 +397,56 @@ prova('lettura da foto: pulizia del testo', () => {
   // un programma gia pulito resta uguale
   const g = O.gcodeFresa('tasca', { n: 3000, f: 600, t: 3, zSic: 50, zR: 2, cx: 40, cy: 25, lx: 40, ly: 20, prof: 6, ap: 3, d: 10 });
   assert.strictEqual(O.pulisciLettura(g.righe.join('\n')).testo, g.righe.join('\n'));
+});
+prova('ciclo proposto: albero', () => {
+  const mt = O.MATERIALI.find(m => m.n === 'C40');
+  const a = O.pianificaAlbero({ dg: 40, lg: 100, smusso: 0.5, tratti: [{ d: 20, l: 25, passo: 2.5 }, { d: 30, l: 20, toll: 'h6' }, { d: 36, l: 15 }], foro: { d: 8, prof: 20 }, troncatura: true }, { mat: mt, nmax: 3000 });
+  assert.ok(!a.errore);
+  assert.deepStrictEqual(a.fasi.map(f => f.op), ['sfacciatura', 'foratura', 'profilo', 'gola', 'filetto', 'troncatura']);
+  const prof = a.fasi[2].c.punti;
+  assert.ok(prof.some(p => Math.abs(p.x - 29.9935) < 0.001), 'Ø30 h6 al centro della tolleranza');
+  assert.ok(prof.some(p => p.x === 19.9), 'filetto un decimo sotto');
+  assert.strictEqual(a.fasi[5].c.zt, -60);
+  assert.ok(a.misure.some(m => m.toll === 'h6'));
+  const r = O.gcodeSequenzaTornio(a.fasi, { num: 9, nome: 'albero' });
+  assert.ok(!r.errore);
+  const c = O.controllaISO(r.righe.join('\n'));
+  assert.deepStrictEqual(c.segnalazioni.filter(x => x.livello !== 'nota'), []);
+  vicino(c.limiti.z.minLavoro, -60);
+  assert.ok(O.pianificaAlbero({ dg: 40, tratti: [{ d: 30, l: 10 }, { d: 20, l: 10 }] }, { mat: mt }).errore.includes('due prese'));
+  // con i cicli fissi: ogni G71 ha i suoi blocchi
+  const b = O.pianificaAlbero({ dg: 40, lg: 50, tratti: [{ d: 30, l: 20 }] }, { mat: mt, nmax: 3000, metodo: 'ciclo' });
+  const rb = O.gcodeSequenzaTornio(b.fasi, { num: 1 });
+  assert.ok(rb.righe.some(l => /^G71 P2100 Q2200/.test(l)) && rb.righe.some(l => /^N2100 /.test(l)));
+  assert.strictEqual(O.controllaISO(rb.righe.join('\n')).errore, null);
+});
+prova('ciclo proposto: piastra', () => {
+  const mt = O.MATERIALI.find(m => m.n === 'C40');
+  const p = O.pianificaPiastra({ gx: 105, gy: 85, gz: 22, fx: 100, fy: 80, fz: 20, tasche: [{ tipo: 'rett', cx: 50, cy: 40, lx: 40, ly: 30, prof: 8, r: 6 }],
+    fori: [{ tipo: 'maschio', d: 8, passante: true, schema: 'griglia', x0: 10, y0: 10, nx: 2, ny: 2, px: 80, py: 60 }, { tipo: 'alesato', d: 10, prof: 15, schema: 'elenco', testo: '30 70\n70 10' }] }, { mat: mt, nmax: 12000 });
+  assert.ok(!p.errore);
+  const tipi = p.fasi.map(f => O.tipoFase(f, p.fasi));
+  assert.strictEqual(tipi[0], 'spianatura'); assert.strictEqual(tipi[tipi.length - 1], 'contorno');
+  assert.ok(tipi.indexOf('maschio') > tipi.indexOf('puntaMD') && tipi.indexOf('alesatore') > tipi.indexOf('puntaMD'));
+  assert.ok(p.fasi.some(f => f.tipoUt === 'puntaMD' && Math.abs(f.c.d - 6.75) < 1e-9), 'preforo M8');
+  assert.ok(p.fasi.some(f => f.tipoUt === 'puntaMD' && Math.abs(f.c.d - 9.8) < 1e-9), 'preforo alesatura');
+  const q = O.gcodeSequenza(p.fasi, { num: 10 });
+  assert.ok(!q.errore);
+  const c = O.controllaISO(q.righe.join('\n'));
+  assert.deepStrictEqual(c.segnalazioni.filter(x => x.livello !== 'nota'), []);
+  vicino(c.limiti.z.maxLavoro, 2);   // la spianatura parte dal grezzo, 2 sopra Z0
+  // con la tabella utensili: i numeri T vengono da li
+  const tab = [{ t: 12, tipo: 'maschio', d: 8 }, { t: 15, tipo: 'fresa', d: 10, z: 3 }];
+  const p2 = O.pianificaPiastra({ fx: 50, fy: 50, fz: 10, tasche: [{ tipo: 'circ', cx: 25, cy: 25, dt: 30, prof: 5 }], fori: [{ tipo: 'maschio', d: 8, passante: true, schema: 'elenco', testo: '5 5' }] }, { mat: mt, tab });
+  assert.ok(p2.fasi.some(f => f.tipoUt === 'maschio' && f.c.t === 12) && p2.fasi.some(f => f.op === 'tascaCircolare' && f.c.t === 15));
+});
+prova('quote lette da un disegno', () => {
+  const q = O.estraiQuote('Ø20h6  Ø30 ±0,02 M20x1,5 4xØ8,5 6 x M8 1x45° R2 H7 120 35');
+  const tipo = (t, testo) => q.find(x => x.tipo === t && x.testo === testo);
+  assert.ok(tipo('diametro', 'Ø20 h6') && tipo('diametro', 'Ø30 ±0.02'));
+  assert.ok(tipo('filetto', 'M20x1.5') && tipo('fori', '4 x Ø8.5') && tipo('fori', '6 x M8'));
+  assert.strictEqual(tipo('fori', '6 x M8').filetto.p, 1.25);
+  assert.ok(tipo('smusso', '1x45°') && tipo('raggio', 'R2') && tipo('tolleranza', 'H7') && tipo('lunghezza', '120') && tipo('lunghezza', '35'));
+  assert.ok(!q.some(x => x.tipo === 'lunghezza' && (x.valore === 20 || x.valore === 45)));
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');
