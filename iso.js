@@ -152,7 +152,7 @@
       return st.giriMax ? Math.min(n, st.giriMax) : n;
     };
     function muovi(x, y, z, rapido, riga, taglio) {
-      const s = { x0: st.x, y0: st.y, z0: st.z, x, y, z, rapido, riga, t: st.t, f: st.f, taglio: !!taglio };
+      const s = { x0: st.x, y0: st.y, z0: st.z, x, y, z, rapido, riga, t: st.t, f: st.f, n: Math.round(st.g96 ? giriAttuali(x) : st.s), g96: st.g96, taglio: !!taglio };
       const l = Math.hypot((x - st.x) / (tornio ? 2 : 1), y - st.y, z - st.z);
       if (l < 1e-9) return;
       segmenti.push(s);

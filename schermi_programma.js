@@ -466,6 +466,9 @@
         const opAtt = tab === 'fresa' ? (FRESA[v.op] ? v.op : 'spianatura') : tab === 'tornio' ? (TORNIO[v.op] ? v.op : 'sgrossatura') : 'fori';
         const defOp = tab === 'fresa' ? FRESA[opAtt] : tab === 'tornio' ? TORNIO[opAtt] : null;
         if (defOp && defOp.profilo) { const box = el('div', { class: 'editor-punti' }); panLav.appendChild(box); editorPunti(box, v, defOp.profilo === 'tornio', () => aggiorna()); }
+        if (defOp && defOp.profilo === 'tornio') panLav.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('modifica') + 'Disegna col dito e vedi in 3D', onclick: () => {
+          const D = A.sezione('disegno'); D.punti = JSON.parse(JSON.stringify(v.punti || [])); if (v.dg) D.dg = String(v.dg); A.salva(); A.vai('disegno');
+        } })]));
         fD = A.modulo(panTaglio, campiTaglio, v, aggiorna);
         if (!(O.num(v.vc) > 0)) { const nuovi = autoTaglio(tab, v); for (const k in nuovi) fD.metti(k, nuovi[k]); }
         genera.addEventListener('click', () => {

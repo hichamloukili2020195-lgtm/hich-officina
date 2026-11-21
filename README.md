@@ -19,6 +19,11 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
     forature, lamature, fori a fresa, alesature, smusso d'imbocco e maschiatura, smussi, profili), senza cambio per lo
     stesso utensile di seguito; un ordine impossibile (maschio prima del preforo) non si accetta.
   Il listato si copia, si condivide, si salva come `.nc` o si tiene in **Programmi salvati**.
+- **Disegna un profilo (tornio)** col dito: a punti o a mano libera (il tratto diventa rette), aggancio alla griglia e
+  alle rette orizzontali e verticali, punti da trascinare, quote, raccordi e smussi da scrivere, **vista 3D del pezzo
+  tornito** da girare col dito; poi diventa il profilo libero di Nuovo programma ISO.
+- **Simulazione a pannello**: quote X Y Z grandi, giri con l'indicatore, avanzamento, utensile, righe del programma che
+  scorrono con la riga in lavoro; su tablet in orizzontale grafico e pannello affiancati.
 - **Ricerca veloce dalla home**: M10 (filetto e preforo), H7 25 (tolleranza), 316 (materiale), G83 (codice), T5
   (utensile), nomi di pezzi, programmi e macro.
 - **Calcolatrice di taglio**: fresatura, tornitura, foratura, maschiatura, filettatura al tornio, cono, fori su
@@ -81,6 +86,7 @@ Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i fil
 ## File
 - `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
 - `programmi.js`: programmi della fresatrice, sequenza, schemi dei fori, macro.
+- `schermi_disegno.js`: disegno del profilo col dito e vista 3D del pezzo tornito.
 - `profilo.js`: profili liberi (raccordi, smussi, archi), percorso con G41/G42, sgrossatura dei profili da tornio.
 - `post.js`: post-processor verso gli altri linguaggi delle macchine.
 - `iso.js`: lettura ed esecuzione dei programmi ISO e delle macro (per simulazione, apertura, foglio di attrezzaggio).

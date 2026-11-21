@@ -190,7 +190,7 @@
       const sv = A.sezione('simVista');
       const modo = r.modo;
       if (!viste(modo).some(x => x[0] === sv.vista)) sv.vista = viste(modo)[0][0];
-      const cv = el('canvas', { class: 'vista', style: 'height:300px', 'aria-label': 'Simulazione del percorso' });
+      const cv = el('canvas', { class: 'vista sim-tela', 'aria-label': 'Simulazione del percorso' });
       const schede = el('div', { class: 'schede' });
       viste(modo).forEach(([id, t]) => schede.appendChild(el('button', { 'data-id': id, testo: t, onclick: () => { sv.vista = id; A.salva(); schede.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === id)); prepara(); disegna(); } })));
       schede.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === sv.vista));
@@ -210,7 +210,37 @@
         b('<path d="M9 6l8 6-8 6z"/>', 'Passo avanti', () => { ferma(); vai(Math.min(N, k + 1)); }),
         b('<path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/>', 'Alla fine', () => { ferma(); vai(N); }),
         el('div', { class: 'ctrl', style: 'flex:0 0 auto;min-width:76px' }, [vel])]);
-      m.append(schede, cv, cursore, comandi, stato);
+      // pannello stile controllo: quote grandi, giri, avanzamento, utensile, righe del programma
+      const tor = modo === 'tornio';
+      const nmax = tor ? A.imp().nmaxTornio : A.imp().nmaxFresa;
+      const dro = {};
+      const quota = (ax) => { const v = el('b', { testo: '0,000' }); dro[ax] = v; return el('div', { class: 'dro-riga' }, [el('span', { class: 'dro-asse', testo: ax }), v]); };
+      const giriBox = el('div', { class: 'dro-giri' });
+      const info = el('div', { class: 'dro-info' });
+      const righe = el('div', { class: 'sim-righe', 'aria-label': 'Righe del programma' });
+      const NR = Math.min(r.righe.length, 3000);
+      righe.innerHTML = r.righe.slice(0, NR).map((x, i) => '<div data-r="' + i + '"><span class="n">' + (i + 1) + '</span><span>' + (A.colora ? A.colora(x) : esc(x)) + '</span></div>').join('');
+      const pannello = el('div', { class: 'sim-pannello' }, [el('div', { class: 'dro' }, [tor ? null : quota('X'), tor ? quota('X') : quota('Y'), quota('Z')].filter(Boolean)), el('div', { class: 'dro-sotto' }, [giriBox, info]), righe]);
+      if (tor) pannello.firstChild.insertBefore(el('div', { class: 'dro-nota', testo: 'X in diametro' }), pannello.firstChild.firstChild);
+      m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, cv, cursore, comandi, stato]), pannello]));
+      let rigaVista = -1;
+      const aggiornaPannello = (cur, px, riga) => {
+        if (tor) { dro.X.textContent = fmt(px[0], 3); dro.Z.textContent = fmt(px[2], 3); }
+        else { dro.X.textContent = fmt(px[0], 3); dro.Y.textContent = fmt(px[1], 3); dro.Z.textContent = fmt(px[2], 3); }
+        const n = cur.n || 0, fr = Math.max(0, Math.min(1, n / (nmax || 1)));
+        const a0 = Math.PI * 0.75, a1 = a0 + Math.PI * 1.5 * fr;
+        const pt = a => (40 + 32 * Math.cos(a)).toFixed(1) + ' ' + (40 + 32 * Math.sin(a)).toFixed(1);
+        giriBox.innerHTML = '<svg viewBox="0 0 80 66" aria-hidden="true"><path d="M' + pt(a0) + ' A32 32 0 1 1 ' + pt(Math.PI * 2.25) + '" fill="none" stroke="var(--bordo)" stroke-width="6" stroke-linecap="round"/>' +
+          (fr > 0.003 ? '<path d="M' + pt(a0) + ' A32 32 0 ' + (a1 - a0 > Math.PI ? 1 : 0) + ' 1 ' + pt(a1) + '" fill="none" stroke="var(--accento2)" stroke-width="6" stroke-linecap="round"/>' : '') +
+          '</svg><b>' + fmt(n, 0) + '</b><small>giri/min' + (cur.g96 ? ' (Vc costante)' : '') + '</small>';
+        info.innerHTML = '<div><small>F</small><b>' + fmt(cur.f, 3) + '</b><small>' + (tor ? 'mm/giro' : 'mm/min') + '</small></div><div><small>T</small><b>' + (cur.t || 0) + '</b></div><div><small>' + (cur.rapido ? 'Rapido' : 'Lavoro') + '</small><b>' + Math.round(k / (N || 1) * 100) + '%</b></div>';
+        if (riga !== rigaVista && riga < NR) {
+          const prima = righe.querySelector('.attuale'); if (prima) prima.classList.remove('attuale');
+          const d = righe.querySelector('[data-r="' + riga + '"]');
+          if (d) { d.classList.add('attuale'); righe.scrollTop = d.offsetTop - righe.clientHeight / 2; }
+          rigaVista = riga;
+        }
+      };
       const sotto = el('div');
       m.appendChild(sotto);
       // riassunto sotto la simulazione
@@ -250,7 +280,14 @@
         const ox = (W - (proj.Mx - proj.mx) * sc) / 2 - proj.mx * sc, oy = (H - (proj.My - proj.my) * sc) / 2 - proj.my * sc;
         const P2 = (x, y, z) => { const q = proj.f(x, y, z); return [ox + q[0] * sc, oy + q[1] * sc]; };
         // asse del tornio
-        if (modo === 'tornio') { g.strokeStyle = colore('--tenue'); g.setLineDash([8, 4, 2, 4]); g.beginPath(); g.moveTo(0, oy); g.lineTo(W, oy); g.stroke(); g.setLineDash([]); }
+        if (modo === 'tornio') {
+          const L = r.limiti;
+          if (L.x.maxLavoro !== null) {
+            const a = P2(L.x.maxLavoro, 0, Math.max(L.z.maxLavoro, 0)), c = P2(0, 0, L.z.minLavoro);
+            g.fillStyle = colore('--tenue'); g.globalAlpha = 0.14; g.fillRect(Math.min(a[0], c[0]), a[1], Math.abs(a[0] - c[0]), c[1] - a[1]); g.globalAlpha = 1;
+          }
+          g.strokeStyle = colore('--tenue'); g.setLineDash([8, 4, 2, 4]); g.beginPath(); g.moveTo(0, oy); g.lineTo(W, oy); g.stroke(); g.setLineDash([]);
+        }
         const acc = colore('--accento2'), ten = colore('--tenue'), fatti = colore('--ok');
         // tutto il percorso, tenue
         g.lineWidth = 1; g.globalAlpha = 0.35;
@@ -274,6 +311,7 @@
         if (modo !== 'tornio' && sv.vista !== 'xy') { g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0], p[1] - 34); g.stroke(); }
         // testo dello stato
         const riga = k > 0 ? cur.riga : (S[0] ? S[0].riga : 0);
+        aggiornaPannello(cur, px, riga);
         stato.textContent = 'Riga ' + (riga + 1) + ':  ' + (r.righe[riga] || '').trim() + '\n' +
           (modo === 'tornio' ? 'X' + fmt(px[0], 3) + '  Z' + fmt(px[2], 3) : 'X' + fmt(px[0], 3) + '  Y' + fmt(px[1], 3) + '  Z' + fmt(px[2], 3)) +
           '   T' + (cur.t || 0) + '  F' + fmt(cur.f, 3) + '   ' + k + ' / ' + N;

@@ -38,11 +38,11 @@ const server = http.createServer((q, r) => {
   await vai('home');
   await foto('01-home');
   const voci = await pg.$$eval('.menu .voce', x => x.length);
-  ok(voci === 11, 'voci del menu: ' + voci);
+  ok(voci === 12, 'voci del menu: ' + voci);
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato']) {
+  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno']) {
     await vai(s); await erroreSchermo(s); await largo(s);
   }
 
@@ -352,6 +352,59 @@ const server = http.createServer((q, r) => {
   await pg.click('text=M10 x 1,5'); await pg.waitForTimeout(80);
   ok((await pg.inputValue('#f-d')) === '10' && (await pg.inputValue('#f-p')) === '1.5', 'ricerca M10 apre la maschiatura');
   await largo('fine 2.7.0');
+
+  // ===== 2.8.0: disegno col dito e pannello =====
+  await vai('disegno'); await pg.waitForTimeout(80);
+  ok((await pg.$$eval('.disegno-tela', x => x.length)) === 1, 'tela del disegno');
+  await pg.click('text=Cancella tutto');
+  const tela = await pg.$('.disegno-tela'); const bb = await tela.boundingBox();
+  // la tela: Z a destra = 0; tocchi da destra verso sinistra
+  const tocca = async (fx, fy) => { await pg.mouse.click(bb.x + bb.width * fx, bb.y + bb.height * fy); await pg.waitForTimeout(30); };
+  await tocca(0.93, 0.5); await tocca(0.93, 0.33); await tocca(0.6, 0.34); await tocca(0.6, 0.25); await tocca(0.3, 0.25);
+  const pts = await pg.evaluate(() => App.mem.disegno.punti);
+  ok(pts.length === 5, 'punti col dito: ' + pts.length);
+  ok(pts[1].z === pts[0].z && pts[2].x === pts[1].x, 'aggancio orizzontale e verticale: ' + JSON.stringify(pts.slice(0, 3)));
+  ok(pts.every(q => Number(q.z) <= 0 && Number(q.x) >= 0 && Math.abs(Number(q.x) * 2 - Math.round(Number(q.x) * 2)) < 1e-9), 'punti sulla griglia');
+  // trascina il punto 4
+  const p4 = await pg.evaluate(() => App.mem.disegno.punti[3]);
+  await pg.click('text=Annulla'); await pg.waitForTimeout(30);
+  ok((await pg.evaluate(() => App.mem.disegno.punti.length)) === 4, 'annulla');
+  // tratto a mano
+  await pg.click('text=A mano libera');
+  await pg.mouse.move(bb.x + bb.width * 0.95, bb.y + bb.height * 0.5); await pg.mouse.down();
+  for (let i = 0; i <= 20; i++) await pg.mouse.move(bb.x + bb.width * (0.95 - i * 0.02), bb.y + bb.height * (0.4 - (i > 10 ? 0.1 : 0)));
+  await pg.mouse.up(); await pg.waitForTimeout(60);
+  const mano = await pg.evaluate(() => App.mem.disegno.punti.length);
+  ok(mano >= 2 && mano <= 8, 'tratto a mano semplificato: ' + mano);
+  await foto('21-disegno');
+  // modifica di un punto con le quote
+  await pg.click('text=Un tocco = un punto');
+  await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '16', z: '0' }, { x: '20', z: '-2' }, { x: '20', z: '-20' }, { x: '30', z: '-25', tratto: 'ccw', r: '5' }, { x: '30', z: '-40' }, { x: '40', z: '-40' }]; });
+  await vai('home'); await vai('disegno'); await pg.waitForTimeout(60);
+  await pg.click('.schede button[data-id="3D"]'); await pg.waitForTimeout(80);
+  const pieno = await pg.$eval('.disegno-tela', c => { const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n / (d.length / 4); });
+  ok(pieno > 0.05, 'vista 3D vuota: ' + pieno);
+  await foto('22-pezzo-3d');
+  await pg.click('.schede button[data-id="2D"]');
+  await pg.click('text=Crea il programma'); await pg.waitForTimeout(100);
+  ok((await pg.evaluate(() => location.hash)) === '#programma' && (await pg.inputValue('#f-op')) === 'profilo', 'il disegno non apre il profilo');
+  ok((await pg.$$eval('.punto-riga', x => x.length)) === 14, 'punti del disegno nel programma');
+  ok(!(await pg.$('#schermo .errore')), 'programma dal disegno con errore');
+  // pannello della simulazione
+  await pg.click('text=Genera programma ISO'); await pg.waitForTimeout(80);
+  await pg.click('text=Simula'); await pg.waitForTimeout(400);
+  ok((await pg.$$eval('.dro-riga', x => x.length)) === 2, 'quote X Z del pannello');
+  ok(/\d/.test(await pg.textContent('.dro-giri b')), 'giri nel pannello');
+  ok((await pg.$$eval('.sim-righe .attuale', x => x.length)) === 1, 'riga del programma evidenziata');
+  await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(60);
+  await foto('23-pannello');
+  await pg.setViewportSize({ width: 1180, height: 820 }); await pg.waitForTimeout(150);
+  await vai('home'); await vai('simula'); await pg.waitForTimeout(300);
+  await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(60);
+  ok(await pg.$eval('.sim-griglia', g => getComputedStyle(g).gridTemplateColumns.split(' ').length === 2), 'pannello su due colonne sul tablet');
+  await foto('24-pannello-tablet');
+  await largo('pannello tablet');
+  await pg.setViewportSize({ width: 390, height: 844 }); await pg.waitForTimeout(100);
 
   // impostazioni: tema chiaro
   await vai('impostazioni');
