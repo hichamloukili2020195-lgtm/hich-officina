@@ -49,6 +49,25 @@ const server = http.createServer((q, r) => {
       if (dirFoto && (op === 'tasca' || op === null || op === 'sgrossatura')) await foto('02-programma-' + tab);
     }
   }
+  // la Vc cambia con il materiale in ogni scheda (bug: restava ferma)
+  for (const tab of ['fresa', 'fori', 'tornio']) {
+    await pg.click('.schede button[data-id="' + tab + '"]');
+    await pg.selectOption('#f-mat', { label: 'Alluminio' });
+    const vA = await pg.inputValue('#f-vc'), sA = await pg.textContent('#schermo .misuratore b');
+    await pg.selectOption('#f-mat', { label: 'AISI 316/316L' });
+    const vB = await pg.inputValue('#f-vc'), sB = await pg.textContent('#schermo .misuratore b');
+    ok(vA !== vB && vB !== '', tab + ': la Vc non cambia con il materiale (' + vA + ' / ' + vB + ')');
+    ok(sA !== sB, tab + ': i giri non cambiano con il materiale');
+    await pg.fill('#f-vc', '77');
+    ok((await pg.textContent('#schermo .risultati')).includes('77'), tab + ': la Vc scritta a mano non vale');
+  }
+  await pg.click('.schede button[data-id="fori"]');
+  await pg.selectOption('#f-mat', { label: 'C40' });
+  await pg.selectOption('#f-tipoUt', 'puntaMD');
+  const vMD = await pg.inputValue('#f-vc');
+  await pg.selectOption('#f-tipoUt', 'alesatore');
+  ok((await pg.inputValue('#f-vc')) !== vMD, 'la Vc non cambia con l\'utensile');
+  await pg.selectOption('#f-tipoUt', 'puntaMD');
   // fori: schemi
   await pg.click('.schede button[data-id="fori"]');
   for (const sc of ['griglia', 'elenco', 'cerchio']) { await pg.selectOption('#f-schema', sc); ok(!(await pg.$('#schermo .errore')), 'schema ' + sc); }
@@ -137,6 +156,18 @@ const server = http.createServer((q, r) => {
   await pg.selectOption('#f-mat', { label: 'C40' });
   await pg.selectOption('#f-tipo', 'fresa');
   ok((await pg.textContent('#schermo .risultati')).includes('190'), 'materiale modificato non usato');
+
+  // importa la tabella materiali (testo JSON della libreria di Hich-CAM)
+  await vai('materialiImporta');
+  const json = JSON.stringify({ materiali: [{ n: 'Acciaio officina', g: 'Acciai al carbonio', vc: 210, fz: .05, ap: .7, ae: 40, dvc: 95, dfn: .15, tvc: 12, rvc: 15, rfn: .22, bvc: 150, bfn: .09 }] });
+  await pg.fill('#f-testo', json);
+  await pg.click('text=Usa questi materiali');
+  await vai('programma');
+  await pg.click('.schede button[data-id="fori"]');
+  await pg.selectOption('#f-mat', { label: 'Acciaio officina' });
+  await pg.selectOption('#f-tipoUt', 'centrino'); await pg.selectOption('#f-tipoUt', 'puntaMD');
+  ok((await pg.inputValue('#f-vc')) === '95', 'materiali importati non usati');
+  await foto('11-programma-importato');
 
   // impostazioni: tema chiaro
   await vai('impostazioni');

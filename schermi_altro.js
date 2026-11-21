@@ -151,6 +151,7 @@
           el('span', { class: 'fine', html: A.icona('modifica') })])));
         m.appendChild(lista);
       }
+      m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('salva') + 'Importa la mia tabella materiali', onclick: () => A.vai('materialiImporta') })]));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('materiale') + 'Aggiungi materiale', onclick: () => {
         const nuovi = JSON.parse(JSON.stringify(A.materiali()));
         nuovi.push(Object.assign({}, nuovi[3] || nuovi[0], { n: 'Nuovo materiale', g: 'Miei materiali', note: '' }));
@@ -162,6 +163,40 @@
         delete A.mem.materiali; A.salva(); A.ridisegna(); A.avviso('Materiali di serie');
       } })]));
       m.appendChild(A.info('Gli stessi materiali e valori del programma parametrico (in officina solo metallo duro: le Vc si usano cosi come sono). La tornitura e la densita sono aggiunte qui e sono indicative.'));
+    }
+  };
+  A.schermi.materialiImporta = {
+    titolo: 'Importa materiali', preferibile: false,
+    render(m) {
+      const v = { testo: '' };
+      m.appendChild(A.info('<b>Come si fa:</b> in Hich-CAM apri la <b>Libreria materiali</b> e premi <b>JSON</b>: copia tutto il testo. ' +
+        'Portalo sul telefono (per esempio mandandotelo per posta o salvandolo in un file .json o .txt), poi incollalo qui sotto o scegli il file. ' +
+        'Sono gli stessi valori che usa il programma parametrico quando prendi i materiali da Hich-CAM.'));
+      const file = el('input', { type: 'file', accept: '.json,.txt,application/json,text/plain', id: 'f-file', style: 'display:none' });
+      const pan = el('div', { class: 'pannello' }), esito = el('div');
+      m.append(file, el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salvati') + 'Scegli un file', onclick: () => file.click() })]), pan, esito);
+      let letti = null;
+      const prova = () => {
+        esito.innerHTML = ''; letti = null;
+        if (!String(v.testo).trim()) return;
+        const r = O.leggiMateriali(v.testo);
+        if (r.errore) { esito.appendChild(el('p', { class: 'errore', testo: r.errore })); return; }
+        letti = r.materiali;
+        esito.appendChild(A.info('<b>' + letti.length + ' materiali</b>: ' + letti.map(x => A.esc(x.n)).join(', ') + '.'));
+        const ese = letti.slice(0, 6).map(x => '<tr><td>' + A.esc(x.n) + '</td><td>' + x.vc + '</td><td>' + x.dvc + '</td><td>' + (x.ivc || '—') + '</td><td>' + x.tvc + '</td></tr>').join('');
+        esito.appendChild(el('div', { class: 'pannello', style: 'padding:4px 8px;margin-top:10px', html: '<div class="scorri"><table><tr><th>Materiale</th><th>Fresa</th><th>Punta</th><th>Inserti</th><th>Maschio</th></tr>' + ese + '</table></div>' }));
+        esito.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('materiale') + 'Usa questi materiali', onclick: () => {
+          A.mem.materiali = letti; A.salva(); A.avviso(letti.length + ' materiali presi'); A.vai('materiali');
+        } })]));
+        esito.appendChild(A.info('I materiali di adesso vengono sostituiti. Tornitura e densita, se mancano, restano quelle di serie.'));
+      };
+      const f = A.modulo(pan, [{ id: 'testo', et: 'Testo JSON dei materiali', tipo: 'area', mono: true, righe: 8 }], v, prova);
+      file.addEventListener('change', () => {
+        const x = file.files && file.files[0]; if (!x) return;
+        const rd = new FileReader();
+        rd.onload = () => { f.metti('testo', String(rd.result || '')); prova(); };
+        rd.readAsText(x);
+      });
     }
   };
   A.schermi.materiale = {
@@ -240,7 +275,7 @@
       m.appendChild(el('div', { class: 'sez', testo: 'Dati' }));
       m.appendChild(el('div', { class: 'menu' }, [A.voceMenu(['materiali', 'materiale', 'Materiali', 'Modifica velocita di taglio e avanzamenti'])]));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salva') + 'Esporta i miei dati', onclick: () => A.condividi('hich-officina-dati.json', JSON.stringify(A.mem, null, 1)) })]));
-      m.appendChild(A.info('Hich-Officina 2.0.0 · funziona anche senza rete. I dati restano su questo telefono. I valori di taglio sono di partenza: controlla sempre i programmi prima di lavorare.'));
+      m.appendChild(A.info('Hich-Officina 2.1.0 · funziona anche senza rete. I dati restano su questo telefono. I valori di taglio sono di partenza: controlla sempre i programmi prima di lavorare.'));
     }
   };
 })();

@@ -13,6 +13,7 @@
         { id: 'vc', et: 'Velocita di taglio Vc', u: 'm/min', v: 180 }, { id: 'fz', et: 'Avanzamento al dente', u: 'mm', v: 0.04 },
         { id: 'ap', et: 'Profondita ap', sub: 'facoltativa', u: 'mm', v: '' }, { id: 'ae', et: 'Larghezza ae', sub: 'facoltativa', u: 'mm', v: '' }],
       mat: (m, v) => { const r = O.datiTaglio(m, { tipo: 'fresa', d: O.num(v.d) || 10, z: 1 }); return { vc: r.vc, fz: arrot(r.fz, 3) }; },
+      ricalcolaMat: ['d'],
       calc(v) {
         if (!(v.d > 0 && v.vc > 0 && v.z > 0 && v.fz > 0)) return null;
         const r = O.fresatura(v);

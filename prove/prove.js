@@ -158,4 +158,20 @@ prova('macro: modelli e controlli', () => {
   assert.strictEqual(e.errori.length, 3);
   assert.deepStrictEqual(O.scriviMacro({ nome: 'x', num: 9100, par: [], corpo: 'G0 X1' }).sotto.slice(-1), ['M99']);
 });
+prova('importa materiali da Hich-CAM', () => {
+  const testo = JSON.stringify({ materiali: [
+    { n: 'C40', g: 'Acciai al carbonio', vc: 180, fz: .05, ap: .7, ae: 40, dvc: 80, dfn: .15, tvc: 12, rvc: 15, rfn: .22, bvc: 150, bfn: .09, ivc: 160, ifn: .08, note: 'mio' },
+    { n: 'Mio acciaio', g: 'Acciai al carbonio', vc: 150, fz: .04, ap: .5, ae: 30, dvc: 70, dfn: .12, tvc: 10, rvc: 12, rfn: .2, bvc: 120, bfn: .08 }] }, null, 1);
+  const r = O.leggiMateriali(testo);
+  assert.ok(!r.errore, r.errore);
+  assert.strictEqual(r.materiali.length, 2);
+  assert.strictEqual(r.materiali[0].dvc, 80); assert.strictEqual(r.materiali[0].ivc, 160);
+  assert.strictEqual(r.materiali[0].lvc, 220);   // tornitura di serie con lo stesso nome
+  assert.strictEqual(r.materiali[1].lvc, 250);   // ... o dello stesso gruppo
+  assert.strictEqual(O.datiTaglio(r.materiali[0], { tipo: 'puntaIns', d: 20 }).vc, 160);
+  assert.ok(O.leggiMateriali('{ rotto').errore);
+  assert.ok(O.leggiMateriali('{"materiali":[{"n":"X","vc":100}]}').errore);
+  assert.ok(O.leggiMateriali(JSON.stringify([{ n: 'A', vc: 1, fz: 1 }])).errore.includes('mancano'));
+  assert.ok(!O.leggiMateriali(JSON.stringify([O.MATERIALI[0]])).errore);   // anche la lista semplice
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

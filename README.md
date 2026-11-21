@@ -22,7 +22,9 @@ Sito: https://hichamloukili2020195-lgtm.github.io/hich-officina/
 - **Galleria esempi**, **Tabelle** (filetti, tolleranze, rugosita, pollici, codici G e M), **Preferiti**,
   **Impostazioni** (tema, giri massimi, quote di sicurezza, codici del tornio, numeri di riga).
 - **Materiali**: gli stessi del programma parametrico, con gli stessi valori e le stesse regole (in officina solo
-  metallo duro: le Vc si usano cosi come sono). Tornitura e densita sono aggiunte qui. Si possono modificare.
+  metallo duro: le Vc si usano cosi come sono). Tornitura e densita sono aggiunte qui. Si possono modificare
+  oppure **importare** la propria tabella: in Hich-CAM, Libreria materiali, pulsante JSON, si copia il testo e lo si
+  incolla (o si sceglie il file) in Materiali > Importa la mia tabella materiali.
 
 I dati di taglio sono **di partenza**. Ogni programma va controllato prima di lavorare (simulazione, prova a vuoto).
 

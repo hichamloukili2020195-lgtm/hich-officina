@@ -132,6 +132,41 @@
     }
   }
 
+  /**
+   * Legge una libreria materiali incollata o caricata da file: {materiali:[...]} (Hich-CAM, pulsante JSON) oppure [...].
+   * Tiene i campi di tornitura e densita di quelli di serie con lo stesso nome (o dello stesso gruppo).
+   */
+  function leggiMateriali(testo) {
+    let a;
+    try { a = JSON.parse(String(testo || '').trim().replace(/^﻿/, '')); } catch (e) { return { errore: 'Il testo non e un JSON valido: copia tutto, dalla prima { all\'ultima }.' }; }
+    if (a && !Array.isArray(a)) a = a.materiali || a.mats || (a.prog && a.prog.mats);
+    if (!Array.isArray(a) || !a.length) return { errore: 'Nel testo non trovo la lista dei materiali.' };
+    const NUM = ['vc', 'fz', 'ap', 'ae', 'dvc', 'dfn', 'tvc', 'rvc', 'rfn', 'bvc', 'bfn', 'ivc', 'ifn', 'fvc', 'ffz', 'lvc', 'lf', 'rho'];
+    const out = [], nomi = {};
+    for (let i = 0; i < a.length; i++) {
+      const x = a[i] || {};
+      const n = String(x.n || '').trim();
+      if (!n) return { errore: 'Il materiale numero ' + (i + 1) + ' non ha il nome.' };
+      if (!(num(x.vc) > 0) || !(num(x.fz) > 0)) return { errore: n + ': mancano la Vc o lo fz della fresa.' };
+      if (nomi[n]) return { errore: 'Il materiale ' + n + ' compare due volte.' };
+      nomi[n] = true;
+      const serie = MATERIALI.find(m => m.n === n) || MATERIALI.find(m => m.g === x.g) || {};
+      const m = { n, g: String(x.g || serie.g || 'Altri') };
+      for (const k of NUM) {
+        const v = num(x[k]);
+        if (v > 0) m[k] = v;
+        else if ((k === 'lvc' || k === 'lf' || k === 'rho') && serie[k] > 0) m[k] = serie[k];
+        else if (!['ivc', 'ifn', 'fvc', 'ffz', 'lvc', 'lf'].includes(k)) m[k] = serie[k] > 0 ? serie[k] : (k === 'rho' ? 7.85 : NaN);
+      }
+      const manca = NUM.filter(k => k !== 'rho' && !['ivc', 'ifn', 'fvc', 'ffz', 'lvc', 'lf'].includes(k) && !(m[k] > 0));
+      if (manca.length) return { errore: n + ': mancano ' + manca.join(', ') + '.' };
+      if (x.nohss) m.nohss = true;
+      m.note = String(x.note || serie.note || '');
+      out.push(m);
+    }
+    return { materiali: out };
+  }
+
   // ----- peso e trigonometria -----
   /** Peso in kg: forma 'tondo' {d,l}, 'tubo' {d,di,l}, 'piatto' {a,b,l}, 'esagono' {s,l} (s = chiave). mm e kg/dm3. */
   function peso(forma, q, rho) {
@@ -516,7 +551,7 @@
   }
 
   const Officina = {
-    num, MATERIALI, UTENSILI, datiTaglio, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
+    num, MATERIALI, UTENSILI, datiTaglio, leggiMateriali, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
     FILETTI_GROSSI, FILETTI_FINI, filetto, passateFiletto,
     tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT,
     cono, foriSuCerchio, rugositaN, gc, gcodeTornio

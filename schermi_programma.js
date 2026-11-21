@@ -5,7 +5,7 @@
 
   // ----- lavorazioni -----
   const MAT = { id: 'mat', et: 'Materiale', tipo: 'scelta', scelte: () => A.sceltaMateriali() };
-  const auto = 'vuoto = dal materiale';
+  const dalMat = 'dal materiale, si puo cambiare';
   const FRESA = {
     spianatura: { t: 'Spianatura', campi: [
       { id: 'lx', et: 'Lunghezza pezzo X', u: 'mm', v: 100 }, { id: 'ly', et: 'Larghezza pezzo Y', u: 'mm', v: 60 },
@@ -131,57 +131,78 @@
   }
 
   // ----- costruzione del programma dai valori -----
-  function datiFresa(v, I) {
-    const n = A.numeri(v), mt = A.materiale(v.mat || 0);
-    const tipoUt = v.tipoUt || 'fresa';
-    const dt = O.datiTaglio(mt, { tipo: tipoUt, d: n.d, z: n.z, nmax: I.nmaxFresa }) || {};
-    return { n, mt, dt };
+  // Vc e avanzamento sono campi veri: si riempiono dal materiale quando cambiano materiale, utensile, diametro o
+  // lavorazione; poi si possono correggere a mano. I giri e l'avanzamento al minuto vengono da li.
+  const giriDa = (vc, d, nmax) => (vc > 0 && d > 0 ? Math.min(nmax, Math.max(100, Math.round(1000 * vc / (Math.PI * d) / 10) * 10)) : NaN);
+  const r3 = x => (isFinite(x) ? Math.round(x * 1000) / 1000 : '');
+  /** I valori di taglio dal materiale per la scheda e la lavorazione di adesso. */
+  function autoTaglio(tab, v) {
+    const I = A.imp(), n = A.numeri(v), mt = A.materiale(v.mat || 0);
+    if (!mt) return {};
+    if (tab === 'fresa') {
+      const dt = O.datiTaglio(mt, { tipo: v.tipoUt || 'fresa', d: n.d, z: n.z, nmax: I.nmaxFresa });
+      if (!dt) return {};
+      return { vc: dt.vc, fz: r3(dt.fz), ap: Math.round(dt.ap * 100) / 100, ae: Math.round(mt.ae) };
+    }
+    if (tab === 'fori') {
+      const dt = O.datiTaglio(mt, { tipo: v.tipoUt || 'puntaMD', d: n.d, passo: n.passo, nmax: I.nmaxFresa });
+      return dt ? { vc: dt.vc, fn: r3(dt.fn) } : {};
+    }
+    const op = TORNIO[v.op] ? v.op : 'sgrossatura';
+    if (op === 'foratura') {
+      const dt = O.datiTaglio(mt, { tipo: v.tipoPunta || 'puntaMD', d: n.dpunta });
+      return dt ? { vc: dt.vc, f: r3(dt.fn) } : {};
+    }
+    if (op === 'filetto' || op === 'filettoInt') return { vc: mt.lvc > 0 ? Math.round(mt.lvc * 0.5) : '' };
+    return { vc: mt.lvc > 0 ? mt.lvc : '', f: mt.lf > 0 ? mt.lf : '' };
   }
+  const RIEMPI = { fresa: ['mat', 'tipoUt', 'd'], fori: ['mat', 'tipoUt', 'd', 'passo'], tornio: ['mat', 'op', 'dpunta', 'tipoPunta'] };
+
   function costruisci(tab, op, v) {
     const I = A.imp();
     const comuni = { num: O.num(v.num) || I.numProg, nome: v.nome || '', t: O.num(v.t) || 1, zSic: I.zSic, zR: I.zR,
       refrig: I.refrig, g43: I.g43, numerare: I.numerare, fineZ: O.num(I.fineZ) };
+    const n = A.numeri(v);
     if (tab === 'fresa') {
-      const { n, dt } = datiFresa(v, I);
-      const giri = n.giri > 0 ? n.giri : dt.n, avanz = n.avanz > 0 ? n.avanz : dt.f;
-      const ap = n.ap > 0 ? n.ap : dt.ap, ae = n.ae > 0 ? n.ae : (dt.ae && n.d ? dt.ae / n.d * 100 : 50);
-      const r = O.gcodeFresa(op, Object.assign({}, n, comuni, { nome: comuni.nome || FRESA[op].t, n: giri, f: avanz, ap: Math.min(ap || 1, n.prof || ap || 1), ae, finitura: v.finitura }));
-      r.riassunto = ['T' + comuni.t, 'D' + fmt(n.d), 'S' + fmt(giri, 0), 'F' + fmt(avanz, 0), 'ap ' + fmt(Math.min(ap || 0, n.prof || ap || 0), 2)];
+      const giri = giriDa(n.vc, n.d, I.nmaxFresa), avanz = Math.round(n.fz * (n.z || 1) * giri);
+      const ap = n.ap > 0 ? Math.min(n.ap, n.prof || n.ap) : n.prof, ae = n.ae > 0 ? n.ae : 50;
+      if (!(giri > 0)) return { errore: 'Scrivi la velocita di taglio Vc e il diametro della fresa.', righe: [], percorso: [], avvisi: [] };
+      if (!(avanz > 0)) return { errore: 'Scrivi l\'avanzamento al dente fz.', righe: [], percorso: [], avvisi: [] };
+      const r = O.gcodeFresa(op, Object.assign({}, n, comuni, { nome: comuni.nome || FRESA[op].t, n: giri, f: avanz, ap, ae, finitura: v.finitura }));
+      r.taglio = { giri, avanz, vc: n.vc, limitato: giri >= I.nmaxFresa };
+      r.riassunto = ['T' + comuni.t, 'D' + fmt(n.d), 'Vc ' + fmt(n.vc, 0), 'S' + fmt(giri, 0), 'F' + fmt(avanz, 0), 'ap ' + fmt(ap, 2)];
       return r;
     }
     if (tab === 'fori') {
-      const n = A.numeri(v), mt = A.materiale(v.mat || 0);
       const tipo = v.tipoUt || 'puntaMD';
-      const dt = O.datiTaglio(mt, { tipo, d: n.d, passo: n.passo, nmax: I.nmaxFresa }) || {};
-      const giri = n.giri > 0 ? n.giri : dt.n;
-      let avanz = n.avanz > 0 ? n.avanz : dt.f;
-      if (tipo === 'maschio' && n.passo > 0 && giri > 0) avanz = Math.round(n.passo * giri);
+      const giri = giriDa(n.vc, n.d, I.nmaxFresa);
+      const avanz = tipo === 'maschio' ? Math.round((n.passo || 0) * giri) : Math.round((n.fn || 0) * giri);
+      if (!(giri > 0)) return { errore: 'Scrivi la velocita di taglio Vc e il diametro.', righe: [], percorso: [], avvisi: [] };
+      if (!(avanz > 0)) return { errore: tipo === 'maschio' ? 'Scrivi il passo del maschio.' : 'Scrivi l\'avanzamento al giro.', righe: [], percorso: [], avvisi: [] };
       const punti = O.schemaFori(Object.assign({}, n, { tipo: v.schema || 'cerchio', testo: v.testo, n: n.nf }));
       let prof = n.prof;
       const coni = { puntaMD: 70, centrino: 0, puntaIns: 0 };
       if (v.conPunta && coni[tipo] > 0 && n.d > 0) prof += n.d / (2 * Math.tan(coni[tipo] * Math.PI / 180));
       const ciclo = v.ciclo && v.ciclo !== 'auto' ? v.ciclo : cicloAuto(tipo, prof, n.d);
       const r = O.gcodeFresa('fori', Object.assign({}, comuni, { nome: comuni.nome || 'FORATURA', n: giri, f: avanz, punti, prof, ciclo, q: n.q, d: n.d }));
-      r.riassunto = ['T' + comuni.t, (tipo === 'maschio' ? 'M' : 'D') + fmt(n.d), ciclo, 'S' + fmt(giri, 0), 'F' + fmt(avanz, 0), 'Z-' + fmt(prof, 2)];
+      r.taglio = { giri, avanz, vc: n.vc, limitato: giri >= I.nmaxFresa };
+      r.riassunto = ['T' + comuni.t, (tipo === 'maschio' ? 'M' : 'D') + fmt(n.d), ciclo, 'Vc ' + fmt(n.vc, 0), 'S' + fmt(giri, 0), 'F' + fmt(avanz, 0), 'Z-' + fmt(prof, 2)];
       return r;
     }
     // tornio
-    const n = A.numeri(v), mt = A.materiale(v.mat || 0);
     const c = Object.assign({}, n, comuni, { nome: comuni.nome || TORNIO[op].t, nmax: n.nmax > 0 ? n.nmax : I.nmaxTornio, codLimite: I.codLimite, codFiletto: I.codFiletto,
       xCambio: O.num(I.xCambio), zCambio: O.num(I.zCambio), finitura: v.finitura });
-    c.vc = n.vc > 0 ? n.vc : (mt && mt.lvc) || 150;
-    c.f = n.f > 0 ? n.f : (mt && mt.lf) || 0.2;
+    let giriFissi = null;
     if (op === 'filetto' || op === 'filettoInt') {
       c.dg = op === 'filetto' ? n.d : n.dg;
-      c.giri = n.giri > 0 ? n.giri : Math.min(c.nmax, Math.round(O.giri(c.vc * 0.5, n.d) / 10) * 10);
+      giriFissi = c.giri = giriDa(n.vc, n.d, c.nmax);
     }
-    if (op === 'foratura') {
-      const dt = O.datiTaglio(mt, { tipo: v.tipoPunta || 'puntaMD', d: n.dpunta, nmax: c.nmax }) || {};
-      c.giri = n.giri > 0 ? n.giri : dt.n;
-      c.f = n.f > 0 ? n.f : Math.round((dt.fn || 0.1) * 1000) / 1000;
-    }
+    if (op === 'foratura') giriFissi = c.giri = giriDa(n.vc, n.dpunta, c.nmax);
     const r = O.gcodeTornio(op, c);
-    r.riassunto = ['T' + pad(c.t) + pad(c.t), (op === 'foratura' || /filetto/.test(op)) ? 'S' + fmt(c.giri, 0) + ' fissi' : 'Vc ' + fmt(c.vc, 0), 'F' + fmt(c.f, 3) + ' mm/giro', 'max ' + fmt(c.nmax, 0) + ' giri'];
+    const dRif = op === 'interna' ? n.di : op === 'foratura' ? n.dpunta : (n.dg || n.d);
+    const giri = giriFissi || giriDa(n.vc, dRif, c.nmax);
+    r.taglio = { giri, avanz: /filetto/.test(op) ? Math.round(giri * n.p) : Math.round(giri * (n.f || 0)), vc: n.vc, fissi: !!giriFissi, limitato: giri >= c.nmax };
+    r.riassunto = ['T' + pad(c.t) + pad(c.t), 'Vc ' + fmt(n.vc, 0), giriFissi ? 'S' + fmt(giriFissi, 0) + ' fissi' : 'G96', /filetto/.test(op) ? 'passo ' + fmt(n.p, 2) : 'F' + fmt(n.f, 3) + ' mm/giro', 'max ' + fmt(c.nmax, 0) + ' giri'];
     r.vista = c;
     return r;
   }
@@ -203,6 +224,10 @@
         corpo.innerHTML = '';
         const tab = S.tab;
         const v = S[tab] = S[tab] || {};
+        if (!v._taglio2) {   // prima versione: giri e avanzamento erano campi a parte
+          delete v.giri; delete v.avanz; delete v.vc; delete v.f;
+          v._taglio2 = true; A.salva();
+        }
         const cv = el('canvas', { class: 'vista', 'aria-label': 'Anteprima del percorso' });
         const pan = el('div', { class: 'pannello' });
         const panLav = el('div', { class: 'pannello' });
@@ -218,10 +243,10 @@
             { id: 'd', et: 'Diametro fresa', u: 'mm', v: 10 }, { id: 'z', et: 'Taglienti', u: 'z', v: 3 }];
           campiLav = FRESA[v.op || 'spianatura'] ? FRESA[v.op || 'spianatura'].campi : FRESA.spianatura.campi;
           campiTaglio = [
-            { id: 'ap', et: 'Profondita passata ap', sub: auto, u: 'mm', v: '', ph: x => fmt(datiFresa(x, A.imp()).dt.ap, 2) },
-            { id: 'ae', et: 'Passo laterale', sub: auto, u: '% D', v: '', ph: x => { const d = datiFresa(x, A.imp()); return d.dt.ae && d.n.d ? fmt(d.dt.ae / d.n.d * 100, 0) : ''; } },
-            { id: 'giri', et: 'Giri S', sub: auto, u: 'giri/min', v: '', ph: x => datiFresa(x, A.imp()).dt.n },
-            { id: 'avanz', et: 'Avanzamento F', sub: auto, u: 'mm/min', v: '', ph: x => datiFresa(x, A.imp()).dt.f },
+            { id: 'vc', et: 'Velocita di taglio Vc', sub: dalMat, u: 'm/min' },
+            { id: 'fz', et: 'Avanzamento al dente fz', sub: dalMat, u: 'mm' },
+            { id: 'ap', et: 'Profondita passata ap', sub: dalMat, u: 'mm' },
+            { id: 'ae', et: 'Passo laterale ae', sub: dalMat, u: '% D' },
             { id: 't', et: 'Numero utensile T', v: 1 }, { id: 'num', et: 'Numero programma O', v: '', ph: () => A.imp().numProg }, { id: 'nome', et: 'Nome', tipo: 'testo', v: '' }];
         } else if (tab === 'fori') {
           campiTesta = [MAT, { id: 'tipoUt', et: 'Utensile', tipo: 'scelta', scelte: UT_FORI, v: 'puntaMD' },
@@ -239,31 +264,40 @@
             { id: 'testo', et: 'Coordinate, una per riga: X Y', tipo: 'area', mono: true, v: '10 10\n50 10\n50 40', se: x => x.schema === 'elenco' }];
           campiTaglio = [{ id: 'ciclo', et: 'Ciclo', tipo: 'scelta', scelte: CICLI },
             { id: 'q', et: 'Beccata Q', sub: 'G83 e G73', u: 'mm', v: '', ph: x => fmt(O.num(x.d) || 2, 2) },
-            { id: 'giri', et: 'Giri S', sub: auto, u: 'giri/min', v: '', ph: x => (O.datiTaglio(A.materiale(x.mat || 0), { tipo: x.tipoUt || 'puntaMD', d: O.num(x.d), passo: O.num(x.passo), nmax: A.imp().nmaxFresa }) || {}).n },
-            { id: 'avanz', et: 'Avanzamento F', sub: 'maschio: passo x giri', u: 'mm/min', v: '', ph: x => (O.datiTaglio(A.materiale(x.mat || 0), { tipo: x.tipoUt || 'puntaMD', d: O.num(x.d), passo: O.num(x.passo), nmax: A.imp().nmaxFresa }) || {}).f },
+            { id: 'vc', et: 'Velocita di taglio Vc', sub: dalMat, u: 'm/min' },
+            { id: 'fn', et: 'Avanzamento al giro', sub: dalMat, u: 'mm/giro', se: x => x.tipoUt !== 'maschio' },
             { id: 't', et: 'Numero utensile T', v: 1 }, { id: 'num', et: 'Numero programma O', v: '', ph: () => A.imp().numProg }, { id: 'nome', et: 'Nome', tipo: 'testo', v: '' }];
         } else {
           const op = TORNIO[v.op] ? v.op : 'sgrossatura';
           campiTesta = [MAT, { id: 'op', et: 'Lavorazione', tipo: 'scelta', scelte: Object.keys(TORNIO).map(k => [k, TORNIO[k].t]) }];
           campiLav = TORNIO[op].campi;
-          const filOFor = op === 'filetto' || op === 'filettoInt' || op === 'foratura';
           campiTaglio = [
-            { id: 'vc', et: 'Velocita di taglio Vc', sub: auto, u: 'm/min', v: '', ph: x => (A.materiale(x.mat || 0) || {}).lvc || '', se: () => !filOFor },
-            { id: 'f', et: 'Avanzamento', sub: auto, u: 'mm/giro', v: '', ph: x => op === 'foratura' ? fmt((O.datiTaglio(A.materiale(x.mat || 0), { tipo: x.tipoPunta || 'puntaMD', d: O.num(x.dpunta) }) || {}).fn, 3) : (A.materiale(x.mat || 0) || {}).lf || '', se: () => !/filetto/.test(op) },
-            { id: 'giri', et: 'Giri fissi S', sub: op === 'foratura' ? auto : 'vuoto = meta della Vc del materiale', u: 'giri/min', v: '', se: () => filOFor },
+            { id: 'vc', et: 'Velocita di taglio Vc', sub: /filetto/.test(op) ? 'dal materiale, meta della tornitura' : dalMat, u: 'm/min' },
+            { id: 'f', et: 'Avanzamento', sub: dalMat, u: 'mm/giro', se: () => !/filetto/.test(op) },
             { id: 'nmax', et: 'Giri massimi', sub: 'vuoto = impostazioni', u: 'giri/min', v: '', ph: () => A.imp().nmaxTornio },
             { id: 't', et: 'Numero utensile T', v: 1 }, { id: 'num', et: 'Numero programma O', v: '', ph: () => A.imp().numProg }, { id: 'nome', et: 'Nome', tipo: 'testo', v: '' }];
         }
         let fT, fL, fD, ultimo = null;
         const aggiorna = id => {
-          if (id === 'op') { A.salva(); apri(); return; }
+          if (id && RIEMPI[tab].includes(id)) {
+            const nuovi = autoTaglio(tab, v);
+            if (id === 'op') { Object.assign(v, nuovi); A.salva(); apri(); return; }
+            for (const k in nuovi) fD.metti(k, nuovi[k]);
+          }
           fT.aggiorna(); fL.aggiorna(); fD.aggiorna();
           const op = tab === 'fresa' ? (FRESA[v.op] ? v.op : 'spianatura') : tab === 'tornio' ? (TORNIO[v.op] ? v.op : 'sgrossatura') : 'fori';
           const r = costruisci(tab, op, v);
           ultimo = { r, tab, op };
           msg.innerHTML = '';
           if (r.errore) msg.appendChild(el('p', { class: 'errore', testo: r.errore }));
-          else msg.appendChild(A.info(A.esc(r.avvisi.join(' ')) + (r.riassunto ? '<br><b>' + A.esc(r.riassunto.join('  ·  ')) + '</b>' : '')));
+          else {
+            const t = r.taglio || {};
+            msg.appendChild(A.misuratore(t.fissi ? 'Giri fissi S' : tab === 'tornio' ? 'Giri al diametro di lavoro' : 'Velocita mandrino S', fmt(t.giri, 0), 'giri/min'));
+            msg.appendChild(A.griglia([['Velocita di taglio', fmt(t.vc, 0), 'm/min'], ['Avanzamento', fmt(t.avanz, 0), 'mm/min']]));
+            if (t.limitato) msg.appendChild(A.info('Giri limitati al massimo delle impostazioni: la Vc vera e piu bassa.', 'avviso'));
+            const mt0 = A.materiale(v.mat || 0);
+            msg.appendChild(A.info((mt0 ? '<b>' + A.esc(mt0.n) + '</b>. ' : '') + A.esc(r.avvisi.join(' ')) + (r.riassunto ? '<br><b>' + A.esc(r.riassunto.join('  ·  ')) + '</b>' : '')));
+          }
           const mt = A.materiale(v.mat || 0);
           if (mt && mt.nohss && tab === 'fori' && (v.tipoUt === 'maschio')) msg.appendChild(A.info('Materiale temprato: maschiatura sconsigliata.', 'avviso'));
           if (tab === 'tornio') {
@@ -274,6 +308,7 @@
         fT = A.modulo(pan, campiTesta, v, aggiorna);
         fL = A.modulo(panLav, campiLav, v, aggiorna);
         fD = A.modulo(panTaglio, campiTaglio, v, aggiorna);
+        if (!(O.num(v.vc) > 0)) { const nuovi = autoTaglio(tab, v); for (const k in nuovi) fD.metti(k, nuovi[k]); }
         genera.addEventListener('click', () => {
           if (!ultimo || ultimo.r.errore) { A.avviso(ultimo ? ultimo.r.errore : 'Compila i campi'); return; }
           A.param.listato = { righe: ultimo.r.righe, nome: (ultimo.r.righe[1] || 'O0001').split(' ')[0], tipo: ultimo.tab, riassunto: ultimo.r.riassunto, avvisi: ultimo.r.avvisi };
