@@ -25,6 +25,9 @@ Sito: https://hichamloukili2020195-lgtm.github.io/hich-officina/
   utensili con giri e avanzamenti, tempo stimato. Legge anche le macro (variabili, IF, WHILE, G65, M98).
 - **Listato**: ricerca, modifica, simulazione, file `.nc`, "Salva in..." (anche cartelle offerte da altre app),
   **invio alla macchina via FTP** (solo nell'APK), foglio di attrezzaggio.
+- **Post-processor**: il programma nasce in ISO e si traduce nel linguaggio della macchina (Impostazioni, o al volo nel
+  listato): ISO con codici G e M; ISO con cicli a nome (CYCLE81..., MCALL, LIMS, G33 K) per fresa e tornio; dialogo a
+  testo con righe numerate (TOOL CALL, L, CYCL DEF con parametri Q) per la fresa. La simulazione legge sempre l'ISO.
 - **Tabella utensili** personale (T, tipo, diametro, lunghezza, taglienti): si sceglie in Nuovo programma ISO.
 - **Pezzi e attrezzaggio**: dati del pezzo, origine, fissaggio, programmi collegati, note, foto, misure da controllare
   con tolleranze (H7, ±0,05, +0,1 -0,05), controllo delle misure prese con storico, **foglio di attrezzaggio** da
@@ -65,6 +68,7 @@ Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i fil
 ## File
 - `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
 - `programmi.js`: programmi della fresatrice, schemi dei fori, macro.
+- `post.js`: post-processor verso gli altri linguaggi delle macchine.
 - `iso.js`: lettura ed esecuzione dei programmi ISO e delle macro (per simulazione, apertura, foglio di attrezzaggio).
 - `app.js`: base dell'interfaccia (schermate, memoria, moduli). `schermi_*.js`: le schermate. `stile.css`: aspetto.
 - `sw.js`: funzionamento senza rete. `manifest.webmanifest`: installazione.

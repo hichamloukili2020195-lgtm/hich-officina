@@ -3,6 +3,7 @@
 const assert = require('assert');
 const O = require('../programmi.js');   // carica anche calcoli.js
 require('../iso.js');
+require('../post.js');
 let n = 0;
 const prova = (nome, f) => { try { f(); n++; } catch (e) { console.error('FALLITA: ' + nome + '\n' + e.message); process.exitCode = 1; } };
 const vicino = (a, b, tol = 1e-6) => assert.ok(Math.abs(a - b) <= tol, a + ' invece di ' + b);
@@ -224,5 +225,41 @@ prova('lettura ISO: tornio dal generatore', () => {
   assert.strictEqual(r.modo, 'tornio'); assert.strictEqual(r.errore, null);
   vicino(r.limiti.x.minLavoro, 26); vicino(r.limiti.z.minLavoro, -50);   // 26: inizio dello smusso
   assert.ok(O.indovinaModo('G0 X10 Y10\nT1 M6') === 'fresa');
+});
+prova('post-processor: cicli a nome', () => {
+  const f = O.gcodeFresa('fori', Object.assign({ punti: O.schemaFori({ tipo: 'cerchio', dc: 60, n: 3 }), prof: 15, ciclo: 'G83', q: 3 }, bf));
+  const r = O.postProcessor(f.righe, { linguaggio: 'cicli', modo: 'fresa', nome: 'flangia' });
+  assert.ok(!r.errore); assert.strictEqual(r.nomeFile, 'FLANGIA.MPF');
+  assert.ok(r.righe.includes('MCALL CYCLE83(12, 0, 2, -15, , -3, , 3, 0, 0, 1, 1)'));
+  assert.strictEqual(r.righe.filter(x => x === 'MCALL').length, 1);
+  assert.ok(r.righe.includes('T3 D1') && r.righe.includes('M6') && r.righe.includes('M30'));
+  assert.ok(!r.righe.some(x => /\bG8[0-9]\b|\bG43\b|^%|^O\d/.test(x)), 'restano codici ISO');
+  const m = O.gcodeFresa('fori', Object.assign({ punti: [[0, 0]], prof: 12, ciclo: 'G84' }, bf, { n: 500, f: 625 }));
+  assert.ok(O.postProcessor(m.righe, { linguaggio: 'cicli' }).righe.some(x => /^MCALL CYCLE84\(.*, 1.25, 0, 500, 500\)$/.test(x)));
+  const t = O.gcodeTornio('sgrossatura', Object.assign({ dg: 40, df: 30, l: 50, ap: 3 }, base));
+  const rt = O.postProcessor(t.righe, { linguaggio: 'cicli', modo: 'tornio', nome: 'albero' });
+  assert.ok(rt.righe.includes('G96 S200 LIMS=3000 M3') && rt.righe.includes('T2 D2'));
+  const fil = O.gcodeTornio('filetto', Object.assign({ dg: 20, d: 20, p: 2.5, l: 30, n: 3, giri: 800 }, base));
+  assert.ok(O.postProcessor(fil.righe, { linguaggio: 'cicli', modo: 'tornio' }).righe.includes('G33 Z-30 K2.5'));
+});
+prova('post-processor: dialogo a testo', () => {
+  const f = O.gcodeFresa('fori', Object.assign({ punti: O.schemaFori({ tipo: 'griglia', nx: 2, ny: 1, px: 20 }), prof: 15, ciclo: 'G81' }, bf));
+  const r = O.postProcessor(f.righe, { linguaggio: 'dialogo', modo: 'fresa', nome: 'piastra' });
+  assert.ok(!r.errore);
+  assert.strictEqual(r.righe[0], '0 BEGIN PGM PIASTRA MM'); assert.strictEqual(r.righe[r.righe.length - 1].replace(/^\d+ /, ''), 'END PGM PIASTRA MM');
+  assert.ok(r.righe.some(x => /^\d+ TOOL CALL 3 Z S3000$/.test(x)));
+  assert.ok(r.righe.some(x => /CYCL DEF 200 FORATURA/.test(x)) && r.righe.includes('  Q201=-15 ;PROFONDITA ~'));
+  assert.strictEqual(r.righe.filter(x => / M99$/.test(x)).length, 2);
+  assert.ok(r.righe.some(x => / M30$/.test(x)));
+  // numeri di riga in ordine
+  const n = r.righe.filter(x => /^\d+ /.test(x)).map(x => Number(x.split(' ')[0]));
+  n.forEach((v, i) => assert.strictEqual(v, i));
+  // tutte le coordinate con il segno
+  r.righe.filter(x => /^\d+ L /.test(x)).forEach(x => assert.ok(!/ [XYZ]\d/.test(x), x));
+  const c = O.gcodeFresa('tasca', Object.assign({ cx: 40, cy: 25, lx: 40, ly: 20, prof: 6, ap: 3, d: 10 }, bf));
+  const rc = O.postProcessor(c.righe, { linguaggio: 'dialogo' });
+  assert.deepStrictEqual(rc.avvisi, []);
+  assert.ok(O.postProcessor(O.gcodeTornio('sfacciatura', Object.assign({ dg: 40, s: 2, ap: 1 }, base)).righe, { linguaggio: 'dialogo', modo: 'tornio' }).errore);
+  assert.ok(O.postProcessor(['G65 P9001 A1'], { linguaggio: 'cicli' }).errore);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

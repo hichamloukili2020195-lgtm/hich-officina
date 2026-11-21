@@ -73,7 +73,7 @@
   const IMPOSTAZIONI_SERIE = {
     tema: 'scuro', nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
     codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1,
-    ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
+    postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
   const imp = () => Object.assign({}, IMPOSTAZIONI_SERIE, mem.imp || {});
   function applicaTema() {
@@ -288,7 +288,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.4.0'
+    schermi: {}, param: {}, VERSIONE: '2.5.0'
   };
   window.App = App;
 

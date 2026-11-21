@@ -55,7 +55,7 @@
       const lista = el('div', { class: 'elenco' });
       L.forEach((p, i) => {
         const riga = el('div', { style: 'display:flex;gap:6px;align-items:center' }, [
-          el('button', { class: 'elem', style: 'flex:1;min-width:0', onclick: () => { A.param.listato = { righe: p.righe, nome: p.nome, tipo: p.tipo }; A.vai('listato'); } }, [
+          el('button', { class: 'elem', style: 'flex:1;min-width:0', onclick: () => { A.param.listato = { righe: p.righe, nome: p.nome, tipo: p.tipo, idSalvato: p.id, iso: p.iso || null, ling: p.ling || 'iso', modificato: !p.iso && p.ling && p.ling !== 'iso' }; A.vai('listato'); } }, [
             el('span', { class: 'ic', testo: p.tipo === 'tornio' ? 'T' : 'F' }),
             el('span', { class: 't' }, [el('b', { testo: p.titolo || p.nome }), el('small', { testo: p.nome + ' · ' + p.data + ' · ' + p.righe.length + ' righe' })])]),
           el('button', { class: 'icona-pul', 'aria-label': 'Elimina ' + (p.titolo || p.nome), html: A.icona('cestino'), onclick: e => {
@@ -273,6 +273,10 @@
         { id: 'codFiletto', et: 'Filettatura', tipo: 'scelta', scelte: [['G32', 'G32'], ['G33', 'G33']] }, { id: 'xCambio', et: 'X cambio utensile', sub: 'vuoto = grezzo + 22', u: 'mm' },
         { id: 'zCambio', et: 'Z cambio utensile', u: 'mm' }]);
       blocco('Programmi', [{ id: 'numProg', et: 'Numero programma di partenza', u: 'O' }, { id: 'refrig', et: 'Refrigerante M8', tipo: 'spunta' }, { id: 'numerare', et: 'Numeri di riga N10, N20...', tipo: 'spunta' }]);
+      blocco('Linguaggio della macchina (post-processor)', [
+        { id: 'postFresa', et: 'Fresa', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].fresa).map(k => [k, O.LINGUAGGI[k].nome]) },
+        { id: 'postTornio', et: 'Tornio', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].tornio).map(k => [k, O.LINGUAGGI[k].nome]) }]);
+      m.appendChild(A.info('Il programma nasce in ISO e si traduce nel linguaggio scelto; nel listato si puo cambiare al volo. Provalo sempre a vuoto la prima volta.'));
       blocco('Macchina in rete (FTP)', [{ id: 'ftpHost', et: 'Indirizzo della macchina', sub: 'es. 192.168.1.50', tipo: 'testo' }, { id: 'ftpPorta', et: 'Porta', v: 21 },
         { id: 'ftpUtente', et: 'Utente', tipo: 'testo' }, { id: 'ftpPassword', et: 'Password', sub: 'resta scritta su questo telefono', tipo: 'testo' },
         { id: 'ftpCartella', et: 'Cartella sulla macchina', sub: 'vuoto = quella di partenza', tipo: 'testo' },

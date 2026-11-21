@@ -26,6 +26,16 @@ const server = http.createServer((q, r) => {
   const erroreSchermo = async dove => { const t = await pg.$$eval('#schermo .errore', x => x.map(e => e.textContent).filter(s => /Errore in questa/.test(s))); ok(!t.length, dove + ': ' + t.join()); };
 
   await pg.goto(url);
+  // stato di un telefono che ha aperto "Utensili e dati di taglio" (bug 2.4.0: Nuovo programma ISO si bloccava)
+  await pg.evaluate(() => { localStorage.setItem('hich-officina-v2', JSON.stringify({ utensili: { mat: '3', tipo: 'fresa', d: '10' }, versione: '2.4.0' })); });
+  await pg.reload();
+  for (const tab of ['fresa', 'fori', 'tornio']) {
+    await vai('programma'); await pg.click('.schede button[data-id="' + tab + '"]');
+    await erroreSchermo('programma ' + tab + ' con i dati vecchi');
+    ok((await pg.$$eval('#schermo .riga-campo', x => x.length)) > 8, tab + ': i campi non ci sono');
+  }
+  await vai('tabellaUtensili'); await erroreSchermo('tabella utensili con i dati vecchi');
+  await vai('home');
   await foto('01-home');
   const voci = await pg.$$eval('.menu .voce', x => x.length);
   ok(voci === 12, 'voci del menu: ' + voci);
@@ -269,6 +279,21 @@ const server = http.createServer((q, r) => {
   await vai('pezzi');
   ok((await pg.textContent('#schermo')).includes('Flangia prova'), 'ripristino della copia');
   await largo('fine 2.4.0');
+
+  // post-processor: linguaggio della macchina
+  await vai('impostazioni');
+  await pg.selectOption('#f-postFresa', 'dialogo');
+  ok((await pg.$$eval('#f-postTornio option', o => o.map(x => x.value))).join() === 'iso,cicli', 'il dialogo a testo non e per il tornio');
+  await vai('programma'); await pg.click('.schede button[data-id="fori"]');
+  await pg.click('text=Genera programma ISO'); await pg.waitForTimeout(80);
+  ok(/^0 BEGIN PGM /.test(await pg.textContent('.listato div span:nth-child(2)')), 'il listato non e nel linguaggio scelto');
+  ok((await pg.textContent('.listato')).includes('CYCL DEF'), 'ciclo di foratura non tradotto');
+  await pg.selectOption('#f-ling', 'cicli'); await pg.waitForTimeout(60);
+  ok((await pg.textContent('.listato')).includes('MCALL CYCLE'), 'cambio del linguaggio nel listato');
+  await foto('16-post');
+  await pg.click('text=Simula'); await pg.waitForTimeout(200);
+  ok(!(await pg.$('#schermo .errore')), 'simulazione di un programma tradotto');
+  await vai('impostazioni'); await pg.selectOption('#f-postFresa', 'iso');
 
   // impostazioni: tema chiaro
   await vai('impostazioni');

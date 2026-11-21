@@ -4,6 +4,7 @@
   const A = window.App, O = A.O, el = A.el, esc = A.esc, fmt = A.fmt;
 
   const nomeFile = L => {
+    if (L.nomeFile) return L.nomeFile;
     const f = A.imp().nomeFtp || 'O0001.nc';
     const base = (L.nome || 'O0001').replace(/[^A-Za-z0-9_-]/g, '') || 'O0001';
     return f === 'O0001' ? base : base + (f === 'O0001.NC' ? '.NC' : '.nc');
@@ -12,7 +13,8 @@
   function salvaInArchivio(L) {
     const arch = A.mem.salvati = A.mem.salvati || [];
     const titolo = ((L.righe[1] || '').match(/\(([^)]*)\)/) || [])[1] || L.nome;
-    const voce = { id: Date.now(), nome: L.nome, titolo, tipo: L.tipo, data: new Date().toISOString().slice(0, 10), righe: L.righe.slice() };
+    const voce = { id: Date.now(), nome: L.nome, titolo, tipo: L.tipo, data: new Date().toISOString().slice(0, 10), righe: L.righe.slice(),
+      iso: L.iso && !L.modificato ? L.iso.slice() : null, ling: L.ling || 'iso' };
     arch.unshift(voce);
     if (arch.length > 100) arch.length = 100;
     L.idSalvato = voce.id;
@@ -43,6 +45,20 @@
     render(m) {
       const L = A.param.listato;
       if (!L) { m.appendChild(el('div', { class: 'vuoto', testo: 'Nessun programma: generane uno o aprine uno.' })); return; }
+      // linguaggio della macchina (post-processor): si traduce dal programma ISO
+      const modoL = L.tipo === 'tornio' ? 'tornio' : 'fresa';
+      if (L.iso && !L.modificato) {
+        const I = A.imp();
+        if (!L.ling) L.ling = modoL === 'tornio' ? I.postTornio : I.postFresa;
+        if (!O.LINGUAGGI[L.ling] || !O.LINGUAGGI[L.ling][modoL]) L.ling = 'iso';
+        const tr = O.postProcessor(L.iso, { linguaggio: L.ling, modo: modoL, nome: ((L.iso[1] || '').match(/\(([^)]*)\)/) || [])[1] || L.nome });
+        if (tr.errore) { L.ling = 'iso'; L.righe = L.iso.slice(); L.nomeFile = null; m.appendChild(A.info(esc(tr.errore), 'avviso')); }
+        else { L.righe = tr.righe; L.nomeFile = tr.nomeFile || null; if (tr.avvisi.length) m.appendChild(A.info(esc(tr.avvisi.join(' ')), 'avviso')); }
+        const sel = el('select', { id: 'f-ling' }, Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k][modoL]).map(k => el('option', { value: k, testo: O.LINGUAGGI[k].nome })));
+        sel.value = L.ling;
+        sel.addEventListener('change', () => { L.ling = sel.value; A.ridisegna(); });
+        m.appendChild(el('div', { class: 'pannello' }, [el('div', { class: 'riga-campo' }, [el('label', { for: 'f-ling', testo: 'Linguaggio della macchina' }), el('div', { class: 'ctrl' }, [sel])])]));
+      } else if (L.ling && L.ling !== 'iso') m.appendChild(A.info('Programma modificato a mano nel linguaggio della macchina: non si traduce piu.'));
       if (L.riassunto) m.appendChild(el('div', { class: 'riassunto' }, L.riassunto.map(t => el('span', { testo: t }))));
       // ricerca
       const cerca = el('input', { id: 'f-cerca', type: 'search', placeholder: 'Cerca nel programma (es. T3, G83, Z-)', autocomplete: 'off', spellcheck: 'false' });
@@ -83,13 +99,16 @@
         if (area.hidden) { area.value = L.righe.join('\n'); area.hidden = false; box.hidden = true; bMod.innerHTML = A.icona('salvati') + 'Fine modifica'; area.focus(); return; }
         L.righe = area.value.replace(/\r/g, '').split('\n');
         while (L.righe.length > 1 && L.righe[L.righe.length - 1] === '') L.righe.pop();
-        if (L.idSalvato) { const v = (A.mem.salvati || []).find(x => x.id === L.idSalvato); if (v) { v.righe = L.righe.slice(); A.salva(); } }
+        if (L.ling && L.ling !== 'iso') L.modificato = true; else if (L.iso) L.iso = L.righe.slice();
+        if (L.idSalvato) { const v = (A.mem.salvati || []).find(x => x.id === L.idSalvato); if (v) { v.righe = L.righe.slice(); v.iso = L.modificato ? null : (L.iso || null); A.salva(); } }
         area.hidden = true; box.hidden = false; bMod.innerHTML = A.icona('modifica') + 'Modifica'; disegna();
         A.avviso(L.idSalvato ? 'Modifiche salvate' : 'Modifiche fatte: premi Tieni per salvarle');
       });
       m.appendChild(el('div', { class: 'pulsanti' }, [
         el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Simula', onclick: () => {
-          A.param.sim = { testo: L.righe.join('\n'), modo: L.tipo === 'tornio' ? 'tornio' : L.tipo ? 'fresa' : 'auto', titolo: L.nome }; A.vai('simula');
+          const isoOk = L.iso && !L.modificato ? L.iso : (!L.ling || L.ling === 'iso' ? L.righe : null);
+          if (!isoOk) { A.avviso('La simulazione legge solo il programma ISO'); return; }
+          A.param.sim = { testo: isoOk.join('\n'), modo: L.tipo === 'tornio' ? 'tornio' : L.tipo ? 'fresa' : 'auto', titolo: L.nome }; A.vai('simula');
         } }),
         bMod]));
       m.appendChild(el('div', { class: 'pulsanti' }, [
@@ -99,7 +118,7 @@
         el('button', { class: 'pul sec', html: A.icona('condividi') + 'Invia alla macchina', onclick: () => inviaMacchina(L) }),
         el('button', { class: 'pul sec', html: A.icona('salvati') + 'Tieni', onclick: () => salvaInArchivio(L) })]));
       m.appendChild(el('div', { class: 'pulsanti' }, [
-        el('button', { class: 'pul sec', html: A.icona('tabella') + 'Foglio di attrezzaggio', onclick: () => A.foglioDaProgramma && A.foglioDaProgramma(L) })]));
+        el('button', { class: 'pul sec', html: A.icona('tabella') + 'Foglio di attrezzaggio', onclick: () => A.foglioDaProgramma && A.foglioDaProgramma(Object.assign({}, L, { righe: L.iso && !L.modificato ? L.iso : L.righe })) })]));
       if (L.avvisi && L.avvisi.length) m.appendChild(A.info(esc(L.avvisi.join(' '))));
       m.appendChild(A.info('Controlla sempre il programma in simulazione o a vuoto prima di lavorare.', 'avviso'));
     }
@@ -136,7 +155,7 @@
       ['Corsa totale X', fmt(Lm.x.min, 1) + ' / ' + fmt(Lm.x.max, 1), 'mm'], ['Corsa totale Z', fmt(Lm.z.min, 1) + ' / ' + fmt(Lm.z.max, 1), 'mm']]));
     if (r.utensili.length) {
       m.appendChild(el('div', { class: 'sez', testo: 'Utensili' }));
-      const tab = A.mem.utensili || [];
+      const tab = A.tabellaUt ? A.tabellaUt() : [];
       m.appendChild(el('div', { class: 'pannello', style: 'padding:4px 8px', html: '<div class="scorri"><table><tr><th>T</th><th>Descrizione</th><th>S</th><th>F</th><th>Lavoro</th></tr>' +
         r.utensili.map(u => { const d = tab.find(x => Number(x.t) === u.t); return '<tr><td><b>' + u.t + '</b></td><td>' + esc(d ? descrUt(d) : (u.commento || '')) + '</td><td>' + u.s.join(', ') + '</td><td>' + u.f.map(x => fmt(x, 3)).join(', ') + '</td><td>' + fmt(u.lunghezza / 1000, 2) + ' m</td></tr>'; }).join('') + '</table></div>' }));
     }

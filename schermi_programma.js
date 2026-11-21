@@ -323,7 +323,7 @@
         if (!(O.num(v.vc) > 0)) { const nuovi = autoTaglio(tab, v); for (const k in nuovi) fD.metti(k, nuovi[k]); }
         genera.addEventListener('click', () => {
           if (!ultimo || ultimo.r.errore) { A.avviso(ultimo ? ultimo.r.errore : 'Compila i campi'); return; }
-          A.param.listato = { righe: ultimo.r.righe, nome: (ultimo.r.righe[1] || 'O0001').split(' ')[0], tipo: ultimo.tab, riassunto: ultimo.r.riassunto, avvisi: ultimo.r.avvisi };
+          A.param.listato = { righe: ultimo.r.righe, iso: ultimo.r.righe.slice(), nome: (ultimo.r.righe[1] || 'O0001').split(' ')[0], tipo: ultimo.tab, riassunto: ultimo.r.riassunto, avvisi: ultimo.r.avvisi };
           A.vai('listato');
         });
         aggiorna();
@@ -344,11 +344,14 @@
   // ----- listato -----
   function colora(riga) {
     const e = A.esc(riga);
-    if (/^\s*\(.*\)\s*$/.test(riga) || riga === '%') return '<span class="c-com">' + e + '</span>';
-    return e.replace(/(\([^)]*\))/g, '<span class="c-com">$1</span>')
-      .replace(/\b(G\d+(?:\.\d)?)\b/g, '<span class="c-g">$1</span>')
+    if (/^\s*\(.*\)\s*$/.test(riga) || riga === '%' || /^\s*(\d+\s+)?;/.test(riga)) return '<span class="c-com">' + e + '</span>';
+    let c = e;
+    const pv = c.indexOf(';'), coda = pv >= 0 ? '<span class="c-com">' + c.slice(pv) + '</span>' : '';
+    if (pv >= 0) c = c.slice(0, pv);
+    if (!/CYCLE\d+\(/.test(c)) c = c.replace(/(\([^)]*\))/g, '<span class="c-com">$1</span>');
+    return c.replace(/\b(G\d+(?:\.\d)?)\b/g, '<span class="c-g">$1</span>')
       .replace(/\b(M\d+)\b/g, '<span class="c-m">$1</span>')
-      .replace(/\b([TO]\d+)\b/g, '<span class="c-t">$1</span>');
+      .replace(/\b([TO]\d+|TOOL CALL|CYCL DEF|MCALL|CYCLE\d+)\b/g, '<span class="c-t">$1</span>') + coda;
   }
   A.colora = colora;
   // il listato, la simulazione e l'apertura dei programmi stanno in schermi_iso.js

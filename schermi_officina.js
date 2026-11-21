@@ -2,7 +2,17 @@
 (function () {
   'use strict';
   const A = window.App, O = A.O, el = A.el, esc = A.esc, fmt = A.fmt;
-  const utensili = () => (A.mem.utensili = A.mem.utensili || []);
+  // La tabella sta in mem.tabellaUt. (2.4.0 la metteva in mem.utensili, dove la schermata "Utensili e dati di taglio"
+  // tiene i suoi campi: si recupera da li se e una lista.)
+  const utensili = () => {
+    if (!Array.isArray(A.mem.tabellaUt)) {
+      A.mem.tabellaUt = Array.isArray(A.mem.utensili) ? A.mem.utensili : [];
+      if (Array.isArray(A.mem.utensili)) delete A.mem.utensili;
+      A.salva();
+    }
+    return A.mem.tabellaUt;
+  };
+  A.tabellaUt = utensili;
   const pezzi = () => (A.mem.pezzi = A.mem.pezzi || []);
   const oggi = () => new Date().toISOString().slice(0, 10);
   let conferme = {};
@@ -56,7 +66,7 @@
       } })]));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul peric', html: A.icona('cestino') + 'Elimina', onclick: () => {
         if (!conferma('ut' + u.id, 'Premi ancora Elimina per confermare')) return;
-        A.mem.utensili = utensili().filter(x => x.id !== u.id); A.salva(); A.vai('tabellaUtensili');
+        A.mem.tabellaUt = utensili().filter(x => x.id !== u.id); A.salva(); A.vai('tabellaUtensili');
       } })]));
     }
   };
@@ -134,7 +144,7 @@
           const s = salvati.find(x => x.id === id);
           if (!s) return;
           progBox.appendChild(el('div', { style: 'display:flex;gap:6px;align-items:center' }, [
-            el('button', { class: 'elem', style: 'flex:1;min-width:0', onclick: () => { A.param.listato = { righe: s.righe, nome: s.nome, tipo: s.tipo, idSalvato: s.id }; A.vai('listato'); } }, [
+            el('button', { class: 'elem', style: 'flex:1;min-width:0', onclick: () => { A.param.listato = { righe: s.righe, nome: s.nome, tipo: s.tipo, idSalvato: s.id, iso: s.iso || null, ling: s.ling || 'iso', modificato: !s.iso && s.ling && s.ling !== 'iso' }; A.vai('listato'); } }, [
               el('span', { class: 'ic', testo: s.tipo === 'tornio' ? 'T' : 'F' }), el('span', { class: 't' }, [el('b', { testo: s.titolo || s.nome }), el('small', { testo: s.nome + ' · ' + s.righe.length + ' righe' })])]),
             el('button', { class: 'icona-pul', 'aria-label': 'Togli dal pezzo', html: A.icona('cestino'), onclick: () => { p.programmi = p.programmi.filter(x => x !== id); A.salva(); disegnaProg(); } })]));
         });
@@ -262,7 +272,7 @@
     h += '<h2>Pezzo</h2><table class="dati">' + [['Disegno / codice', p.disegno], ['Materiale', p.materiale], ['Grezzo', p.grezzo], ['Origine', p.origine], ['Fissaggio', p.fissaggio]]
       .map(([a, b]) => '<tr><td>' + a + '</td><td>' + esc(b || '') + '</td></tr>').join('') + '</table>';
     programmi.forEach(pr => {
-      const r = O.eseguiISO(pr.righe.join('\n'), { modo: pr.tipo === 'tornio' ? 'tornio' : pr.tipo ? 'fresa' : 'auto' });
+      const r = O.eseguiISO((pr.iso || pr.righe).join('\n'), { modo: pr.tipo === 'tornio' ? 'tornio' : pr.tipo ? 'fresa' : 'auto' });
       const L = r.limiti, q = k => (L[k].minLavoro === null ? '—' : fmt(L[k].minLavoro, 3) + ' / ' + fmt(L[k].maxLavoro, 3));
       h += '<h2>Programma ' + esc(pr.nome || '') + (pr.titolo ? ' · ' + esc(pr.titolo) : '') + '</h2>';
       h += '<table class="dati"><tr><td>Tempo stimato</td><td>' + fmt(r.tempo, 1) + ' min</td></tr><tr><td>Quote di lavoro X</td><td>' + q('x') + '</td></tr>' +
@@ -343,7 +353,7 @@
       if (!c) { A.vai('impostazioni'); return; }
       const n = k => (Array.isArray(c.mem[k]) ? c.mem[k].length : 0);
       m.appendChild(A.info('Copia del <b>' + esc(String(c.data || '').slice(0, 10)) + '</b> (versione ' + esc(c.versione || '?') + '): ' +
-        n('salvati') + ' programmi, ' + n('macro') + ' macro, ' + n('pezzi') + ' pezzi, ' + n('utensili') + ' utensili, ' + Object.keys(c.foto).length + ' foto' +
+        n('salvati') + ' programmi, ' + n('macro') + ' macro, ' + n('pezzi') + ' pezzi, ' + (n('tabellaUt') || n('utensili')) + ' utensili, ' + Object.keys(c.foto).length + ' foto' +
         (Array.isArray(c.mem.materiali) ? ', materiali personali' : '') + '.'));
       m.appendChild(A.info('Tutti i dati di adesso su questo telefono vengono sostituiti da quelli della copia.', 'avviso'));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('salvati') + 'Ripristina', onclick: async () => {
