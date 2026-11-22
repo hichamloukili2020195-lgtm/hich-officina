@@ -44,6 +44,17 @@ const server = http.createServer((q, r) => {
   // tutte le schermate si aprono
   for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo', 'angolo']) {
     await vai(s); await erroreSchermo(s); await largo(s);
+    // accessibilita: ogni pulsante, campo e tela ha un nome per i lettori di schermo
+    const senzaNome = await pg.evaluate(() => {
+      const out = [];
+      document.querySelectorAll('#schermo button, #schermo input, #schermo select, #schermo textarea, #testata button, #barra button, #schermo canvas, #schermo summary').forEach(e => {
+        if (e.type === 'hidden' || e.type === 'file' || e.hidden || e.closest('[hidden]')) return;
+        const nome = (e.getAttribute('aria-label') || '').trim() || (e.id && document.querySelector('label[for="' + e.id + '"]') ? 'l' : '') || (e.closest('label') ? 'l' : '') || (e.tagName === 'CANVAS' ? '' : (e.textContent || '').trim()) || (e.getAttribute('title') || '') || (e.getAttribute('placeholder') || '');
+        if (!nome) out.push(e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (e.className ? '.' + String(e.className).split(' ')[0] : ''));
+      });
+      return out;
+    });
+    ok(!senzaNome.length, 'accessibilita ' + s + ': senza nome ' + senzaNome.join(', '));
   }
 
   // nuovo programma: ogni scheda e ogni strategia genera un programma
@@ -589,6 +600,33 @@ const server = http.createServer((q, r) => {
   await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(60);
   ok(!(await pg.$('#schermo .errore')), 'simulazione con il centro fresa');
   await largo('centro fresa');
+
+  // ===== 2.15.0: guanti, contrasto, tablet, recenti =====
+  await vai('impostazioni');
+  await pg.check('#f-guanti'); await pg.waitForTimeout(40);
+  ok(await pg.evaluate(() => document.body.classList.contains('guanti')), 'modalita guanti');
+  const dim = await pg.evaluate(() => { const b = document.querySelector('#barra button'); const i = document.querySelector('#schermo .ctrl input, #schermo .ctrl select'); return [b.getBoundingClientRect().height, i ? i.getBoundingClientRect().height : 0, parseFloat(getComputedStyle(document.body).fontSize)]; });
+  ok(dim[0] >= 56 && dim[1] >= 44 && dim[2] >= 18, 'bersagli grandi con i guanti: ' + dim.join('/'));
+  await largo('guanti');
+  await foto('33-guanti');
+  await pg.uncheck('#f-guanti');
+  await pg.check('#f-contrasto'); await pg.waitForTimeout(40);
+  ok(await pg.evaluate(() => document.body.classList.contains('contrasto')), 'contrasto alto');
+  await pg.uncheck('#f-contrasto');
+  // recenti in home
+  await vai('calcoli'); await vai('tabelle'); await vai('home'); await pg.waitForTimeout(60);
+  ok((await pg.textContent('.recenti')).includes('Tabelle') && (await pg.textContent('.recenti')).includes('Calcolatrice'), 'usati di recente');
+  // tablet in orizzontale: home a piu colonne, moduli su due colonne
+  await pg.setViewportSize({ width: 1180, height: 820 }); await pg.waitForTimeout(100);
+  ok(await pg.$eval('.menu', g => getComputedStyle(g).gridTemplateColumns.split(' ').length >= 3), 'home a tre colonne sul tablet');
+  await foto('34-tablet-home');
+  await vai('calcoli'); await pg.waitForTimeout(80);
+  ok(await pg.$eval('.pannello', g => getComputedStyle(g).gridTemplateColumns.split(' ').length === 2), 'moduli su due colonne sul tablet');
+  await largo('tablet calcoli');
+  await foto('35-tablet-calcoli');
+  await vai('programma'); await pg.waitForTimeout(80); await largo('tablet programma');
+  await vai('ciclo'); await pg.waitForTimeout(80); await largo('tablet ciclo');
+  await pg.setViewportSize({ width: 390, height: 844 }); await pg.waitForTimeout(80);
 
   // impostazioni: tema chiaro
   await vai('impostazioni');

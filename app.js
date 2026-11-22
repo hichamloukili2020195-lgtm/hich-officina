@@ -62,16 +62,22 @@
   try { mem = JSON.parse(localStorage.getItem(CHIAVE) || '{}') || {}; } catch (e) { mem = {}; }
   // valori della versione 1 (calcolatori): si tengono
   try { const v1 = JSON.parse(localStorage.getItem('hich-officina-v1') || 'null'); if (v1 && !mem.valori && v1.valori) mem.valori = v1.valori; } catch (e) { /* niente */ }
-  let salvaTimer = null;
+  let salvaTimer = null, salvaFallito = false;
   function salva() {
     clearTimeout(salvaTimer);
-    salvaTimer = setTimeout(() => { try { localStorage.setItem(CHIAVE, JSON.stringify(mem)); } catch (e) { /* niente */ } }, 150);
+    salvaTimer = setTimeout(() => {
+      try { localStorage.setItem(CHIAVE, JSON.stringify(mem)); salvaFallito = false; }
+      catch (e) {
+        // memoria piena o bloccata: si dice una volta sola, perche non si perda il lavoro senza saperlo
+        if (!salvaFallito) { salvaFallito = true; try { avviso('Non riesco a salvare i dati su questo telefono: fai la copia di sicurezza (Impostazioni)'); } catch (x) { /* niente */ } }
+      }
+    }, 150);
   }
   const sezione = k => (mem[k] = mem[k] || {});
 
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
-    tema: 'scuro', nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
+    tema: 'scuro', guanti: false, contrasto: false, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
     codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1,
     postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
@@ -81,6 +87,8 @@
     if (t === 'chiaro') document.documentElement.setAttribute('data-theme', 'light');
     else if (t === 'scuro') document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
+    document.body.classList.toggle('guanti', !!imp().guanti);
+    document.body.classList.toggle('contrasto', !!imp().contrasto);
   }
 
   // ----- materiali: quelli di serie con le modifiche fatte sul telefono -----
@@ -288,7 +296,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.14.0'
+    schermi: {}, param: {}, VERSIONE: '2.15.0'
   };
   window.App = App;
 
@@ -309,7 +317,11 @@
         html: icona('stella'), onclick: () => preferito(id) }));
     }
     (s.azioni ? s.azioni() : []).forEach(a => azioni.appendChild(a));
-    document.querySelectorAll('#barra button').forEach(b => b.classList.toggle('attiva', b.dataset.vai === id));
+    document.querySelectorAll('#barra button').forEach(b => { const on = b.dataset.vai === id; b.classList.toggle('attiva', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    // schermate usate di recente (per la home)
+    if (!['home', 'preferiti', 'impostazioni', 'listato', 'simula', 'foglio', 'ripristino', 'macroModifica', 'materiale', 'utensile', 'pezzo', 'misure', 'materialiImporta'].includes(id)) {
+      const R = mem.recenti = (mem.recenti || []).filter(x => x !== id); R.unshift(id); if (R.length > 5) R.length = 5; salva();
+    }
     const main = $('schermo'); main.innerHTML = '';
     try { s.render(main); } catch (e) { main.appendChild(el('p', { class: 'errore', testo: 'Errore in questa schermata: ' + e.message })); console.error(e); }
     window.scrollTo(0, 0);
@@ -331,7 +343,7 @@
   window.addEventListener('hashchange', () => { App._dentro = true; mostra(); });
 
   // ----- home -----
-  const SCENA = '<svg class="scena" viewBox="0 0 400 250" role="img" aria-label="Fresa che lavora un blocco di acciaio">' +
+  const SCENA = '<svg class="scena" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Fresa che lavora un blocco di acciaio">' +
     '<defs><linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2b4a"/><stop offset="1" stop-color="#070c16"/></linearGradient>' +
     '<linearGradient id="gM" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5b6678"/><stop offset=".45" stop-color="#d9e1ec"/><stop offset="1" stop-color="#4a5466"/></linearGradient>' +
     '<linearGradient id="gF" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6b7486"/><stop offset=".5" stop-color="#f2f5fa"/><stop offset="1" stop-color="#5a6274"/></linearGradient>' +
@@ -387,12 +399,14 @@
       const risultati = el('div', { class: 'menu', hidden: true });
       const menu = el('div', { class: 'menu' });
       MENU.forEach(v => menu.appendChild(voceMenu(v)));
-      m.append(el('div', { class: 'ctrl cerca-home' }, [el('span', { html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>' }), cerca]), risultati, menu);
+      const rec = (mem.recenti || []).map(id => MENU.find(x => x[0] === id)).filter(Boolean).slice(0, 4);
+      const recBox = rec.length ? el('div', { class: 'recenti' }, [el('div', { class: 'sez', style: 'margin:0 2px 6px', testo: 'Usati di recente' }), el('div', { class: 'chips' }, rec.map(v => el('button', { class: 'chip', testo: v[2], onclick: () => App.vai(v[0]) })))]) : null;
+      m.append(el('div', { class: 'ctrl cerca-home' }, [el('span', { html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>' }), cerca]), recBox, risultati, menu);
       cerca.addEventListener('input', () => {
         const q = cerca.value.trim();
         const L = App.cerca ? App.cerca(q) : [];
         risultati.innerHTML = '';
-        risultati.hidden = q.length < 2; menu.hidden = q.length >= 2;
+        risultati.hidden = q.length < 2; menu.hidden = q.length >= 2; if (recBox) recBox.hidden = q.length >= 2;
         if (q.length < 2) return;
         if (!L.length) risultati.appendChild(el('div', { class: 'vuoto', testo: 'Niente per "' + q + '". Prova M10, H7 25, 316, G83, T5 o il nome di un pezzo.' }));
         L.forEach(r => risultati.appendChild(el('button', { class: 'voce', onclick: r.vai }, [el('span', { class: 't' }, [el('b', { testo: r.titolo }), el('small', { testo: r.sotto })]), el('span', { html: icona('avanti', 'freccia') })])));

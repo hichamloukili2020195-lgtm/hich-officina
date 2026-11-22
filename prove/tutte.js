@@ -16,8 +16,9 @@ passo('versione coerente', () => {
   const app = /VERSIONE: '([\d.]+)'/.exec(fs.readFileSync(path.join(radice, 'app.js'), 'utf8'));
   const sw = /hich-officina-([\d.]+)/.exec(fs.readFileSync(path.join(radice, 'sw.js'), 'utf8'));
   const log = /^## ([\d.]+)/m.exec(fs.readFileSync(path.join(radice, 'CHANGELOG.md'), 'utf8'));
-  const ok = app && sw && log && app[1] === sw[1] && app[1] === log[1];
-  return { ok, testo: 'app.js ' + (app && app[1]) + ', sw.js ' + (sw && sw[1]) + ', CHANGELOG.md ' + (log && log[1]) };
+  const pk = JSON.parse(fs.readFileSync(path.join(radice, 'package.json'), 'utf8')).version;
+  const ok = app && sw && log && app[1] === sw[1] && app[1] === log[1] && app[1] === pk;
+  return { ok, testo: 'app.js ' + (app && app[1]) + ', sw.js ' + (sw && sw[1]) + ', CHANGELOG.md ' + (log && log[1]) + ', package.json ' + pk };
 });
 passo('calcoli e programmi', () => esegui(['prove/prove.js']));
 passo('prova a tappeto', () => esegui(['prove/tappeto.js']));

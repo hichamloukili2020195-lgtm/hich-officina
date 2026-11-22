@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.15.0 - Interfaccia e uso in officina
+- Modalita guanti (testi, campi e pulsanti piu grandi) e contrasto alto, in Impostazioni.
+- Tablet in orizzontale: home a tre colonne, moduli su due colonne, elenchi e risultati su piu colonne.
+- Home: "Usati di recente".
+- Se la memoria del telefono e piena o bloccata, l'app lo dice (prima falliva in silenzio).
+- Prova automatica dell'accessibilita: ogni pulsante, campo e tela ha un nome per i lettori di schermo.
+
 ## 2.14.0 - Basi del progetto e affidabilita
 - Prova a tappeto (migliaia di combinazioni di lavorazioni, utensili e materiali): nessun NaN, nessuna segnalazione.
 - Prove contro le norme: tolleranze ISO 286 e filetti metrici.
