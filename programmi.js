@@ -5,6 +5,8 @@
   const O = typeof module !== 'undefined' && module.exports ? require('./calcoli.js') : radice.Officina;
   const gc = O.gc;
   const pos = v => v > 0;
+  // minimo e massimo con un ciclo: con migliaia di punti Math.min(...) puo superare la pila
+  const minimo = a => a.reduce((m, v) => (v < m ? v : m), Infinity), massimo = a => a.reduce((m, v) => (v > m ? v : m), -Infinity);
 
   /**
    * Programma per fresatrice.
@@ -231,7 +233,7 @@
       coda();
       const xs = pti.map(p => p[0]), ys = pti.map(p => p[1]);
       const m = Math.max(10, (c.d || 5) * 2);
-      pezzo = { x0: Math.min(...xs) - m, y0: Math.min(...ys) - m, x1: Math.max(...xs) + m, y1: Math.max(...ys) + m, z0: Math.min(pz - 5, -10), z1: 0 };
+      pezzo = { x0: minimo(xs) - m, y0: minimo(ys) - m, x1: massimo(xs) + m, y1: massimo(ys) + m, z0: Math.min(pz - 5, -10), z1: 0 };
       avvisi.push(pti.length + ' fori con ' + ciclo + ', piano R' + gc(zR) + ', ritorno al piano iniziale (G98).');
       if (ciclo === 'G84') avvisi.push('Maschiatura: avanzamento = passo x giri. Su alcune macchine serve la maschiatura rigida prima del ciclo.');
     } else if (op === 'profilo') {
@@ -252,7 +254,7 @@
       coda();
       const xs = [], ys = [];
       P.forEach(s => { if (!s.rapido) { xs.push(s.x); ys.push(s.y); } });
-      pezzo = { x0: Math.min(...xs) - 5, y0: Math.min(...ys) - 5, x1: Math.max(...xs) + 5, y1: Math.max(...ys) + 5, z0: -c.prof - 5, z1: 0 };
+      pezzo = { x0: minimo(xs) - 5, y0: minimo(ys) - 5, x1: massimo(xs) + 5, y1: massimo(ys) + 5, z0: -c.prof - 5, z1: 0 };
       avvisi.push(...pr.avvisi);
       avvisi.unshift(pr.livelli + ' passate in Z, ' + pr.tratti.length + ' tratti.');
     } else if (op === 'tascaCircolare') {

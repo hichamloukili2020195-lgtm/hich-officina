@@ -289,6 +289,24 @@
     return { sup, inf, it, foro, max: d + sup / 1000, min: d + inf / 1000 };
   }
 
+  /**
+   * Tolleranza scritta a mano: "H7", "g6", "±0,05", "+0,1 -0,05", "0/-0.02". Ritorna {sup, inf} in mm oppure {errore}.
+   * (una sola funzione per tutta l'app: misure del pezzo, ciclo proposto, profilo disegnato)
+   */
+  function leggiTolleranza(nominale, testo) {
+    const t = String(testo || '').trim().replace(/,/g, '.');
+    if (!t) return { sup: 0, inf: 0 };
+    if (/^(js|JS|[a-zA-Z])\d{1,2}$/.test(t)) {
+      const r = tolleranza(nominale, t);
+      return r.errore ? { errore: r.errore } : { sup: r.sup / 1000, inf: r.inf / 1000 };
+    }
+    let m = /^(?:±|\+\/?-|\+-)\s*(\d*\.?\d+)$/.exec(t);
+    if (m) return { sup: Number(m[1]), inf: -Number(m[1]) };
+    m = /^([+-]?\d*\.?\d+)\s*[/ ;]\s*([+-]?\d*\.?\d+)$/.exec(t);
+    if (m) { const a = Number(m[1]), b = Number(m[2]); return { sup: Math.max(a, b), inf: Math.min(a, b) }; }
+    return { errore: 'Tolleranza non capita: scrivi H7, ±0,05 oppure +0,1 -0,05' };
+  }
+
   // ----- geometria -----
   /** Cono: semiangolo in gradi da diametro maggiore, minore e lunghezza. */
   function cono(dMax, dMin, l) {
@@ -696,7 +714,7 @@
   }
 
   const Officina = {
-    campoNonValido, num, MATERIALI, UTENSILI, datiTaglio, leggiMateriali, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
+    leggiTolleranza, campoNonValido, num, MATERIALI, UTENSILI, datiTaglio, leggiMateriali, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
     FILETTI_GROSSI, FILETTI_FINI, filetto, passateFiletto,
     tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT,
     cono, foriSuCerchio, rugositaN, gc, gcodeTornio

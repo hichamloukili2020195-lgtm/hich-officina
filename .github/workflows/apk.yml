@@ -31,6 +31,21 @@ jobs:
       # se le prove falliscono non si costruisce l'APK
       - name: Prove (sintassi, calcoli, prova a tappeto)
         run: node prove/tutte.js
+      - name: Chiave di firma dai segreti (se ci sono)
+        env:
+          FIRMA_KEYSTORE_B64: ${{ secrets.FIRMA_KEYSTORE_B64 }}
+          FIRMA_PASSWORD: ${{ secrets.FIRMA_PASSWORD }}
+          FIRMA_ALIAS: ${{ secrets.FIRMA_ALIAS }}
+        run: |
+          if [ -n "$FIRMA_KEYSTORE_B64" ]; then
+            echo "$FIRMA_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/firma.jks"
+            echo "FIRMA_KEYSTORE=$RUNNER_TEMP/firma.jks" >> "$GITHUB_ENV"
+            echo "FIRMA_PASSWORD=$FIRMA_PASSWORD" >> "$GITHUB_ENV"
+            echo "FIRMA_ALIAS=${FIRMA_ALIAS:-hich}" >> "$GITHUB_ENV"
+            echo "Firma con la chiave dei segreti"
+          else
+            echo "Firma con la chiave di serie del repository"
+          fi
       - name: Costruisci l'APK
         run: gradle -p android assembleRelease --no-daemon
       - name: Pubblica l'APK

@@ -239,15 +239,7 @@
     if (note.daControllare.size) t.push('Utensili non trovati nella tabella: numeri proposti ' + Array.from(note.daControllare).sort((a, b) => a - b).map(x => 'T' + x).join(' ') + ', da controllare.');
     return t;
   }
-  function leggiTol(d, testo) {
-    const t = String(testo || '').trim().replace(/,/g, '.');
-    if (/^(js|JS|[a-zA-Z])\d{1,2}$/.test(t)) { const r = O.tolleranza(d, t); return r.errore ? r : { sup: r.sup / 1000, inf: r.inf / 1000 }; }
-    let m = /^(?:±|\+\/?-|\+-)\s*(\d*\.?\d+)$/.exec(t);
-    if (m) return { sup: Number(m[1]), inf: -Number(m[1]) };
-    m = /^([+-]?\d*\.?\d+)\s*[/ ;]\s*([+-]?\d*\.?\d+)$/.exec(t);
-    if (m) { const a = Number(m[1]), b = Number(m[2]); return { sup: Math.max(a, b), inf: Math.min(a, b) }; }
-    return { errore: 'tolleranza non capita' };
-  }
+  const leggiTol = (d, testo) => O.leggiTolleranza(d, testo);
 
   // ----- programma del tornio con piu lavorazioni -----
   function gcodeSequenzaTornio(fasi, comuni) {

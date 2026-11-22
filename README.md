@@ -105,6 +105,12 @@ stessa, in `android/firma`; serve solo a questa app).
 Il progetto Android (`android/`) e una WebView che apre le stesse pagine del sito, copiate negli asset; salva i file
 in Download/Hich-Officina, condivide, copia negli appunti e sceglie i file.
 
+### Chiave di firma dai segreti (consigliato)
+La chiave di serie sta nel repository (`android/firma`): serve solo a far funzionare gli aggiornamenti, ma chi vede il
+repository potrebbe firmare un APK con la stessa firma. Per usare una chiave tua: crea un file di chiavi, convertilo in
+testo con `base64` e metti nei segreti del repository `FIRMA_KEYSTORE_B64`, `FIRMA_PASSWORD` e (se serve) `FIRMA_ALIAS`.
+Cambiare chiave obbliga a disinstallare l'app gia installata: prima fai la copia di sicurezza.
+
 ## Prove
 - `node prove/prove.js`: calcoli, materiali, dati di taglio, programmi di fresa e tornio, macro.
 - `node prove/ui.js [cartella-schermate]`: tutte le schermate in un browser a misura di telefono (serve la libreria di prova del browser gia installata).

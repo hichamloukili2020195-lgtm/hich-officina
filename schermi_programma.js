@@ -107,8 +107,8 @@
     const pts = [];
     for (const x of [p.x0, p.x1]) for (const y of [p.y0, p.y1]) for (const z of [p.z0, p.z1]) pts.push(pr(x, y, z));
     r.percorso.forEach(s => { if (!s.rapido || s.z <= 5) pts.push(pr(s.x, s.y, Math.min(s.z, 5))); });
-    const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
-    const mx = Math.min(...xs), Mx = Math.max(...xs), my = Math.min(...ys), My = Math.max(...ys);
+    let mx = Infinity, Mx = -Infinity, my = Infinity, My = -Infinity;
+    for (let i = 0; i < pts.length; i++) { const q = pts[i]; if (q[0] < mx) mx = q[0]; if (q[0] > Mx) Mx = q[0]; if (q[1] < my) my = q[1]; if (q[1] > My) My = q[1]; }
     const sc = Math.min((W - 24) / (Mx - mx || 1), (H - 24) / (My - my || 1));
     const ox = (W - (Mx - mx) * sc) / 2 - mx * sc, oy = (H - (My - my) * sc) / 2 - my * sc;
     const P = (x, y, z) => { const q = pr(x, y, z); return [ox + q[0] * sc, oy + q[1] * sc]; };

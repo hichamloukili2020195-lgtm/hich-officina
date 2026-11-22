@@ -198,7 +198,7 @@
     const P = poli.map(p => ({ z: p.a + (sz || 0), r: p.b + (sx || 0) / 2 }));
     let monotono = true;
     for (let i = 1; i < P.length; i++) if (P[i].r < P[i - 1].r - 1e-6 && P[i].z < P[i - 1].z) monotono = false;
-    const rMin = Math.min(...P.map(p => p.r));
+    let rMin = Infinity; for (const p of P) if (p.r < rMin) rMin = p.r;
     const passate = [];
     let r = dg / 2;
     let k = 0;

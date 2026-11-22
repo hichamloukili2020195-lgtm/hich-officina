@@ -58,10 +58,39 @@
 
   // ----- memoria: solo su questo telefono; se non c'e l'app va lo stesso -----
   const CHIAVE = 'hich-officina-v2';
+  const SCHEMA = 2;
+  /** Porta i dati salvati da qualunque versione precedente alla forma di adesso. Non perde niente di quello che si capisce. */
+  function migra(m) {
+    if (!m || typeof m !== 'object' || Array.isArray(m)) m = {};
+    const lista = k => { if (!Array.isArray(m[k])) m[k] = []; };
+    // 2.5.0: la tabella utensili sta a parte (prima nello stesso posto dei campi della schermata utensili)
+    if (Array.isArray(m.utensili)) { if (!Array.isArray(m.tabellaUt)) m.tabellaUt = m.utensili; delete m.utensili; }
+    ['salvati', 'pezzi', 'macro', 'preferiti', 'recenti', 'tabellaUt'].forEach(lista);
+    if (m.materiali !== undefined && !Array.isArray(m.materiali)) delete m.materiali;
+    if (Array.isArray(m.materiali) && !m.materiali.length) delete m.materiali;
+    if (!m.imp || typeof m.imp !== 'object' || Array.isArray(m.imp)) m.imp = {};
+    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
+    // programmi salvati e pezzi: solo voci complete
+    m.salvati = m.salvati.filter(x => x && Array.isArray(x.righe)).map(x => Object.assign({ id: Date.now() + Math.random(), nome: 'O0001', data: '' }, x));
+    m.pezzi = m.pezzi.filter(x => x && typeof x === 'object').map(x => Object.assign({ id: 'p' + Date.now() + Math.floor(Math.random() * 1e6), nome: 'Pezzo', programmi: [], foto: [], misure: [], controlli: [] }, x));
+    m.pezzi.forEach(x => ['programmi', 'foto', 'misure', 'controlli'].forEach(k => { if (!Array.isArray(x[k])) x[k] = []; }));
+    // 2.2.0: i dati di taglio dei programmi non sono piu campi giri/avanzamento
+    ['fresa', 'fori', 'tornio'].forEach(t => { const v = m.programma && m.programma[t]; if (v && typeof v === 'object' && !v._taglio2) { delete v.giri; delete v.avanz; } });
+    m.schema = SCHEMA;
+    return m;
+  }
+  /** Somma di controllo semplice (FNV-1a) per accorgersi di una copia rovinata o modificata. */
+  function hash(testo) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < testo.length; i++) { h ^= testo.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(16).padStart(8, '0');
+  }
   let mem = {};
   try { mem = JSON.parse(localStorage.getItem(CHIAVE) || '{}') || {}; } catch (e) { mem = {}; }
   // valori della versione 1 (calcolatori): si tengono
   try { const v1 = JSON.parse(localStorage.getItem('hich-officina-v1') || 'null'); if (v1 && !mem.valori && v1.valori) mem.valori = v1.valori; } catch (e) { /* niente */ }
+  mem = migra(mem);
+  if (!mem.primoUso) mem.primoUso = new Date().toISOString().slice(0, 10);
   let salvaTimer = null, salvaFallito = false;
   function salva() {
     clearTimeout(salvaTimer);
@@ -77,7 +106,7 @@
 
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
-    tema: 'scuro', guanti: false, contrasto: false, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
+    tema: 'scuro', guanti: false, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
     codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1,
     postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
@@ -292,11 +321,34 @@
     });
   }
 
+  // ----- dialoghi dentro la pagina (alert, confirm e prompt non esistono nell'APK) -----
+  function dialogo(titolo, corpo, pulsanti) {
+    return new Promise(ok => {
+      const chiudi = v => { vel.remove(); ok(v); };
+      const vel = el('div', { class: 'velo dialogo', role: 'dialog', 'aria-modal': 'true', 'aria-label': titolo }, [el('div', { class: 'dialogo-box' }, [el('b', { testo: titolo })].concat(corpo(chiudi), [el('div', { class: 'pulsanti' }, pulsanti(chiudi))]))]);
+      document.body.appendChild(vel);
+      const i = vel.querySelector('input'); if (i) i.focus();
+    });
+  }
+  /** Chiede un testo (anche una password): ritorna il testo o null se si annulla. */
+  function chiedi(titolo, opz) {
+    opz = opz || {};
+    const inp = el('input', { type: opz.password ? 'password' : 'text', id: 'f-chiedi', autocomplete: 'off', 'aria-label': titolo, inputmode: opz.numerico ? 'numeric' : null });
+    return dialogo(titolo, chiudi => { inp.addEventListener('keydown', e => { if (e.key === 'Enter') chiudi(inp.value); }); return [opz.nota ? el('p', { class: 'leggenda', testo: opz.nota }) : null, el('div', { class: 'ctrl' }, [inp])]; },
+      chiudi => [el('button', { class: 'pul sec', testo: 'Annulla', onclick: () => chiudi(null) }), el('button', { class: 'pul', testo: 'OK', onclick: () => chiudi(inp.value) })]);
+  }
+  /** Chiede conferma: ritorna true o false. */
+  function conferma(titolo, testo, etichetta, pericolo) {
+    return dialogo(titolo, () => [el('p', { testo: testo || '' })],
+      chiudi => [el('button', { class: 'pul sec', testo: 'Annulla', onclick: () => chiudi(false) }), el('button', { class: 'pul' + (pericolo ? ' peric' : ''), testo: etichetta || 'Conferma', onclick: () => chiudi(true) })]);
+  }
+
   // ----- schermate -----
   const App = {
+    migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.15.0'
+    schermi: {}, param: {}, VERSIONE: '2.16.0'
   };
   window.App = App;
 
@@ -400,8 +452,17 @@
       const menu = el('div', { class: 'menu' });
       MENU.forEach(v => menu.appendChild(voceMenu(v)));
       const rec = (mem.recenti || []).map(id => MENU.find(x => x[0] === id)).filter(Boolean).slice(0, 4);
+      // promemoria della copia di sicurezza: una settimana dall'ultima copia (o dal primo uso) se ci sono dati
+      const ha = ['salvati', 'pezzi', 'macro', 'tabellaUt'].some(k => (mem[k] || []).length) || Array.isArray(mem.materiali);
+      const giorni = d => Math.floor((Date.now() - new Date(d + (String(d).length === 10 ? 'T12:00:00' : '')).getTime()) / 86400000);
+      const rif = mem.ultimaCopia || mem.primoUso;
+      const dovuta = imp().promemoriaCopia && ha && rif && giorni(rif) >= 7 && !(mem.promemoriaFino && new Date(mem.promemoriaFino) > new Date());
+      const promemoria = dovuta ? el('div', { class: 'info avviso', role: 'alert' }, [el('div', { html: icona('avviso') }), el('div', {}, [
+        el('div', { html: '<b>' + (mem.ultimaCopia ? 'Ultima copia di sicurezza ' + giorni(mem.ultimaCopia) + ' giorni fa' : 'Non hai ancora fatto la copia di sicurezza') + '.</b> Programmi, macro, pezzi e utensili stanno solo su questo telefono.' }),
+        el('div', { class: 'pulsanti', style: 'margin:8px 0 0' }, [el('button', { class: 'pul', style: 'padding:9px', testo: 'Fai la copia', onclick: () => App.copiaSicurezza && App.copiaSicurezza() }),
+          el('button', { class: 'pul sec', style: 'padding:9px', testo: 'Tra 3 giorni', onclick: () => { mem.promemoriaFino = new Date(Date.now() + 3 * 86400000).toISOString(); salva(); promemoria.remove(); } })])])]) : null;
       const recBox = rec.length ? el('div', { class: 'recenti' }, [el('div', { class: 'sez', style: 'margin:0 2px 6px', testo: 'Usati di recente' }), el('div', { class: 'chips' }, rec.map(v => el('button', { class: 'chip', testo: v[2], onclick: () => App.vai(v[0]) })))]) : null;
-      m.append(el('div', { class: 'ctrl cerca-home' }, [el('span', { html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>' }), cerca]), recBox, risultati, menu);
+      m.append(el('div', { class: 'ctrl cerca-home' }, [el('span', { html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>' }), cerca]), promemoria, recBox, risultati, menu);
       cerca.addEventListener('input', () => {
         const q = cerca.value.trim();
         const L = App.cerca ? App.cerca(q) : [];

@@ -76,22 +76,8 @@
   A.utensileDa = id => utensili().find(x => x.id === id);
 
   // ----- tolleranze scritte a mano -----
-  /** "H7", "g6", "±0,05", "+0,1 -0,05", "+0.1/0", "0 -0.02" -> {sup, inf} in mm, oppure {errore}. */
-  function leggiTolleranza(nominale, testo) {
-    const t = String(testo || '').trim().replace(/,/g, '.');
-    if (!t) return { sup: 0, inf: 0 };
-    if (/^(js|JS|[a-zA-Z])\d{1,2}$/.test(t)) {
-      const r = O.tolleranza(nominale, t);
-      return r.errore ? { errore: r.errore } : { sup: r.sup / 1000, inf: r.inf / 1000 };
-    }
-    let m = /^(?:±|\+\/?-|\+-)\s*(\d*\.?\d+)$/.exec(t);
-    if (m) return { sup: Number(m[1]), inf: -Number(m[1]) };
-    m = /^([+-]?\d*\.?\d+)\s*[/ ;]\s*([+-]?\d*\.?\d+)$/.exec(t);
-    if (m) { const a = Number(m[1]), b = Number(m[2]); return { sup: Math.max(a, b), inf: Math.min(a, b) }; }
-    return { errore: 'Tolleranza non capita: scrivi H7, ±0,05 oppure +0,1 -0,05' };
-  }
+  const leggiTolleranza = O.leggiTolleranza;
   A.leggiTolleranza = leggiTolleranza;
-  O.leggiTolleranza = leggiTolleranza;
   /** Esito di una misura: {ok, scarto (mm, rispetto al limite superato), testo}. */
   function esitoMisura(nom, tol, misurato) {
     if (!(isFinite(misurato))) return null;
@@ -327,7 +313,11 @@
   A.copiaSicurezza = async function () {
     const foto = {};
     for (const p of pezzi()) for (const id of (p.foto || [])) { const d = await A.Foto.prendi(id); if (d) foto[id] = d; }
-    const dati = { app: 'hich-officina', versione: A.VERSIONE, data: new Date().toISOString(), mem: A.mem, foto };
+    // la password della macchina non finisce mai in una copia
+    const mem = JSON.parse(JSON.stringify(A.mem)); if (mem.imp) mem.imp.ftpPassword = '';
+    const corpo = { mem, foto };
+    const dati = { app: 'hich-officina', versione: A.VERSIONE, schema: A.SCHEMA, data: new Date().toISOString(), controllo: A.hash(JSON.stringify(corpo)), mem, foto };
+    A.mem.ultimaCopia = oggi(); A.mem.promemoriaFino = null; A.salva();
     A.condividiFile('hich-officina-copia-' + oggi() + '.json', JSON.stringify(dati), 'application/json');
   };
   /** Controlla il file di copia e ritorna {mem, foto} o {errore}. */
@@ -335,7 +325,12 @@
     let d;
     try { d = JSON.parse(String(testo || '').replace(/^﻿/, '')); } catch (e) { return { errore: 'Il file non e una copia di Hich-Officina (JSON non valido).' }; }
     if (!d || d.app !== 'hich-officina' || !d.mem || typeof d.mem !== 'object') return { errore: 'Il file non e una copia di Hich-Officina.' };
-    return { mem: d.mem, foto: d.foto || {}, data: d.data, versione: d.versione };
+    const foto = d.foto && typeof d.foto === 'object' ? d.foto : {};
+    // controllo: la copia non deve essere stata modificata, tagliata o rovinata
+    let avvertenza = '';
+    if (!d.controllo) avvertenza = 'Questa copia non ha il controllo di integrita (e di una versione vecchia): controlla i numeri qui sotto.';
+    else if (d.controllo !== A.hash(JSON.stringify({ mem: d.mem, foto }))) avvertenza = 'Il file e stato modificato o e rovinato: la somma di controllo non torna. Ripristinarlo puo dare dati sbagliati.';
+    return { mem: A.migra(JSON.parse(JSON.stringify(d.mem))), foto, data: d.data, versione: d.versione, avvertenza, danneggiata: !!d.controllo && !!avvertenza };
   }
   O.leggiCopia = leggiCopia;
   A.ripristina = function () {
@@ -355,12 +350,16 @@
       m.appendChild(A.info('Copia del <b>' + esc(String(c.data || '').slice(0, 10)) + '</b> (versione ' + esc(c.versione || '?') + '): ' +
         n('salvati') + ' programmi, ' + n('macro') + ' macro, ' + n('pezzi') + ' pezzi, ' + (n('tabellaUt') || n('utensili')) + ' utensili, ' + Object.keys(c.foto).length + ' foto' +
         (Array.isArray(c.mem.materiali) ? ', materiali personali' : '') + '.'));
+      if (c.avvertenza) m.appendChild(A.info(esc(c.avvertenza), 'avviso'));
       m.appendChild(A.info('Tutti i dati di adesso su questo telefono vengono sostituiti da quelli della copia.', 'avviso'));
-      m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('salvati') + 'Ripristina', onclick: async () => {
+      m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('salvati') + (c.danneggiata ? 'Ripristina comunque' : 'Ripristina'), onclick: async () => {
+        if (!(await A.conferma('Ripristinare la copia?', 'I dati di adesso su questo telefono vengono sostituiti.' + (c.danneggiata ? ' Il file risulta rovinato.' : ''), 'Ripristina', true))) return;
+        const pw = (A.mem.imp || {}).ftpPassword;
         for (const id in c.foto) await A.Foto.metti(id, c.foto[id]);
         Object.keys(A.mem).forEach(k => delete A.mem[k]);
         Object.assign(A.mem, c.mem);
         A.mem.versione = A.VERSIONE;
+        if (pw) { A.mem.imp = A.mem.imp || {}; A.mem.imp.ftpPassword = pw; }
         try { localStorage.setItem('hich-officina-v2', JSON.stringify(A.mem)); } catch (e) { A.avviso('Non salvato: ' + e.message); return; }
         A.param.copia = null; A.applicaTema(); A.avviso('Copia ripristinata'); A.vai('home');
       } })]));

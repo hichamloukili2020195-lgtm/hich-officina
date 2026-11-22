@@ -291,7 +291,8 @@ const server = http.createServer((q, r) => {
   const [fc] = await Promise.all([pg.waitForEvent('filechooser'), pg.click('text=Ripristina')]);
   await fc.setFiles({ name: 'copia.json', mimeType: 'application/json', buffer: Buffer.from(copia) });
   await pg.waitForTimeout(200);
-  await pg.click('#schermo >> text=Ripristina'); await pg.waitForTimeout(300);
+  await pg.click('#schermo >> text=Ripristina'); await pg.waitForTimeout(100);
+  await pg.click('.dialogo button:text-is("Ripristina")'); await pg.waitForTimeout(300);
   await vai('pezzi');
   ok((await pg.textContent('#schermo')).includes('Flangia prova'), 'ripristino della copia');
   await largo('fine 2.4.0');
@@ -642,6 +643,98 @@ const server = http.createServer((q, r) => {
   ok((await pg.$$eval('.elenco .elem', x => x.length)) >= 1, 'programma salvato perso');
   const sw = await pg.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()));
   ok(sw, 'service worker non registrato');
+
+  // ===== 2.16.0: simulazione di un programma molto lungo =====
+  await vai('apri'); await pg.waitForTimeout(60);
+  const lungo = ['%', 'O0001 (LUNGO)', 'G21 G17 G90', 'T1 M6', 'S3000 M3', 'G0 X10 Y0 Z5', 'G1 Z-1 F500'].concat(Array.from({ length: 1500 }, () => 'G3 X10 Y0 I-10 J0')).concat(['G0 Z50', 'M5', 'M30', '%']).join('\n');
+  await pg.fill('#f-testo', lungo);
+  const t0 = Date.now();
+  await pg.click('text=Controlla e simula'); await pg.waitForTimeout(200);
+  await pg.click('button.pul:text-is("Simula")'); await pg.waitForTimeout(500);
+  const tSim = Date.now() - t0;
+  ok(tSim < 8000, 'apertura della simulazione lunga: ' + tSim + ' ms');
+  ok((await pg.$eval('#f-passo', e => Number(e.max))) > 150000, 'segmenti del programma lungo');
+  await pg.selectOption('#f-vel', '4096'); await pg.waitForTimeout(900);
+  await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(200);
+  ok(!(await pg.$('#schermo .errore')), 'simulazione lunga senza errori');
+  await pg.selectOption('#f-vel', '4');
+
+  // ===== 2.16.0: migrazioni, promemoria, copia rovinata, password, esporta e importa =====
+  const ctx3 = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, acceptDownloads: true });
+  await ctx3.addInitScript(() => { window.__ftpChiamate = []; window.Android = { inviaFtp(h, p, u, pw, c, n, t) { window.__ftpChiamate.push([h, p, u, pw, c, n]); setTimeout(() => window.__ftpEsito && window.__ftpEsito(true, 'Inviato'), 10); } }; });
+  const pg3 = await ctx3.newPage();
+  pg3.on('pageerror', e => errori.push('pagina 3: ' + e.message));
+  const vai3 = async h => { await pg3.evaluate(x => { location.hash = x; }, h); await pg3.waitForTimeout(60); };
+  // dati salvati da versioni vecchie e dati rovinati: l'app si apre e tutte le schermate funzionano
+  const VECCHI = {
+    v1: { valori: { fresa: { d: '10' } } },
+    v24: { utensili: [{ id: 'u1', t: 5, tipo: 'fresa', d: 10, z: 3 }], programma: { tab: 'fresa', fresa: { vc: 200, giri: 3000, avanz: 600 } }, salvati: [{ id: 1, nome: 'O0001', titolo: 'PROVA', tipo: 'fresa', data: '2026-11-01', righe: ['%', 'O0001', 'G0 X0', 'M30', '%'] }], pezzi: [{ id: 'p1', nome: 'Vecchio', foto: ['f1'] }] },
+    rovinati: { salvati: 'abc', pezzi: {}, macro: null, imp: [], materiali: 'x', tabellaUt: 7, valori: 5, programma: [], preferiti: { a: 1 } }
+  };
+  for (const k of Object.keys(VECCHI)) {
+    await pg3.goto(url);
+    await pg3.evaluate(d => { localStorage.setItem('hich-officina-v2', JSON.stringify(d)); }, VECCHI[k]);
+    await pg3.reload(); await pg3.waitForTimeout(150);
+    for (const sc of ['home', 'programma', 'calcoli', 'tabellaUtensili', 'salvati', 'pezzi', 'macro', 'materiali', 'impostazioni', 'ciclo', 'disegno', 'tabelle']) {
+      await vai3(sc);
+      const e = await pg3.$$eval('#schermo .errore', x => x.map(q => q.textContent).filter(t => /Errore in questa/.test(t)));
+      ok(!e.length, 'dati ' + k + ' schermata ' + sc + ': ' + e.join());
+    }
+    const sch = await pg3.evaluate(() => [App.mem.schema, Array.isArray(App.mem.salvati), Array.isArray(App.mem.pezzi), Array.isArray(App.mem.tabellaUt)]);
+    ok(sch[0] === 2 && sch[1] && sch[2] && sch[3], 'migrazione ' + k + ': ' + sch.join());
+  }
+  await pg3.goto(url);
+  await pg3.evaluate(d => { localStorage.setItem('hich-officina-v2', JSON.stringify(d)); }, VECCHI.v24); await pg3.reload(); await pg3.waitForTimeout(100);
+  ok((await pg3.evaluate(() => App.mem.tabellaUt.length + '/' + App.mem.salvati.length + '/' + App.mem.programma.fresa.giri)) === '1/1/undefined', 'migrazione 2.4: utensile, programma salvato, dati di taglio vecchi');
+  // promemoria della copia: una settimana dal primo uso, con dati
+  await pg3.evaluate(() => { const d = new Date(Date.now() - 10 * 86400000).toISOString().slice(0, 10); App.mem.primoUso = d; delete App.mem.ultimaCopia; App.mem.macro = [{ nome: 'M', num: 9101, par: [], corpo: '' }]; App.salva(); });
+  await vai3('impostazioni'); await vai3('home');
+  ok((await pg3.textContent('[role="alert"]')).includes('Non hai ancora fatto la copia'), 'promemoria della copia');
+  await pg3.click('text=Tra 3 giorni'); await vai3('impostazioni'); await vai3('home');
+  ok(!(await pg3.$('[role="alert"]')), 'promemoria rimandato');
+  // copia: la password non c'e, il controllo si accorge di una modifica
+  await vai3('impostazioni');
+  await pg3.evaluate(() => { App.mem.imp = Object.assign(App.mem.imp || {}, { ftpChiedi: false, ftpPassword: 'segreta' }); App.salva(); });
+  const [dlc] = await Promise.all([pg3.waitForEvent('download'), pg3.click('text=Fai la copia')]);
+  const copia3 = fs.readFileSync(await dlc.path(), 'utf8');
+  const dc3 = JSON.parse(copia3);
+  ok(dc3.controllo && !copia3.includes('segreta') && dc3.schema === 2, 'copia con controllo e senza password');
+  ok((await pg3.evaluate(() => App.mem.ultimaCopia)) === new Date().toISOString().slice(0, 10), 'data dell\'ultima copia');
+  const rovinata = JSON.stringify(Object.assign({}, dc3, { mem: Object.assign({}, dc3.mem, { salvati: [] }) }));
+  await vai3('scambio');
+  await pg3.evaluate(t => App.scambioAnalizza(t), rovinata); await pg3.waitForTimeout(100);
+  ok((await pg3.textContent('#schermo')).includes('somma di controllo') && (await pg3.textContent('#schermo')).includes('Ripristina comunque'), 'copia rovinata segnalata');
+  await vai3('scambio');
+  await pg3.evaluate(t => App.scambioAnalizza(t), copia3); await pg3.waitForTimeout(100);
+  ok(!(await pg3.textContent('#schermo')).includes('somma di controllo'), 'copia sana senza avvertenze');
+  // password FTP: chiesta a ogni invio, non salvata
+  await pg3.evaluate(() => { App.mem.imp = Object.assign(App.mem.imp, { ftpChiedi: true, ftpPassword: '', ftpHost: '192.168.1.50', ftpUtente: 'cnc' }); App.mem.salvati = [{ id: 5, nome: 'O0001', titolo: 'T', tipo: 'fresa', data: 'x', righe: ['%', 'O0001', 'M30', '%'] }]; App.salva(); });
+  await pg3.evaluate(() => { App.param.listato = { righe: ['%', 'O0001', 'M30', '%'], nome: 'O0001', tipo: 'fresa' }; }); await vai3('listato');
+  await pg3.click('text=Invia alla macchina'); await pg3.waitForTimeout(80);
+  ok(await pg3.$('.dialogo input[type="password"]'), 'la password si chiede');
+  await pg3.fill('#f-chiedi', 'pw-di-prova'); await pg3.click('.dialogo button:text-is("OK")'); await pg3.waitForTimeout(80);
+  ok((await pg3.evaluate(() => window.__ftpChiamate[0] && window.__ftpChiamate[0][3])) === 'pw-di-prova' && (await pg3.evaluate(() => App.mem.imp.ftpPassword || '')) === '', 'password usata e non salvata');
+  await pg3.click('text=Invia alla macchina'); await pg3.waitForTimeout(60); await pg3.click('.dialogo button:text-is("Annulla")'); await pg3.waitForTimeout(60);
+  ok((await pg3.evaluate(() => window.__ftpChiamate.length)) === 1, 'annullando non si invia');
+  // esporta e importa: utensili, macro, materiali nel formato di Hich-CAM
+  await pg3.evaluate(() => { App.mem.tabellaUt = [{ id: 'a', t: 1, tipo: 'fresa', d: 10, z: 3 }, { id: 'b', t: 2, tipo: 'maschio', d: 8, passo: 1.25 }]; App.mem.macro = [{ nome: 'Mia', num: 9101, par: [['Z', 'Prof', -5]], corpo: 'M99' }]; App.salva(); });
+  await vai3('scambio');
+  const [dU] = await Promise.all([pg3.waitForEvent('download'), pg3.click('text=Tabella utensili')]);
+  const fU = fs.readFileSync(await dU.path(), 'utf8');
+  const [dM] = await Promise.all([pg3.waitForEvent('download'), pg3.click('text=Materiali (formato di Hich-CAM)')]);
+  const fM = JSON.parse(fs.readFileSync(await dM.path(), 'utf8'));
+  ok(Array.isArray(fM.materiali) && fM.materiali.length === 20 && fM.materiali[0].vc > 0, 'materiali nel formato di Hich-CAM');
+  const [dA] = await Promise.all([pg3.waitForEvent('download'), pg3.click('text=Le mie macro')]);
+  const fA = fs.readFileSync(await dA.path(), 'utf8');
+  await pg3.evaluate(() => { App.mem.tabellaUt = [{ id: 'z', t: 1, tipo: 'puntaMD', d: 5 }]; App.mem.macro = [{ nome: 'Altra', num: 9101, par: [], corpo: 'M99' }]; App.salva(); });
+  await pg3.evaluate(t => App.scambioAnalizza(t), fU); await pg3.click('.pul:text-is("Importa")'); await pg3.waitForTimeout(60);
+  ok((await pg3.evaluate(() => App.mem.tabellaUt.map(u => u.t + u.tipo).sort().join())) === '1fresa,2maschio', 'utensili importati: T1 sostituito, T2 aggiunto');
+  await pg3.evaluate(t => App.scambioAnalizza(t), fA); await pg3.click('.pul:text-is("Importa")'); await pg3.waitForTimeout(60);
+  ok((await pg3.evaluate(() => App.mem.macro.map(x => x.nome + x.num).join())) === 'Altra9101,Mia9102', 'macro importate e rinumerate');
+  await pg3.evaluate(t => App.scambioAnalizza(t), JSON.stringify(fM)); await pg3.click('.pul:text-is("Importa")'); await pg3.waitForTimeout(60);
+  ok((await pg3.evaluate(() => Array.isArray(App.mem.materiali) && App.mem.materiali.length)) === 20, 'materiali importati');
+  await pg3.evaluate(() => App.scambioAnalizza('{ rotto')); ok((await pg3.textContent('#schermo')).includes('non e un JSON valido'), 'file rotto');
+  await ctx3.close();
 
   // lettura da foto: telefono finto che restituisce il testo letto (nel browser la lettura non c'e)
   const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

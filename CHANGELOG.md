@@ -2,6 +2,16 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.16.0 - Dati, sicurezza e prestazioni
+- Promemoria della copia di sicurezza (una settimana, rimandabile) in home.
+- La copia ha una somma di controllo: un file modificato o rovinato viene segnalato prima di ripristinare; il ripristino chiede conferma. La password della macchina non finisce mai nella copia.
+- Password FTP chiesta a ogni invio e non salvata (si puo tornare a salvarla in Impostazioni).
+- Migrazioni dei dati: i dati di versioni vecchie e anche rovinati si portano alla forma di adesso; provate su tutte le schermate.
+- Esporta e importa: tabella utensili, macro, materiali nel formato della libreria di Hich-CAM.
+- Simulazione di programmi molto lunghi (centinaia di migliaia di movimenti) senza piantarsi: strati in memoria, velocita fino a x4096; corretto un errore di pila su programmi enormi.
+- Una sola funzione per leggere le tolleranze scritte a mano.
+- APK: la chiave di firma puo venire dai segreti del repository (vedi README).
+
 ## 2.15.0 - Interfaccia e uso in officina
 - Modalita guanti (testi, campi e pulsanti piu grandi) e contrasto alto, in Impostazioni.
 - Tablet in orizzontale: home a tre colonne, moduli su due colonne, elenchi e risultati su piu colonne.

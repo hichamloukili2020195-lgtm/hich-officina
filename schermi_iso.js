@@ -23,13 +23,18 @@
   A.salvaInArchivio = salvaInArchivio;
 
   /** Manda il programma alla macchina (solo nell'APK). */
-  function inviaMacchina(L) {
+  async function inviaMacchina(L) {
     const I = A.imp();
     if (!A.ANDROID || !A.ANDROID.inviaFtp) { A.avviso('L\'invio alla macchina si fa dall\'app Android (APK)'); return; }
     if (!I.ftpHost) { A.avviso('Scrivi prima l\'indirizzo della macchina in Impostazioni'); A.vai('impostazioni'); return; }
+    let password = String(I.ftpPassword || '');
+    if (I.ftpChiedi) {
+      password = await A.chiedi('Password della macchina', { password: true, nota: 'Utente ' + (I.ftpUtente || '(nessuno)') + ' su ' + I.ftpHost + '. Non viene salvata.' });
+      if (password === null) return;
+    }
     window.__ftpEsito = (ok, msg) => A.avviso(msg);
     A.avviso('Invio a ' + I.ftpHost + '...');
-    A.ANDROID.inviaFtp(String(I.ftpHost), Number(I.ftpPorta) || 21, String(I.ftpUtente || ''), String(I.ftpPassword || ''), String(I.ftpCartella || ''), nomeFile(L), L.righe.join('\r\n') + '\r\n');
+    A.ANDROID.inviaFtp(String(I.ftpHost), Number(I.ftpPorta) || 21, String(I.ftpUtente || ''), password, String(I.ftpCartella || ''), nomeFile(L), L.righe.join('\r\n') + '\r\n');
   }
   A.inviaMacchina = inviaMacchina;
 
@@ -258,7 +263,7 @@
       const b = (svg, et, fn) => el('button', { class: 'icona-pul', 'aria-label': et, html: '<svg viewBox="0 0 24 24" fill="currentColor">' + svg + '</svg>', onclick: fn });
       let k = N, gira = false, timer = null;
       const vel = el('select', { id: 'f-vel', 'aria-label': 'Velocita' });
-      [['1', 'x1'], ['4', 'x4'], ['16', 'x16'], ['64', 'x64'], ['256', 'x256']].forEach(([v, t]) => vel.appendChild(el('option', { value: v, testo: t })));
+      [['1', 'x1'], ['4', 'x4'], ['16', 'x16'], ['64', 'x64'], ['256', 'x256'], ['1024', 'x1024'], ['4096', 'x4096']].forEach(([v, t]) => vel.appendChild(el('option', { value: v, testo: t })));
       vel.value = sv.vel || '4';
       vel.addEventListener('change', () => { sv.vel = vel.value; A.salva(); });
       const bPlay = b('<path d="M8 5v14l11-7z"/>', 'Avvia', () => (gira ? ferma() : avvia()));
@@ -330,39 +335,59 @@
         const zMaxL = r.limiti.z.maxLavoro !== null ? r.limiti.z.maxLavoro : 0;
         S.forEach(s => { if (!s.rapido || modo === 'tornio' || s.z <= zMaxL + 10) { pts.push(f(s.x0, s.y0, s.z0)); pts.push(f(s.x, s.y, s.z)); } });
         if (!pts.length) S.forEach(s => pts.push(f(s.x, s.y, s.z)));
-        const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
-        proj = { f, mx: Math.min(...xs), Mx: Math.max(...xs), my: Math.min(...ys), My: Math.max(...ys) };
+        // minimo e massimo con un ciclo: con centinaia di migliaia di punti Math.min(...) supera la pila
+        let mx = Infinity, Mx = -Infinity, my = Infinity, My = -Infinity;
+        for (let i = 0; i < pts.length; i++) { const q = pts[i]; if (q[0] < mx) mx = q[0]; if (q[0] > Mx) Mx = q[0]; if (q[1] < my) my = q[1]; if (q[1] > My) My = q[1]; }
+        proj = { f, mx, Mx, my, My };
         if (modo === 'tornio') proj.My = Math.max(proj.My, 0);
       };
       const colore = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-      const disegna = () => {
-        const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 340, H = cv.clientHeight || 300;
-        cv.width = W * dpr; cv.height = H * dpr;
-        const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-        if (!N || !proj) return;
+      // Strati in memoria: il percorso intero e quello gia fatto si disegnano una volta (e a pezzi), non a ogni fotogramma.
+      // Cosi anche un programma con centinaia di migliaia di movimenti si simula senza piantarsi.
+      let strati = null;   // {chiave, W, H, dpr, sc, ox, oy, base, fatto, kFatto}
+      const nuovoStrato = (W, H, dpr) => { const c = document.createElement('canvas'); c.width = W * dpr; c.height = H * dpr; const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { c, g }; };
+      const preparaStrati = (W, H, dpr) => {
+        const chiave = [W, H, dpr, sv.vista, sv.centro ? 1 : 0, N].join('|');
+        if (strati && strati.chiave === chiave) return strati;
         const sc = Math.min((W - 30) / ((proj.Mx - proj.mx) || 1), (H - 30) / ((proj.My - proj.my) || 1));
         const ox = (W - (proj.Mx - proj.mx) * sc) / 2 - proj.mx * sc, oy = (H - (proj.My - proj.my) * sc) / 2 - proj.my * sc;
         const P2 = (x, y, z) => { const q = proj.f(x, y, z); return [ox + q[0] * sc, oy + q[1] * sc]; };
-        // asse del tornio
+        const base = nuovoStrato(W, H, dpr), fatto = nuovoStrato(W, H, dpr);
+        const g = base.g;
+        // il percorso intero, tenue; oltre 120000 movimenti se ne disegna uno ogni tanti (e solo per orientarsi)
+        const passo = Math.max(1, Math.ceil(N / 120000));
+        g.lineWidth = 1; g.globalAlpha = 0.35; g.strokeStyle = colore('--accento2');
+        g.beginPath();
+        for (let i = 0; i < N; i += passo) { const s = S[i]; if (s.rapido) continue; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); }
+        g.stroke(); g.globalAlpha = 1;
+        strati = { chiave, W, H, dpr, sc, ox, oy, P2, base, fatto, kFatto: 0 };
+        return strati;
+      };
+      const disegna = () => {
+        const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 340, H = cv.clientHeight || 300;
+        if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = W * dpr; cv.height = H * dpr; }
+        const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+        if (!N || !proj) return;
+        const T = preparaStrati(W, H, dpr), P2 = T.P2;
+        // asse e grezzo del tornio
         if (modo === 'tornio') {
           const L = r.limiti;
           if (L.x.maxLavoro !== null) {
             const a = P2(L.x.maxLavoro, 0, Math.max(L.z.maxLavoro, 0)), c = P2(0, 0, L.z.minLavoro);
             g.fillStyle = colore('--tenue'); g.globalAlpha = 0.14; g.fillRect(Math.min(a[0], c[0]), a[1], Math.abs(a[0] - c[0]), c[1] - a[1]); g.globalAlpha = 1;
           }
-          g.strokeStyle = colore('--tenue'); g.setLineDash([8, 4, 2, 4]); g.beginPath(); g.moveTo(0, oy); g.lineTo(W, oy); g.stroke(); g.setLineDash([]);
+          g.strokeStyle = colore('--tenue'); g.setLineDash([8, 4, 2, 4]); g.beginPath(); g.moveTo(0, T.oy); g.lineTo(W, T.oy); g.stroke(); g.setLineDash([]);
         }
-        const acc = colore('--accento2'), ten = colore('--tenue'), fatti = colore('--ok');
-        // tutto il percorso, tenue
-        g.lineWidth = 1; g.globalAlpha = 0.35;
-        g.beginPath();
-        S.forEach(s => { if (s.rapido) return; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); });
-        g.strokeStyle = acc; g.stroke();
-        g.globalAlpha = 1;
-        // fatto fin qui
-        g.lineWidth = 1.6; g.beginPath();
-        for (let i = 0; i < k; i++) { const s = S[i]; if (s.rapido) continue; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); }
-        g.strokeStyle = fatti; g.stroke();
+        const ten = colore('--tenue');
+        g.drawImage(T.base.c, 0, 0, W, H);
+        // quello fatto fin qui: si aggiunge solo il pezzo nuovo (se si torna indietro si rifa da capo)
+        if (k < T.kFatto) { T.fatto.g.clearRect(0, 0, W, H); T.kFatto = 0; }
+        if (k > T.kFatto) {
+          const f = T.fatto.g; f.lineWidth = 1.6; f.strokeStyle = colore('--ok'); f.beginPath();
+          for (let i = T.kFatto; i < k; i++) { const s = S[i]; if (s.rapido) continue; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); f.moveTo(a[0], a[1]); f.lineTo(c[0], c[1]); }
+          f.stroke(); T.kFatto = k;
+        }
+        g.drawImage(T.fatto.c, 0, 0, W, H);
         g.setLineDash([4, 4]); g.lineWidth = 1; g.beginPath();
         for (let i = Math.max(0, k - 200); i < k; i++) { const s = S[i]; if (!s.rapido) continue; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); }
         g.strokeStyle = ten; g.stroke(); g.setLineDash([]);

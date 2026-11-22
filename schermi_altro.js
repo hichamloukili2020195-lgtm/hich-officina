@@ -280,6 +280,7 @@
           else if (typeof def === 'number') { const n = O.num(v[k]); s[k] = n > 0 ? n : def; }
           else s[k] = v[k];
         }
+        if (s.ftpChiedi) s.ftpPassword = '';   // chiesta a ogni invio: non si tiene
         A.mem.imp = s; A.salva();
         if (id === 'tema' || id === 'guanti' || id === 'contrasto') A.applicaTema();
       };
@@ -291,13 +292,14 @@
       blocco('Tornio', [{ id: 'nmaxTornio', et: 'Giri massimi mandrino', u: 'giri/min' }, { id: 'codLimite', et: 'Limite giri', tipo: 'scelta', scelte: [['G50', 'G50 S...'], ['G92', 'G92 S...']] },
         { id: 'codFiletto', et: 'Filettatura', tipo: 'scelta', scelte: [['G32', 'G32'], ['G33', 'G33']] }, { id: 'xCambio', et: 'X cambio utensile', sub: 'vuoto = grezzo + 22', u: 'mm' },
         { id: 'zCambio', et: 'Z cambio utensile', u: 'mm' }]);
-      blocco('Programmi', [{ id: 'numProg', et: 'Numero programma di partenza', u: 'O' }, { id: 'refrig', et: 'Refrigerante M8', tipo: 'spunta' }, { id: 'numerare', et: 'Numeri di riga N10, N20...', tipo: 'spunta' }]);
+      blocco('Programmi', [{ id: 'numProg', et: 'Numero programma di partenza', u: 'O' }, { id: 'refrig', et: 'Refrigerante M8', tipo: 'spunta' }, { id: 'numerare', et: 'Numeri di riga N10, N20...', tipo: 'spunta' }, { id: 'promemoriaCopia', et: 'Promemoria della copia di sicurezza ogni settimana', tipo: 'spunta' }]);
       blocco('Linguaggio della macchina (post-processor)', [
         { id: 'postFresa', et: 'Fresa', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].fresa).map(k => [k, O.LINGUAGGI[k].nome]) },
         { id: 'postTornio', et: 'Tornio', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].tornio).map(k => [k, O.LINGUAGGI[k].nome]) }]);
       m.appendChild(A.info('Il programma nasce in ISO e si traduce nel linguaggio scelto; nel listato si puo cambiare al volo. Provalo sempre a vuoto la prima volta.'));
       blocco('Macchina in rete (FTP)', [{ id: 'ftpHost', et: 'Indirizzo della macchina', sub: 'es. 192.168.1.50', tipo: 'testo' }, { id: 'ftpPorta', et: 'Porta', v: 21 },
-        { id: 'ftpUtente', et: 'Utente', tipo: 'testo' }, { id: 'ftpPassword', et: 'Password', sub: 'resta scritta su questo telefono', tipo: 'testo' },
+        { id: 'ftpUtente', et: 'Utente', tipo: 'testo' }, { id: 'ftpChiedi', et: 'Chiedi la password a ogni invio (consigliato)', tipo: 'spunta' },
+        { id: 'ftpPassword', et: 'Password', sub: 'resta scritta su questo telefono, non va nelle copie', tipo: 'testo', se: q => !q.ftpChiedi },
         { id: 'ftpCartella', et: 'Cartella sulla macchina', sub: 'vuoto = quella di partenza', tipo: 'testo' },
         { id: 'nomeFtp', et: 'Nome del file', tipo: 'scelta', scelte: [['O0001.nc', 'O0001.nc'], ['O0001.NC', 'O0001.NC'], ['O0001', 'O0001 senza estensione']] }]);
       m.appendChild(A.info('L\'invio diretto funziona dall\'app Android (APK) quando il telefono e nella stessa rete della macchina. Per una cartella condivisa usa "Salva in..." nel programma.'));
@@ -306,7 +308,7 @@
         el('button', { class: 'pul sec', html: A.icona('salvati') + 'Ripristina', onclick: () => A.ripristina() })]));
       m.appendChild(A.info('La copia contiene programmi, macro, pezzi con foto, utensili, materiali e impostazioni. Mandala su Drive o per posta con Condividi.'));
       m.appendChild(el('div', { class: 'sez', testo: 'Dati' }));
-      m.appendChild(el('div', { class: 'menu' }, [A.voceMenu(['materiali', 'materiale', 'Materiali', 'Modifica velocita di taglio e avanzamenti'])]));
+      m.appendChild(el('div', { class: 'menu' }, [A.voceMenu(['materiali', 'materiale', 'Materiali', 'Modifica velocita di taglio e avanzamenti']), A.voceMenu(['scambio', 'salva', 'Esporta e importa', 'Utensili, macro e materiali (anche per Hich-CAM)'])]));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salva') + 'Esporta i miei dati', onclick: () => A.condividi('hich-officina-dati.json', JSON.stringify(A.mem, null, 1)) })]));
       m.appendChild(A.info('Hich-Officina ' + A.VERSIONE + ' · funziona anche senza rete. I dati restano su questo telefono. I valori di taglio sono di partenza: controlla sempre i programmi prima di lavorare.'));
     }
