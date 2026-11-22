@@ -324,7 +324,7 @@
     return { fasi, misure, note: finisci(note), modo: 'tornio' };
   }
 
-  const Ciclo = { pianificaProfilo, estraiQuote, pianificaAlbero, pianificaPiastra, gcodeSequenzaTornio, passoGrosso };
+  const Ciclo = { pianificaProfilo, estraiQuote, pianificaAlbero, pianificaPiastra, gcodeSequenzaTornio, passoGrosso, trovaT };
   Object.assign(O, Ciclo);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

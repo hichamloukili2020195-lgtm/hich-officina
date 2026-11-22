@@ -53,13 +53,13 @@ ${corpo}
 const FUNZIONI = [
   ['Programmi di fresa, foratura e tornio', 'Spianatura, tasche, profili con G41/G42, fori con tutti i cicli, filetti, troncatura e cicli fissi. Piu lavorazioni in un programma, nell\'ordine di officina.'],
   ['Controllo e simulazione', 'Trova gli errori riga per riga, anche da una foto dello schermo. Simulazione animata con quote, giri, centro fresa e urti con le staffe.'],
-  ['Disegna il profilo col dito', 'Linee, archi, smussi, raggi, filetti e gole di scarico, con la vista 3D del pezzo tornito.'],
+  ['Mini CAD/CAM per fresa e tornio', 'Disegni col dito, a schermo intero e girando il telefono: profili, fori, tasche, asole, filetti e gole. A ogni disegno dai la lavorazione e l\'app scrive il programma e lo simula.'],
   ['Ciclo di lavoro proposto', 'Dal pezzo, o dalle quote di un disegno, alla lavorazione completa con utensili e dati di taglio.'],
-  ['Dati di taglio e tabelle', 'Giri e avanzamenti per utensile e materiale, tolleranze ISO, filetti, rugosita, codici G e M.'],
+  ['Dati di taglio e tabelle', 'Giri e avanzamenti per utensile e materiale, tolleranze ISO, codici G e M e la tabella dei filetti: metrici, pollici, gas, NPT, trapezi, Whitworth e altri.'],
   ['Macro, pezzi, attrezzaggio', 'Modelli di macro con simulazione, fogli di attrezzaggio da stampare, foto e controllo delle misure.']
 ];
 const SCHERMATE = [['home', 'Home con il menu delle funzioni', 'Home'], ['listato', 'Programma ISO generato', 'Programma'], ['simulazione', 'Simulazione a pannello con quote e giri', 'Simulazione'],
-  ['disegno', 'Disegno del profilo del tornio', 'Disegno del profilo'], ['angolo', 'Angolo misurato su una foto', 'Angolo da una foto'], ['ciclo', 'Ciclo di lavoro proposto per una piastra', 'Ciclo proposto']];
+  ['cad', 'Disegno della fresa con le lavorazioni', 'CAD fresa'], ['disegno', 'Disegno del profilo del tornio', 'CAD tornio'], ['angolo', 'Angolo misurato su una foto', 'Angolo da una foto'], ['ciclo', 'Ciclo di lavoro proposto per una piastra', 'Ciclo proposto']];
 const DOMANDE = [
   ['Funziona senza internet?', 'Si. Dopo la prima apertura l\'app funziona senza rete. La rete serve solo per mandare un programma alla macchina o condividere un file.'],
   ['Dove vanno i miei dati?', 'Restano sul tuo telefono. Non c\'e un account, non c\'e pubblicita e non c\'e nessun tracciamento. Per non perderli, fai ogni tanto la copia di sicurezza dall\'app.'],
@@ -82,7 +82,7 @@ function indexHtml() {
     <p class="azioni"><a class="pul" href="app.html">Apri l'app</a> <a class="pul sec" id="apk" href="#installa" data-apk="${esc(apk)}">Scarica l'APK Android</a></p>
     <p class="piccolo">Nessun account, nessuna pubblicita, i dati restano sul telefono.</p>
   </div>
-  <img class="eroe-img" src="docs/schermate/home.png" alt="La home dell'app con il menu delle funzioni" width="390" height="844">
+  <div class="telefono"><img class="eroe-img" src="docs/schermate/home.png" alt="La home dell'app con il menu delle funzioni" width="390" height="844"></div>
 </div></section>
 <section id="funzioni" class="sezione"><div class="largo">
   <h2>Cosa fa</h2>

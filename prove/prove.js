@@ -3,6 +3,8 @@
 const assert = require('assert');
 const O = require('../programmi.js');   // carica anche calcoli.js
 require('../profilo.js');
+require('../filetti.js');
+require('../cad.js');
 require('../iso.js');
 require('../post.js');
 require('../ciclo.js');
@@ -499,5 +501,84 @@ prova('compensazione G41/G42 calcolata e urti con le staffe', () => {
   assert.strictEqual(O.controllaIngombri(s, { staffe: [{ x0: 30, y0: -20, x1: 50, y1: -3.5, z: -8 }], raggio: 5 }).length, 0);   // staffa piu bassa del taglio
   // sotto il fondo del grezzo
   assert.ok(O.controllaIngombri(s, { grezzo: { lx: 80, ly: 50, lz: 1 }, raggio: 5 }).some(x => x.livello === 'errore' && /sotto il fondo/.test(x.testo)));
+});
+prova('tabelle dei filetti: famiglie e misure dalle norme', () => {
+  const ids = O.FILETTI_FAMIGLIE.map(f => f.id);
+  ['m', 'mf', 'unc', 'unf', 'unef', 'npt', 'g', 'r', 'bsw', 'bsf', 'tr', 'acme', 'pg'].forEach(i => assert.ok(ids.includes(i), 'manca ' + i));
+  const tutte = O.FILETTI_FAMIGLIE.map(f => [f, f.righe()]);
+  tutte.forEach(([f, righe]) => { assert.ok(righe.length > 5, f.id); righe.forEach(r => f.colonne.forEach(c => { if (r[c] !== undefined) assert.ok(isFinite(r[c]) && r[c] > 0, f.id + ' ' + r.nome + ' ' + c); })); });
+  const r = (id, nome) => O.righeFamiglia(id, nome).find(x => x.nome === nome || x.nome.startsWith(nome + ' '));
+  // valori di riferimento
+  vicino(r('g', 'G 1/2').nocciolo, 18.631, 0.01);          // gas 1/2: diametro di nocciolo ISO 228
+  vicino(r('g', 'G 1/2').p, 1.814, 0.001);
+  vicino(r('g', 'G 1').d, 33.249, 1e-9);
+  vicino(r('npt', 'NPT 1/2').medio, 19.264, 0.01);         // NPT 1/2: diametro medio all'inizio, 0,75843"
+  vicino(r('npt', 'NPT 1/2').preforo, 18.3);
+  vicino(r('unc', '1/4-20').p, 1.27, 0.001);
+  vicino(r('unc', '1/4-20').preforo, 5.08, 0.01);
+  vicino(r('unf', '#10-32').d, 4.826, 0.001);
+  vicino(r('m', 'M12').preforo, 10.25, 0.001);
+  vicino(r('tr', 'Tr 20x4').noccioloVite, 15.5, 0.01);     // d3 = d - 2 (P/2 + ac) = 20 - 2*2,25
+  vicino(r('tr', 'Tr 20x4').nocciolo, 16, 1e-9);
+  vicino(r('pg', 'Pg 21').d, 28.3, 1e-9);
+  vicino(r('bsw', 'BSW 1/2-12').d, 12.7, 0.001);
+  assert.strictEqual(O.righeFamiglia('npt', '1/2').length, 3);        // NPT 1/2, 1 1/2 e 2 1/2 contengono "1/2"
+  assert.strictEqual(O.righeFamiglia('r', 'zzz').length, 0);
+  assert.ok(O.righeFamiglia('m', 'M12').length >= 1);
+});
+prova('tasca libera: fresa sempre dentro il profilo e lontana dalle pareti', () => {
+  const pts = [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 30 }, { x: 30, y: 30 }, { x: 30, y: 60 }, { x: 0, y: 60 }];   // a L
+  const d = 8, sov = 0.2, marg = d / 2 + sov;
+  const r = O.gcodeFresa('tascaLibera', { n: 3000, f: 600, t: 1, d, prof: 6, ap: 3, ae: 50, sovra: sov, punti: pts });
+  assert.ok(!r.errore, r.errore);
+  const poli = pts.map(p => ({ a: p.x, b: p.y })); poli.push(poli[0]);
+  const dist = (x, y) => { let m = Infinity; for (let i = 1; i < poli.length; i++) { const a = poli[i - 1], b = poli[i], dx = b.a - a.a, dy = b.b - a.b, t = Math.max(0, Math.min(1, ((x - a.a) * dx + (y - a.b) * dy) / (dx * dx + dy * dy))); m = Math.min(m, Math.hypot(x - a.a - t * dx, y - a.b - t * dy)); } return m; };
+  const dentro = (x, y) => x > 0 && y > 0 && x < 60 && y < 60 && !(x > 30 && y > 30);
+  const lav = r.percorso.filter(s => !s.rapido && s.z === s.z0);
+  assert.ok(lav.length > 20);
+  lav.forEach(s => { [[s.x0, s.y0], [s.x, s.y], [(s.x0 + s.x) / 2, (s.y0 + s.y) / 2]].forEach(([x, y]) => assert.ok(dentro(x, y) && dist(x, y) >= marg - 0.02, 'fresa troppo vicina alla parete in ' + x + ',' + y)); });
+  // si toglie davvero la maggior parte: le righe coprono tutta l'altezza dell'asse corto
+  assert.ok(Math.min(...lav.map(s => s.y)) < 4.5 && Math.max(...lav.map(s => s.y)) > 55);
+  assert.ok(O.gcodeFresa('tascaLibera', { n: 3000, f: 600, t: 1, d: 70, prof: 6, ap: 3, punti: pts }).errore.includes('troppo grande'));
+  // la simulazione legge il programma senza errori
+  assert.ok(!O.eseguiISO(r.righe.join('\n')).errore);
+});
+prova('mini CAD: dalle entita al programma con le regole di officina', () => {
+  const mt = O.MATERIALI.find(m => m.n === 'C40');
+  const modello = { fz: 20, entita: [
+    { id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 100, y1: 60, r: 5, lav: [{ op: 'contorno', prof: 15, lato: 'esterno' }] },
+    { id: 2, tipo: 'cerchio', cx: 20, cy: 30, r: 4.25, lav: [{ op: 'foro', passante: true }] },
+    { id: 3, tipo: 'cerchio', cx: 80, cy: 30, r: 4, lav: [{ op: 'maschio', passante: true, passo: 1.25 }] },
+    { id: 4, tipo: 'poli', chiuso: true, punti: [{ x: 35, y: 10 }, { x: 65, y: 10 }, { x: 65, y: 30 }, { x: 50, y: 50 }, { x: 35, y: 30 }], lav: [{ op: 'tasca', prof: 6 }] },
+    { id: 5, tipo: 'asola', x1: 20, y1: 50, x2: 40, y2: 50, w: 8, lav: [{ op: 'asola', prof: 5 }] },
+    { id: 6, tipo: 'punto', x: 50, y: 5, lav: [{ op: 'foro', d: 3, prof: 8 }] }] };
+  const p = O.pianificaCAD(modello, { mat: mt, tab: [], nmax: 6000 });
+  assert.ok(!p.errore, p.errore);
+  const t = p.fasi.map(f => f.titolo);
+  const i = s => t.findIndex(x => x.startsWith(s));
+  assert.ok(i('Centrino') < i('Punta') && i('Punta') < i('Maschio'), 'centrino, punta, maschio');
+  assert.ok(i('Punta') >= 0 && i('Smusso') > i('Punta') && i('Smusso') < i('Maschio'), 'smusso prima del maschio');
+  assert.strictEqual(t[t.length - 1].split(' ')[0], 'Contorno', 'il contorno esterno e l\'ultimo');
+  assert.ok(i('Tasca libera') >= 0 && i('Finitura tasca') > i('Tasca libera'), 'tasca libera e finitura');
+  // numeri T: due utensili diversi non hanno lo stesso numero
+  const perT = {}; p.fasi.forEach(f => { const k = (f.op === 'fori' ? f.tipoUt : 'fresa') + '|' + f.c.d; if (perT[f.c.t] && perT[f.c.t] !== k) assert.fail('T' + f.c.t + ' usato per ' + perT[f.c.t] + ' e ' + k); perT[f.c.t] = k; });
+  const r = O.gcodeSequenza(p.fasi, { num: 1, nome: 'CAD' });
+  assert.ok(!r.errore, r.errore);
+  assert.ok(r.righe.some(l => /^G84 /.test(l)) || r.righe.some(l => /G84/.test(l)));
+  assert.ok(!O.eseguiISO(r.righe.join('\n')).errore);
+  // errori chiari
+  assert.ok(O.pianificaCAD({ fz: 20, entita: [] }, { mat: mt }).errore.includes('Nessuna lavorazione'));
+  assert.ok(O.pianificaCAD({ fz: 0, entita: [] }, { mat: mt }).errore.includes('spessore'));
+  assert.ok(O.pianificaCAD({ fz: 20, entita: [{ tipo: 'punto', x: 1, y: 1, lav: [{ op: 'tasca', prof: 3 }] }] }, { mat: mt }).errore.includes('non si puo fare'));
+  assert.ok(O.pianificaCAD({ fz: 20, entita: [{ tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }], lav: [{ op: 'tasca', prof: 3 }] }] }, { mat: mt }).errore.includes('profilo chiuso'));
+  // contorno di un cerchio e di un profilo aperto (a sinistra)
+  const c = O.pianificaCAD({ fz: 10, entita: [{ tipo: 'cerchio', cx: 0, cy: 0, r: 15, lav: [{ op: 'contorno', prof: 5, lato: 'esterno' }] }, { tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 20 }], lav: [{ op: 'contorno', prof: 3, lato: 'esterno' }] }] }, { mat: mt });
+  assert.ok(!c.errore, c.errore);
+  const rc = O.gcodeSequenza(c.fasi, { num: 2, nome: 'X' });
+  assert.ok(!rc.errore, rc.errore);
+  assert.ok(rc.righe.some(l => /G41|G42/.test(l)));
+  // i limiti del disegno
+  const b = O.limitiCAD(modello.entita);
+  vicino(b.x0, 0); vicino(b.x1, 100); vicino(b.y1, 60);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

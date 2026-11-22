@@ -67,6 +67,6 @@ mark{background:var(--avviso);color:#000;padding:0 4px;border-radius:4px}
 /* telefono: il menu delle pagine va su una riga a parte */
 @media (max-width:640px){.testata .largo{gap:6px 12px;padding-block:6px}.testata nav{order:3;flex:1 1 100%}.marchio{flex:1}.eroe{padding-top:32px}}
 /* schermo largo: titolo a sinistra, schermata a destra */
-.eroe-img{display:none}
-@media (min-width:880px){.eroe-griglia{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:40px;align-items:center}.eroe-img{display:block;justify-self:center;height:520px;width:auto;border-radius:24px;border:1px solid var(--bordo);box-shadow:0 20px 60px rgba(0,0,0,.35)}.eroe{padding:64px 0 32px}}
+.telefono{display:none}.eroe-img{display:none}
+@media (min-width:880px){.eroe-griglia{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:40px;align-items:center}.telefono{display:block;justify-self:center;padding:12px;border-radius:44px;background:linear-gradient(145deg,#2b3650,#0d1424);border:1px solid #3b4866;box-shadow:0 24px 70px rgba(0,0,0,.45),inset 0 0 0 2px #0a0f1c}.eroe-img{display:block;height:520px;width:auto;border-radius:32px}.eroe{padding:64px 0 32px}}
 @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}

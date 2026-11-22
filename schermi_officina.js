@@ -145,8 +145,12 @@
       // foto
       m.appendChild(el('div', { class: 'sez', testo: 'Foto' }));
       const fotoBox = el('div', { class: 'foto-griglia' });
-      const input = el('input', { type: 'file', accept: 'image/*', multiple: true, id: 'f-foto', style: 'display:none' });
-      m.append(fotoBox, input, el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('piu') + 'Aggiungi foto', onclick: () => input.click() })]));
+      m.append(fotoBox, A.pulsantiFoto({ id: 'f-foto', multiple: true, dopo: async files => {
+        for (const f of files) {
+          try { const id = await A.riduciFoto(f); p.foto = (p.foto || []).concat(id); A.salva(); } catch (e) { A.avviso('Foto non aggiunta: ' + e.message); }
+        }
+        disegnaFoto();
+      } }));
       const disegnaFoto = () => {
         fotoBox.innerHTML = '';
         (p.foto || []).forEach(id => {
@@ -165,14 +169,6 @@
             } })])]);
         document.body.appendChild(vel);
       };
-      input.addEventListener('change', async () => {
-        const files = Array.from(input.files || []);
-        for (const f of files) {
-          try { const id = await A.riduciFoto(f); p.foto = (p.foto || []).concat(id); A.salva(); } catch (e) { A.avviso('Foto non aggiunta: ' + e.message); }
-        }
-        input.value = '';
-        disegnaFoto();
-      });
       disegnaFoto();
       // misure
       m.appendChild(el('div', { class: 'sez', testo: 'Misure da controllare' }));

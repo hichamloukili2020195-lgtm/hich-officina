@@ -109,7 +109,9 @@
       const barraVista = el('div', { class: 'barra-vista' }, [
         el('button', { class: 'icona-pul', 'aria-label': 'Rimpicciolisci', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/></svg>', onclick: () => zoomA(1 / 1.5) }),
         el('button', { class: 'icona-pul', 'aria-label': 'Ingrandisci', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5v14"/></svg>', onclick: () => zoomA(1.5) }),
-        el('button', { class: 'chip', testo: 'Adatta', onclick: () => { vista.zoom = 1; vista.dx = 0; vista.dy = 0; v3.zoom = 1; disegna(); } }), lettura]);
+        el('button', { class: 'chip', testo: 'Adatta', onclick: () => { vista.zoom = 1; vista.dx = 0; vista.dy = 0; v3.zoom = 1; disegna(); } }),
+        el('button', { class: 'chip', id: 'd-pieno', testo: 'Schermo intero', 'aria-label': 'Schermo intero', onclick: e => { const on = A.schermoPieno(m, () => disegna()); e.currentTarget.textContent = on ? 'Esci' : 'Schermo intero'; } }),
+        el('button', { class: 'chip', id: 'd-ruota', testo: 'Ruota', 'aria-label': 'Ruota lo schermo', onclick: e => { const o = A.ruotaSchermo(() => disegna()); e.currentTarget.textContent = o === 'libero' ? 'Ruota' : o === 'orizzontale' ? 'Orizzontale' : 'Verticale'; } }), lettura]);
       cv.after(barraVista);
 
       // ----- coordinate: Z in orizzontale (0 a destra), raggio in verticale; mezzo pezzo sopra l'asse, specchio sotto -----
@@ -590,6 +592,7 @@
       A.disegnoRidisegna = () => tutto(true);
     }
   };
+  window.addEventListener('orientationchange', () => { if (A.attuale && A.attuale() === 'disegno' && A.disegnoRidisegna) setTimeout(A.disegnoRidisegna, 250); });
   window.addEventListener('resize', () => { if (A.attuale && A.attuale() === 'disegno' && A.disegnoRidisegna) A.disegnoRidisegna(); });
 
   /** Semplifica un tratto a mano (Ramer-Douglas-Peucker) in coordinate (z, r). */

@@ -31,7 +31,9 @@
     tornio: '<path d="M3 9h5v6H3zM8 10h7v4H8zM15 11h4v2h-4zM19 12h2"/>',
     foro: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>',
     fresa: '<path d="M4 18h16v3H4z"/><path d="M10 3h4v9h-4z"/><path d="M10 12l2 4 2-4"/>',
-    modifica: '<path d="M4 20h4L19 9l-4-4L4 16z"/>'
+    modifica: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+    fotocamera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+    immagine: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4"/>'
   };
   const icona = (n, cl) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"' + (cl ? ' class="' + cl + '"' : '') + ' aria-hidden="true">' + (IC[n] || '') + '</svg>';
 
@@ -69,7 +71,7 @@
     if (m.materiali !== undefined && !Array.isArray(m.materiali)) delete m.materiali;
     if (Array.isArray(m.materiali) && !m.materiali.length) delete m.materiali;
     if (!m.imp || typeof m.imp !== 'object' || Array.isArray(m.imp)) m.imp = {};
-    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
+    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo', 'cad'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
     // programmi salvati e pezzi: solo voci complete
     m.salvati = m.salvati.filter(x => x && Array.isArray(x.righe)).map(x => Object.assign({ id: Date.now() + Math.random(), nome: 'O0001', data: '' }, x));
     m.pezzi = m.pezzi.filter(x => x && typeof x === 'object').map(x => Object.assign({ id: 'p' + Date.now() + Math.floor(Math.random() * 1e6), nome: 'Pezzo', programmi: [], foto: [], misure: [], controlli: [] }, x));
@@ -321,6 +323,51 @@
     });
   }
 
+  /** Due pulsanti per le foto: "Scatta una foto" (fotocamera subito) e "Dalla galleria". dopo(files) riceve i file. */
+  function pulsantiFoto(opz) {
+    const id = opz.id || 'f-foto';
+    const mk = (suffisso, capture) => {
+      const attr = { type: 'file', accept: 'image/*', id: id + suffisso, style: 'display:none' };
+      if (opz.multiple && !capture) attr.multiple = true;
+      if (capture) attr.capture = 'environment';
+      const i = el('input', attr);
+      i.addEventListener('change', () => { const f = Array.from(i.files || []); i.value = ''; if (f.length) opz.dopo(f); });
+      return i;
+    };
+    const iGal = mk('', false), iCam = mk('-cam', true);
+    return el('div', { class: 'pulsanti' }, [iGal, iCam,
+      el('button', { class: 'pul', id: id + '-scatta', html: icona('fotocamera') + 'Scatta una foto', onclick: () => iCam.click() }),
+      el('button', { class: 'pul sec', id: id + '-galleria', html: icona('immagine') + 'Dalla galleria', onclick: () => iGal.click() })]);
+  }
+
+  // ----- schermo intero per i disegni: nasconde testata e barra, lascia girare lo schermo -----
+  const ORIENTA = ['libero', 'orizzontale', 'verticale'];
+  function orienta(modo) {
+    try {
+      if (window.Android && window.Android.orientamento) window.Android.orientamento(modo);
+      else if (window.screen && screen.orientation && screen.orientation.lock) {
+        if (modo === 'libero') screen.orientation.unlock(); else screen.orientation.lock(modo === 'orizzontale' ? 'landscape' : 'portrait').catch(() => { /* non permesso */ });
+      }
+    } catch (e) { /* niente */ }
+  }
+  /** Schermo intero: ritorna true se ora e intero. dopo() ridisegna. */
+  function schermoPieno(radice, dopo) {
+    const on = !document.body.classList.contains('cad-pieno');
+    document.body.classList.toggle('cad-pieno', on); radice.classList.toggle('pieno', on);
+    orienta('libero');
+    App.orientaPieno = 0;
+    App.esciPieno = on ? () => schermoPieno(radice, dopo) : null;
+    if (dopo) setTimeout(dopo, 60);
+    return on;
+  }
+  /** Con lo schermo intero: libero > orizzontale > verticale. */
+  function ruotaSchermo(dopo) {
+    App.orientaPieno = ((App.orientaPieno || 0) + 1) % ORIENTA.length;
+    orienta(ORIENTA[App.orientaPieno]);
+    if (dopo) setTimeout(dopo, 300);
+    return ORIENTA[App.orientaPieno];
+  }
+
   // ----- dialoghi dentro la pagina (alert, confirm e prompt non esistono nell'APK) -----
   function dialogo(titolo, corpo, pulsanti) {
     return new Promise(ok => {
@@ -347,13 +394,14 @@
   const App = {
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
-    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.18.0'
+    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo,
+    schermi: {}, param: {}, VERSIONE: '2.19.0'
   };
   window.App = App;
 
   let attuale = null;
   function mostra() {
+    if (document.body.classList.contains('cad-pieno')) { document.body.classList.remove('cad-pieno'); $('schermo').classList.remove('pieno'); App.esciPieno = null; App.orientaPieno = 0; if (window.Android && window.Android.orientamento) window.Android.orientamento('libero'); }
     const h = (location.hash || '').replace(/^#/, '');
     const id = App.schermi[h] ? h : 'home';
     const s = App.schermi[id];
@@ -388,6 +436,7 @@
     if (('#' + id) === location.hash) mostra(); else location.hash = id;
   };
   App.indietro = function () {
+    if (App.esciPieno) { App.esciPieno(); return; }
     if (history.length > 1 && App._dentro) history.back(); else App.vai('home');
   };
   App.ridisegna = () => mostra();
@@ -416,9 +465,7 @@
     '<g fill="#e3c27a" opacity=".9"><path d="M262 168c8-6 14-2 10 4-3 4-8 2-6-1"/><path d="M216 172c-6-5-12-1-8 4 3 3 7 1 5-1"/><path d="M280 150c6-3 9 1 6 4"/><path d="M200 160c-5-2-8 2-5 4"/></g>' +
     '<g fill="#fff" opacity=".7"><circle cx="270" cy="160" r="1.4"/><circle cx="290" cy="170" r="1"/><circle cx="210" cy="164" r="1.2"/></g>' +
     '<rect y="150" width="400" height="100" fill="url(#gC)" opacity=".35"/></svg>';
-  const MARCHIO = '<svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32)"><g fill="#1f7aff">' +
-    Array.from({ length: 8 }, (_, i) => '<rect x="-5" y="-30" width="10" height="12" rx="2" transform="rotate(' + i * 45 + ')"/>').join('') +
-    '</g><circle r="21" fill="#1f7aff"/><circle r="15" fill="#0b1220"/><path d="M-6 6l12-12" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle r="3.5" fill="#fff"/></g></svg>';
+  const MARCHIO = '<svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#63b4ff"/><stop offset="1" stop-color="#1f5fe0"/></linearGradient><linearGradient id="ma" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#c9d4e6"/><stop offset="1" stop-color="#8a98b2"/></linearGradient><linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17305c"/><stop offset="1" stop-color="#091226"/></linearGradient><radialGradient id="ml" cx=".3" cy=".25" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><path d="M415.1,225.6 L454.4,230.9 L454.4,281.1 L415.1,286.4 L402.6,325.0 L431.3,352.4 L401.8,392.9 L366.9,374.1 L334.0,398.0 L341.2,437.0 L293.5,452.5 L276.3,416.7 L235.7,416.7 L218.5,452.5 L170.8,437.0 L178.0,398.0 L145.1,374.1 L110.2,392.9 L80.7,352.4 L109.4,325.0 L96.9,286.4 L57.6,281.1 L57.6,230.9 L96.9,225.6 L109.4,187.0 L80.7,159.6 L110.2,119.1 L145.1,137.9 L178.0,114.0 L170.8,75.0 L218.5,59.5 L235.7,95.3 L276.3,95.3 L293.5,59.5 L341.2,75.0 L334.0,114.0 L366.9,137.9 L401.8,119.1 L431.3,159.6 L402.6,187.0 Z" fill="url(#mg)"/><circle cx="256" cy="256" r="118.0" fill="#0b1830"/><circle cx="256" cy="256" r="118.0" fill="none" stroke="#5db0ff" stroke-width="5.0" opacity=".9"/><circle cx="256.0" cy="256.0" r="92.0" fill="url(#ma)"/><circle cx="319.8" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="319.8" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="256" cy="256" r="41.4" fill="none" stroke="#7d8aa6" stroke-width="3.0"/><circle cx="256" cy="256" r="12.9" fill="#2a3a5c"/></svg>';
 
   const MENU = [
     ['programma', 'nuovo', 'Nuovo programma ISO', 'Fresatura, foratura e tornitura con anteprima'],
@@ -428,6 +475,7 @@
     ['galleria', 'galleria', 'Galleria esempi', 'Programmi d\'esempio da aprire e modificare'],
     ['ciclo', 'tabella', 'Ciclo di lavoro proposto', 'Dal pezzo (o dalle quote di un disegno) alla lavorazione completa'],
     ['angolo', 'tolleranza', 'Angolo da una foto', 'Misura un lato inclinato e trova la fresa (60°, 90°...)'],
+    ['cad', 'fresa', 'Disegna e programma (fresa)', 'Profili, fori, tasche e asole col dito; il programma e la simulazione'],
     ['disegno', 'tornio', 'Disegna un profilo (tornio)', 'Col dito sullo schermo, con la vista 3D del pezzo'],
     ['apri', 'codice', 'Controlla e simula un programma', 'Da una foto dello schermo, da un file o incollato: errori, percorso, tempo'],
     ['salvati', 'salvati', 'Programmi salvati', 'I programmi tenuti su questo telefono'],
@@ -437,6 +485,15 @@
     ['tabelle', 'tabella', 'Tabelle', 'Filetti, tolleranze, rugosita, pollici'],
     ['materiali', 'materiale', 'Materiali', 'Velocita di taglio e avanzamenti per materiale']
   ];
+  // la home: le voci raggruppate per lavoro, a tessere
+  const SEZIONI = [['Disegna e programma', ['cad', 'disegno', 'programma', 'macro', 'ciclo']], ['Calcola e misura', ['calcoli', 'tolleranze', 'angolo', 'tabelle']],
+    ['Controlla', ['apri', 'galleria']], ['Officina', ['pezzi', 'tabellaUtensili', 'salvati', 'materiali']], ['Aiuto', ['guida']]];
+  const TITOLO_BREVE = { cad: 'CAD fresa', disegno: 'CAD tornio', programma: 'Programma ISO', macro: 'Macro CNC', ciclo: 'Ciclo di lavoro', calcoli: 'Calcolatrice', tolleranze: 'Tolleranze', angolo: 'Angolo da foto',
+    tabelle: 'Tabelle e filetti', apri: 'Controlla e simula', galleria: 'Esempi', pezzi: 'Pezzi', tabellaUtensili: 'Utensili', salvati: 'Programmi salvati', materiali: 'Materiali', guida: 'Come si fa' };
+  function tessera([id, ic, t, s]) {
+    return el('button', { class: 'tessera' + (id === 'cad' || id === 'disegno' ? ' evid' : ''), 'data-vai': id, 'aria-label': t, onclick: () => App.vai(id) }, [
+      el('span', { class: 'ic', html: icona(ic) }), el('b', { testo: TITOLO_BREVE[id] || t }), el('small', { testo: s })]);
+  }
   function voceMenu([id, ic, t, s]) {
     return el('button', { class: 'voce', onclick: () => App.vai(id) }, [
       el('span', { class: 'ic', html: icona(ic) }), el('span', { class: 't' }, [el('b', { testo: t }), el('small', { testo: s })]),
@@ -450,8 +507,11 @@
       m.appendChild(el('div', { class: 'eroe', html: SCENA + '<div class="marchio">' + MARCHIO + '<div><b>Hich-Officina</b><small>Calcoli e programmi CNC</small></div></div>' }));
       const cerca = el('input', { id: 'f-cerca-home', type: 'search', placeholder: 'Cerca: M10, H7 25, 316, G83, T5...', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search' });
       const risultati = el('div', { class: 'menu', hidden: true });
-      const menu = el('div', { class: 'menu' });
-      MENU.forEach(v => menu.appendChild(voceMenu(v)));
+      const menu = el('div', { class: 'menu-sezioni' });
+      SEZIONI.forEach(([nome, ids]) => {
+        menu.appendChild(el('div', { class: 'sez', testo: nome }));
+        menu.appendChild(el('div', { class: 'tessere' }, ids.map(id => MENU.find(x => x[0] === id)).filter(Boolean).map(tessera)));
+      });
       const rec = (mem.recenti || []).map(id => MENU.find(x => x[0] === id)).filter(Boolean).slice(0, 4);
       // promemoria della copia di sicurezza: una settimana dall'ultima copia (o dal primo uso) se ci sono dati
       const ha = ['salvati', 'pezzi', 'macro', 'tabellaUt'].some(k => (mem[k] || []).length) || Array.isArray(mem.materiali);

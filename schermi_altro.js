@@ -72,12 +72,7 @@
 
   // ----- tabelle -----
   const TAB = {
-    filetti() {
-      const riga = ([d, p], fine) => { const f = O.filetto(d, p); return '<tr><td>M' + fmt(d) + (fine ? 'x' + fmt(p) : '') + '</td><td>' + fmt(p) + '</td><td><b>' + fmt(f.preforo, 2) + '</b></td><td>' + fmt(f.medio, 3) + '</td><td>' + fmt(f.nocciolo, 3) + '</td><td>' + fmt(f.nocciolo_vite, 3) + '</td></tr>'; };
-      const t = '<tr><th>Filetto</th><th>Passo</th><th>Preforo</th><th>d2</th><th>D1</th><th>d3</th></tr>';
-      return '<div class="sez">Metrico ISO passo grosso</div><div class="pannello" style="padding:4px 8px"><div class="scorri"><table>' + t + O.FILETTI_GROSSI.map(x => riga(x)).join('') + '</table></div></div>' +
-        '<div class="sez">Passo fine</div><div class="pannello" style="padding:4px 8px"><div class="scorri"><table>' + t + O.FILETTI_FINI.map(x => riga(x, true)).join('') + '</table></div></div>';
-    },
+    filetti() { return ''; },
     tolleranze(S) {
       const campi = ['H7', 'H8', 'G7', 'F7', 'JS7', 'h6', 'h7', 'g6', 'f7', 'js6', 'k6', 'm6', 'n6', 'p6'], sc = S.toll || 'H7';
       let h = '<div class="chips">' + campi.map(c => '<button class="chip' + (c === sc ? ' attiva' : '') + '" data-toll="' + c + '">' + c + '</button>').join('') + '</div>';
@@ -128,6 +123,30 @@
       return '<div class="sez">Codici G piu usati</div>' + t(G) + '<div class="sez">Codici M</div>' + t(M) + '<p class="leggenda" style="margin-top:8px">Il significato puo cambiare da una macchina all\'altra: vale il manuale della macchina.</p>';
     }
   };
+
+  /** Tabella dei filetti: famiglie a schede, ricerca, colonne secondo la famiglia. */
+  function filettiDom(S, corpo) {
+    S.fam = O.FILETTI_FAMIGLIE.some(f => f.id === S.fam) ? S.fam : 'm';
+    if (typeof S.cercaFil !== 'string') S.cercaFil = '';
+    const schede = el('div', { class: 'chips fam' }), cerca = el('input', { type: 'search', id: 'f-cercaFil', placeholder: 'Cerca: M12, 1/2, G 3/4, Tr 20…', value: S.cercaFil, 'aria-label': 'Cerca un filetto', autocomplete: 'off' });
+    const nota = el('div'), tab = el('div');
+    corpo.append(el('div', { class: 'ctrl' }, [cerca]), schede, nota, tab);
+    const disegna = () => {
+      const f = O.FILETTI_FAMIGLIE.find(x => x.id === S.fam);
+      schede.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.fam));
+      const righe = O.righeFamiglia(S.fam, S.cercaFil);
+      nota.innerHTML = '';
+      nota.appendChild(el('div', { class: 'fil-testa' }, [el('b', { testo: f.nome }), el('span', { class: 'badge', testo: 'Profilo ' + f.angolo }), f.conico ? el('span', { class: 'badge', testo: 'Conico 1:16' }) : null]));
+      nota.appendChild(el('p', { class: 'leggenda', testo: f.note }));
+      const th = '<tr><th>Filetto</th>' + f.colonne.map(c => '<th>' + O.FILETTI_ETICHETTE[c] + '</th>').join('') + '</tr>';
+      const celle = r => f.colonne.map(c => '<td' + (c === 'preforo' ? ' class="evid"' : '') + '>' + (r[c] === undefined ? '—' : fmt(r[c], c === 'tpi' ? 1 : 3)) + '</td>').join('');
+      tab.innerHTML = righe.length ? '<div class="pannello" style="padding:4px 8px"><div class="scorri"><table class="tab-fil">' + th + righe.map(r => '<tr><td><b>' + A.esc(r.nome) + '</b></td>' + celle(r) + '</tr>').join('') + '</table></div></div>' +
+        '<p class="leggenda">' + righe.length + ' misure · quote in mm · valori teorici di base: vale la tabella del costruttore del maschio o dell\'utensile.</p>' : '<p class="leggenda">Nessun filetto trovato.</p>';
+    };
+    O.FILETTI_FAMIGLIE.forEach(f => schede.appendChild(el('button', { class: 'chip', 'data-id': f.id, testo: f.nome, onclick: () => { S.fam = f.id; A.salva(); disegna(); } })));
+    cerca.addEventListener('input', () => { S.cercaFil = cerca.value; disegna(); });
+    disegna();
+  }
   A.schermi.tabelle = {
     titolo: 'Tabelle',
     render(m) {
@@ -138,7 +157,8 @@
       const mostra = k => {
         S.tab = TAB[k] ? k : 'filetti'; A.salva();
         chips.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.tab));
-        corpo.innerHTML = TAB[S.tab](S);
+        corpo.innerHTML = '';
+        if (S.tab === 'filetti') filettiDom(S, corpo); else corpo.innerHTML = TAB[S.tab](S);
         corpo.querySelectorAll('[data-toll]').forEach(b => b.addEventListener('click', () => { S.toll = b.dataset.toll; mostra('tolleranze'); }));
       };
       Object.keys(TAB).forEach(k => chips.appendChild(el('button', { class: 'chip', 'data-id': k, testo: nomi[k], onclick: () => mostra(k) })));

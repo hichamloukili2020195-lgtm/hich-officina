@@ -2,6 +2,17 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.19.0 - Mini CAD/CAM, tabella dei filetti, foto e nuova icona
+- **CAD fresa** (nuova schermata): disegni profili, rettangoli, cerchi, fori e asole col dito e dai a ognuno la lavorazione (contorno, tasca, foro, maschio, alesatura, asola). L'app scrive il programma nell'ordine di officina, con i dati di taglio del materiale, e lo apri nella simulazione.
+- Gesti: un dito disegna e sposta (mirino sopra il dito, il punto si mette quando lo alzi, lente d'ingrandimento); due dita zoom e spostamento; un tocco con due dita annulla, con tre ripete. Aggancio ai punti, alla griglia e alle linee dritte; quote scritte e frecce di 0,1 / 1 / 10 mm per la precisione.
+- Schermo intero e rotazione dello schermo, per il CAD della fresa e per il disegno del tornio.
+- Nuova lavorazione "tasca libera": righe dentro un profilo qualsiasi piu un giro lungo le pareti, finitura con il profilo interno. La fresa non va mai a meno di raggio piu sovrametallo dalla parete.
+- Il contorno esterno chiuso va sempre per ultimo; due utensili diversi non hanno mai lo stesso numero T.
+- **Tabella filetti** rifatta: metrico, metrico fine, UNC, UNF, UNEF, NPT, gas G e R/Rc, Whitworth BSW e BSF, trapezio Tr, ACME e Pg, con ricerca e le misure di ogni famiglia (preforo, diametro medio, nocciolo). Valori teorici di base.
+- **Foto**: ora ci sono "Scatta una foto" (fotocamera subito) e "Dalla galleria".
+- **Home** a tessere per gruppo di lavoro. Nuova icona dell'app (ingranaggio con fresa) e icona adattiva su Android.
+- Il sito mostra il telefono con la cornice e le nuove schermate.
+
 ## 2.18.0 - Il sito di Hich-Officina
 - Un sito vero: pagina principale con funzioni, schermate, installazione e domande frequenti; guida, novita e informativa sulla privacy; pagina "non trovata".
 - L'app si apre da `app.html`. Chi l'ha gia installata viene portato all'app da solo.

@@ -29,6 +29,10 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository). La pagina p
   programma; poi il programma, la Sequenza da modificare o il pezzo con le misure da controllare.
   **Quote da una foto del disegno** (nell'APK) o dal testo incollato: Ø con tolleranze, filetti, fori ripetuti
   (4xØ9, 6xM8), smussi, raggi, lunghezze diventano bottoni da toccare per riempire i campi.
+- **CAD fresa** col dito (2.19.0): profili, rettangoli, cerchi, fori e asole; a ognuno la sua lavorazione (contorno, tasca
+  anche libera, foro, maschio, alesatura, asola); il programma esce nell'ordine di officina e si simula. Mirino sopra il dito,
+  aggancio, frecce di precisione, due dita zoom, un tocco con due dita annulla, tre ripete; schermo intero e rotazione.
+- **Tabella filetti**: metrico, fine, UNC/UNF/UNEF, NPT, gas G e R/Rc, Whitworth, trapezio, ACME, Pg.
 - **Disegna un profilo (tornio)** col dito: a punti o a mano libera (il tratto diventa rette), aggancio alla griglia e
   alle rette orizzontali e verticali, punti da trascinare, quote, raccordi e smussi da scrivere, **vista 3D del pezzo
   tornito** da girare col dito; poi diventa il profilo libero di Nuovo programma ISO. **Zoom con due dita** (e

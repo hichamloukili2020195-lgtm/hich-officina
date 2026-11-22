@@ -163,7 +163,8 @@
     const mosse = [];
     const livelli = [];
     const nl = Math.max(1, Math.ceil(c.prof / (c.ap > 0 ? c.ap : c.prof) - 1e-9));
-    for (let i = 1; i <= nl; i++) livelli.push(-c.prof * i / nl);
+    if (c.soloFondo) livelli.push(-c.prof);
+    else for (let i = 1; i <= nl; i++) livelli.push(-c.prof * i / nl);
     livelli.forEach(z => {
       mosse.push({ g: 0, x: A.a, y: A.b });
       mosse.push({ g: 0, z: (c.zR || 2) });

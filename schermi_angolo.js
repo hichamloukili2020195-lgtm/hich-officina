@@ -39,22 +39,19 @@
       S.cosa = S.cosa || 'fianco';
       const st = { img: null, W: 0, H: 0, pti: null, zoom: 1, dx: 0, dy: 0, grad: null };
       A.angoloStato = st;
-      const input = el('input', { type: 'file', accept: 'image/*', id: 'f-fotoAngolo', style: 'display:none' });
       const cv = el('canvas', { class: 'vista angolo-tela', 'aria-label': 'Foto del pezzo: trascina i quattro punti sui due lati' });
       const esito = el('div'), pan = el('div', { class: 'pannello' });
-      m.append(input, el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Scatta o scegli la foto', onclick: () => input.click() })]),
+      m.append(A.pulsantiFoto({ id: 'f-fotoAngolo', dopo: f => leggiFile(f[0]) }),
         cv, el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', testo: 'Aggancia ai bordi', onclick: () => { if (!st.img) return; aggancia(); disegna(); } }), el('button', { class: 'pul sec', testo: 'Adatta', onclick: () => { st.zoom = 1; st.dx = st.dy = 0; disegna(); } })]),
         pan, esito);
       A.modulo(pan, [{ id: 'cosa', et: 'Cosa misuri', tipo: 'scelta', scelte: [['fianco', 'Un lato inclinato rispetto a un piano (smusso, fianco)'], ['cava', 'L\'angolo tra due fianchi (cava a V)']] }], S, () => calcola());
 
       // ----- foto -----
-      input.addEventListener('change', () => {
-        const f = input.files && input.files[0]; if (!f) return;
+      function leggiFile(f) {
         const r = new FileReader();
         r.onload = () => { const im = new Image(); im.onload = () => carica(im); im.src = String(r.result); };
         r.readAsDataURL(f);
-        input.value = '';
-      });
+      }
       function carica(im) {
         // si lavora su una copia di al massimo 1400 pixel
         const k = Math.min(1, 1400 / Math.max(im.width, im.height));

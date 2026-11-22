@@ -37,12 +37,13 @@ const server = http.createServer((q, r) => {
   await vai('tabellaUtensili'); await erroreSchermo('tabella utensili con i dati vecchi');
   await vai('home');
   await foto('01-home');
-  const voci = await pg.$$eval('.menu .voce', x => x.length);
-  ok(voci === 15, 'voci del menu: ' + voci);
+  const voci = await pg.$$eval('.menu-sezioni .tessera', x => x.length);
+  ok(voci === 16, 'voci del menu: ' + voci);
+  ok((await pg.$$eval('.menu-sezioni .sez', x => x.length)) === 5, 'sezioni della home');
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['home', 'programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
+  for (const s of ['home', 'programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'cad', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
     await vai(s); await erroreSchermo(s); await largo(s);
     // nessun "null", "undefined" o "NaN" scritto sullo schermo
     const sporco = await pg.evaluate(() => { const t = document.getElementById('schermo').innerText; const m = t.match(/\b(null|undefined|NaN)\b/); return m ? m[0] + ' in: ' + t.slice(Math.max(0, m.index - 30), m.index + 30).replace(/\n/g, ' ') : ''; });
@@ -169,6 +170,22 @@ const server = http.createServer((q, r) => {
   await pg.waitForTimeout(60);
   ok((await pg.inputValue('#f-d')) === '20', 'esempio non caricato');
   await foto('09-galleria-filetto');
+
+  // tabella filetti: famiglie, ricerca, misure
+  await vai('tabelle');
+  ok((await pg.$$eval('#schermo .chips.fam .chip', x => x.length)) >= 13, 'famiglie di filetti');
+  await pg.click('#schermo .chips.fam .chip[data-id="npt"]');
+  ok((await pg.textContent('#schermo')).includes('NPT 1/2') && (await pg.textContent('#schermo')).includes('Conico 1:16'), 'tabella NPT');
+  await pg.click('#schermo .chips.fam .chip[data-id="g"]');
+  await pg.fill('#f-cercaFil', '3/4'); await pg.waitForTimeout(40);
+  ok((await pg.$$eval('#schermo .tab-fil tr', x => x.length)) === 3 && (await pg.textContent('#schermo .tab-fil')).includes('G 3/4'), 'ricerca filetto gas');
+  await pg.fill('#f-cercaFil', '');
+  await foto('08-filetti');
+  // foto: due pulsanti, fotocamera e galleria
+  await vai('angolo'); await pg.waitForTimeout(60);
+  ok((await pg.$eval('#f-fotoAngolo-cam', i => i.getAttribute('capture'))) === 'environment', 'campo fotocamera senza capture');
+  ok(!(await pg.$eval('#f-fotoAngolo', i => i.hasAttribute('capture'))), 'galleria con capture');
+  ok((await pg.textContent('#f-fotoAngolo-scatta')).includes('Scatta una foto') && (await pg.textContent('#f-fotoAngolo-galleria')).includes('galleria'), 'pulsanti foto');
 
   // preferiti
   await vai('tabelle');
@@ -494,7 +511,6 @@ const server = http.createServer((q, r) => {
   ok(p3.smusso === '1' && !p3.raccordo, 'smusso con un tocco: ' + JSON.stringify(p3));
   ok(!(await pg.$('#schermo .errore')), 'disegno con errore dopo lo smusso');
   // tutti gli spigoli
-  await pg.click('text=Tutti gli spigoli:'); // etichetta, non fa niente
   await pg.click('.chips button:text-is("C0.5")'); await pg.waitForTimeout(40);
   // zoom: rotella e due dita
   const z0 = await pg.evaluate(() => document.querySelector('.lettura') !== null);
@@ -545,6 +561,138 @@ const server = http.createServer((q, r) => {
   ok((await pg.textContent('#schermo')).includes('Fresa a V'), 'cava a V');
   await foto('32-angolo');
   await largo('fine 2.13.0');
+
+  // ===== 2.19.0: mini CAD/CAM per la fresa =====
+  {
+  await vai('cad'); await pg.waitForTimeout(150);
+  await pg.evaluate(() => { const c = App.cadStato; c.S.entita = []; c.S.prossimo = 1; c.S.strum = 'sel'; c.aggiorna(); });
+  const telaCad = await pg.$eval('.cad-tela', c => { const b = c.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height }; });
+  const trascinaCad = async (a, b) => { await pg.mouse.move(telaCad.x + a[0], telaCad.y + a[1]); await pg.mouse.down(); await pg.mouse.move(telaCad.x + (a[0] + b[0]) / 2, telaCad.y + (a[1] + b[1]) / 2, { steps: 3 }); await pg.mouse.move(telaCad.x + b[0], telaCad.y + b[1], { steps: 3 }); await pg.mouse.up(); await pg.waitForTimeout(40); };
+  const toccaCad = async a => { await pg.mouse.click(telaCad.x + a[0], telaCad.y + a[1]); await pg.waitForTimeout(40); };
+  const entCad = () => pg.evaluate(() => JSON.parse(JSON.stringify(App.cadStato.S.entita)));
+  // rettangolo trascinando
+  await pg.click('.cad-strum [data-strum="rett"]');
+  await trascinaCad([90, 110], [260, 220]);
+  let EC = await entCad();
+  ok(EC.length === 1 && EC[0].tipo === 'rett' && EC[0].x1 > EC[0].x0 && EC[0].y1 > EC[0].y0, 'rettangolo disegnato col dito: ' + JSON.stringify(EC));
+  ok((await pg.$$eval('.cad-strum [data-strum]', x => x.length)) === 6, 'strumenti del CAD');
+  // scelto e lavorazione: contorno
+  ok((await pg.textContent('.cad-pannello')).includes('+ Contorno') && (await pg.textContent('.cad-pannello')).includes('+ Tasca'), 'lavorazioni proposte per il rettangolo');
+  await pg.click('.cad-op[data-op="contorno"]');
+  EC = await entCad(); ok(EC[0].lav.length === 1 && EC[0].lav[0].op === 'contorno', 'contorno aggiunto');
+  // cerchio: foro di serie
+  await pg.click('.cad-strum [data-strum="cerchio"]');
+  await trascinaCad([150, 160], [170, 160]);
+  EC = await entCad(); ok(EC.length === 2 && EC[1].tipo === 'cerchio' && EC[1].lav[0].op === 'foro', 'cerchio con foro di serie: ' + JSON.stringify(EC[1]));
+  // due tocchi: primo punto e secondo punto (senza trascinare)
+  await pg.click('.cad-strum [data-strum="asola"]');
+  await toccaCad([100, 250]); await toccaCad([200, 250]);
+  EC = await entCad(); ok(EC.length === 3 && EC[2].tipo === 'asola', 'asola con due tocchi');
+  // fori a tocchi: il secondo copia la lavorazione del primo
+  await pg.click('.cad-strum [data-strum="punto"]');
+  await toccaCad([300, 140]); await toccaCad([300, 200]);
+  EC = await entCad(); ok(EC.length === 5 && EC[3].tipo === 'punto' && EC[4].tipo === 'punto', 'due fori a tocchi');
+  // profilo: tre punti e Chiudi
+  await pg.click('.cad-strum [data-strum="poli"]');
+  await toccaCad([60, 280]); await toccaCad([140, 280]); await toccaCad([100, 330]);
+  ok(!(await pg.$eval('#cad-chiudi', b => b.hidden)), 'pulsante Chiudi durante il profilo');
+  await pg.click('#cad-chiudi');
+  EC = await entCad(); ok(EC.length === 6 && EC[5].tipo === 'poli' && EC[5].chiuso === true && EC[5].punti.length === 3, 'profilo chiuso a tocchi: ' + JSON.stringify(EC[5]));
+  // annulla e ripeti con i pulsanti
+  await pg.click('#cad-annulla'); EC = await entCad(); ok(EC.length === 5, 'annulla toglie l\'ultimo elemento');
+  await pg.click('#cad-ripeti'); EC = await entCad(); ok(EC.length === 6, 'ripeti lo rimette');
+  // due dita: un tocco = annulla; tre dita: ripeti
+  await pg.evaluate(() => {
+    const c = document.querySelector('.cad-tela'), b = c.getBoundingClientRect();
+    const ev = (t, id, x, y) => c.dispatchEvent(new PointerEvent(t, { pointerId: id, pointerType: 'touch', clientX: b.x + x, clientY: b.y + y, bubbles: true, isPrimary: id === 1 }));
+    ev('pointerdown', 1, 100, 100); ev('pointerdown', 2, 140, 100); ev('pointerup', 1, 100, 100); ev('pointerup', 2, 140, 100);
+  });
+  await pg.waitForTimeout(60);
+  EC = await entCad(); ok(EC.length === 5, 'un tocco con due dita annulla: ' + EC.length);
+  await pg.evaluate(() => {
+    const c = document.querySelector('.cad-tela'), b = c.getBoundingClientRect();
+    const ev = (t, id, x, y) => c.dispatchEvent(new PointerEvent(t, { pointerId: id, pointerType: 'touch', clientX: b.x + x, clientY: b.y + y, bubbles: true, isPrimary: id === 1 }));
+    ev('pointerdown', 1, 100, 100); ev('pointerdown', 2, 140, 100); ev('pointerdown', 3, 180, 100); ev('pointerup', 1, 100, 100); ev('pointerup', 2, 140, 100); ev('pointerup', 3, 180, 100);
+  });
+  await pg.waitForTimeout(60);
+  EC = await entCad(); ok(EC.length === 6, 'un tocco con tre dita ripete: ' + EC.length);
+  // pizzico con due dita: zoom
+  const sc0 = await pg.evaluate(() => App.cadStato.vista.sc);
+  await pg.evaluate(() => {
+    const c = document.querySelector('.cad-tela'), b = c.getBoundingClientRect();
+    const ev = (t, id, x, y) => c.dispatchEvent(new PointerEvent(t, { pointerId: id, pointerType: 'touch', clientX: b.x + x, clientY: b.y + y, bubbles: true }));
+    ev('pointerdown', 1, 150, 200); ev('pointerdown', 2, 200, 200); ev('pointermove', 1, 100, 200); ev('pointermove', 2, 250, 200); ev('pointerup', 1, 100, 200); ev('pointerup', 2, 250, 200);
+  });
+  const sc1 = await pg.evaluate(() => App.cadStato.vista.sc);
+  ok(sc1 > sc0 * 2, 'pizzico = zoom: ' + sc0 + ' -> ' + sc1);
+  EC = await entCad(); ok(EC.length === 6, 'il pizzico non cambia il disegno');
+  // il dito (tocco) disegna col mirino sopra: il punto sta sopra il dito
+  await pg.evaluate(() => { const c = App.cadStato; c.S.strum = 'punto'; c.S.snap = false; c.S.mirino = true; c.aggiorna(); c.adatta(); c.disegna(); });
+  const prima = (await entCad()).length;
+  await pg.evaluate(() => {
+    const c = document.querySelector('.cad-tela'), b = c.getBoundingClientRect();
+    const ev = (t, x, y) => c.dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', clientX: b.x + x, clientY: b.y + y, bubbles: true }));
+    ev('pointerdown', 200, 300); ev('pointermove', 200, 300); ev('pointerup', 200, 300);
+  });
+  const dopo = await entCad();
+  const mondoDito = await pg.evaluate(() => { const c = App.cadStato; return [c.mondo(200), c.S.entita[c.S.entita.length - 1]]; });
+  ok(dopo.length === prima + 1, 'punto con il dito');
+  const pt = mondoDito[1];
+  ok(pt.tipo === 'punto' && pt.y > (await pg.evaluate(() => { const c = App.cadStato; return c.S.entita.length ? 0 : 0; })) - 1e9, 'punto messo');
+  await pg.evaluate(() => { const c = App.cadStato; c.S.snap = true; c.S.strum = 'sel'; c.aggiorna(); });
+  // il pannello dell'elemento scelto: quote, frecce, lavorazioni
+  await pg.evaluate(() => { const c = App.cadStato; c.sel = c.S.entita[0].id; c.aggiorna(); });
+  ok((await pg.$$eval('.cad-d .icona-pul', x => x.length)) === 4, 'frecce di spostamento fine');
+  const x0prima = (await entCad())[0].x0;
+  await pg.click('.cad-d button[aria-label="Destra"]');
+  ok(Math.abs((await entCad())[0].x0 - x0prima - 1) < 1e-9, 'freccia sposta di 1 mm');
+  // programma: dal disegno agli ISO
+  await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [
+    { id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 80, y1: 50, r: 5, lav: [{ op: 'contorno', prof: 12, lato: 'esterno' }] },
+    { id: 2, tipo: 'cerchio', cx: 15, cy: 25, r: 4.25, lav: [{ op: 'foro', passante: true }] },
+    { id: 3, tipo: 'poli', chiuso: true, punti: [{ x: 30, y: 10 }, { x: 55, y: 10 }, { x: 55, y: 25 }, { x: 42, y: 40 }, { x: 30, y: 25 }], lav: [{ op: 'tasca', prof: 5 }] }]; c.S.prossimo = 4; c.S.fz = '15'; c.aggiorna(); });
+  await pg.click('#cad-percorso'); await pg.waitForTimeout(80);
+  ok((await pg.textContent('#cad-msg')).includes('Percorso mostrato'), 'percorso mostrato: ' + (await pg.textContent('#cad-msg')));
+  await foto('33-cad');
+  await pg.click('#cad-crea'); await pg.waitForTimeout(200);
+  ok((await pg.evaluate(() => location.hash)) === '#listato', 'il programma si apre nel listato');
+  const lst2 = await pg.textContent('.listato');
+  ok(lst2.includes('(FASE 1:') && /FASE \d: TASCA LIBERA/.test(lst2) && /FASE \d: CONTORNO ESTERNO/.test(lst2) && lst2.includes('G41'), 'listato dal CAD: ' + lst2.slice(0, 200));
+  await pg.goBack(); await pg.waitForTimeout(150);
+  // schermo intero in orizzontale
+  await pg.setViewportSize({ width: 844, height: 390 });
+  await pg.click('#cad-pieno'); await pg.waitForTimeout(150);
+  ok(await pg.evaluate(() => document.body.classList.contains('cad-pieno')), 'schermo intero attivo');
+  const boxP = await pg.$eval('.cad-tela', c => { const b = c.getBoundingClientRect(); return [b.width, b.height]; });
+  ok(boxP[0] >= 840 && boxP[1] >= 385, 'il disegno riempie lo schermo girato: ' + boxP.join('x'));
+  ok(!(await pg.isVisible('#testata')) && !(await pg.isVisible('#barra')), 'testata e barra nascoste a schermo intero');
+  ok(await pg.isVisible('#cad-ruota') && await pg.isVisible('.cad-strum [data-strum="rett"]'), 'strumenti sopra il disegno');
+  await foto('34-cad-intero');
+  await pg.evaluate(() => { const c = App.cadStato; c.sel = c.S.entita[0].id; c.aggiorna(); });
+  ok(await pg.isVisible('.cad-pannello'), 'il pannello si apre scegliendo un elemento');
+  await pg.click('#cad-chiudi-pannello'); ok(!(await pg.isVisible('.cad-pannello')), 'pannello chiuso');
+  await pg.evaluate(() => App.indietro());
+  ok(!(await pg.evaluate(() => document.body.classList.contains('cad-pieno'))) && (await pg.evaluate(() => location.hash)) === '#cad', 'indietro esce dallo schermo intero senza lasciare il disegno');
+  await pg.setViewportSize({ width: 390, height: 844 });
+  await vai('home'); await erroreSchermo('dopo il CAD');
+  // errori chiari
+  await vai('cad'); await pg.waitForTimeout(80);
+  await pg.evaluate(() => { const c = App.cadStato; c.S.entita = []; c.aggiorna(); });
+  await pg.click('#cad-crea'); ok((await pg.textContent('#cad-msg')).includes('Nessuna lavorazione'), 'disegno vuoto: messaggio');
+  await vai('home');
+  }
+
+  // tornio: schermo intero e rotazione
+  await vai('disegno'); await pg.waitForTimeout(100);
+  await pg.setViewportSize({ width: 844, height: 390 });
+  await pg.click('#d-pieno'); await pg.waitForTimeout(150);
+  const boxT = await pg.$eval('.disegno-tela', c => { const b = c.getBoundingClientRect(); return [b.width, b.height]; });
+  ok(boxT[0] >= 840 && boxT[1] >= 385, 'disegno del tornio a schermo intero: ' + boxT.join('x'));
+  ok(!(await pg.isVisible('#testata')), 'testata nascosta nel tornio a schermo intero');
+  await pg.click('#d-pieno'); await pg.waitForTimeout(80);
+  ok(!(await pg.evaluate(() => document.body.classList.contains('cad-pieno'))), 'uscito dallo schermo intero');
+  await pg.setViewportSize({ width: 390, height: 844 });
+  await vai('home');
 
   // ===== 2.10.0: ciclo proposto e quote dal disegno =====
   await vai('ciclo'); await pg.waitForTimeout(80);

@@ -257,6 +257,129 @@
       pezzo = { x0: minimo(xs) - 5, y0: minimo(ys) - 5, x1: massimo(xs) + 5, y1: massimo(ys) + 5, z0: -c.prof - 5, z1: 0 };
       avvisi.push(...pr.avvisi);
       avvisi.unshift(pr.livelli + ' passate in Z, ' + pr.tratti.length + ' tratti.');
+    } else if (op === 'tascaLibera') {
+      // tasca di forma libera: righe parallele dentro il profilo, a distanza dalle pareti = raggio fresa + sovrametallo.
+      // Gli angoli e le pareti si finiscono con un profilo interno (G41) con la stessa fresa.
+      if (!O.costruisciProfilo) return err('Profili non disponibili.');
+      if (!pos(c.d)) return err('Diametro della fresa mancante.');
+      if (!pos(c.prof) || !pos(c.ap)) return err('Profondita e profondita di passata mancanti.');
+      const pts = (c.punti || []).map(q => ({ a: Number(q.x), b: Number(q.y), tratto: q.tratto, r: Number(q.r), raccordo: Number(q.raccordo), smusso: Number(q.smusso) }));
+      const g = O.costruisciProfilo(pts, true);
+      if (g.errore) return err(g.errore);
+      const poli = O.polilineaProfilo(g.tratti, 0.3);
+      if (poli.length < 4) return err('La tasca ha bisogno di almeno tre punti.');
+      const marg = c.d / 2 + (c.sovra > 0 ? c.sovra : 0);
+      const dentro = (x, y) => {
+        let in_ = false;
+        for (let i = 0, j = poli.length - 1; i < poli.length; j = i++) {
+          const a = poli[i], b = poli[j];
+          if ((a.b > y) !== (b.b > y) && x < (b.a - a.a) * (y - a.b) / (b.b - a.b) + a.a) in_ = !in_;
+        }
+        return in_;
+      };
+      const distanza = (x, y) => {
+        let m = Infinity;
+        for (let i = 1; i < poli.length; i++) {
+          const a = poli[i - 1], b = poli[i], dx = b.a - a.a, dy = b.b - a.b, l2 = dx * dx + dy * dy;
+          const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - a.a) * dx + (y - a.b) * dy) / l2)) : 0;
+          m = Math.min(m, Math.hypot(x - a.a - t * dx, y - a.b - t * dy));
+        }
+        return m;
+      };
+      const libero = (x, y) => dentro(x, y) && distanza(x, y) >= marg - 1e-6;
+      const xa = minimo(poli.map(q => q.a)), xb = massimo(poli.map(q => q.a)), ya = minimo(poli.map(q => q.b)), yb = massimo(poli.map(q => q.b));
+      const step = c.d * Math.min(0.9, Math.max(0.1, (c.ae > 0 ? c.ae : 50) / 100)), ds = 0.25;
+      const righe = [];
+      const yy = [];
+      for (let y = ya + marg; y <= yb - marg + 1e-9; y += step) yy.push(y);
+      if (yb - marg > ya + marg && yy.length && yb - marg - yy[yy.length - 1] > 0.05) yy.push(yb - marg);
+      if (!yy.length && yb - ya >= 2 * marg - 1e-9) yy.push((ya + yb) / 2);
+      yy.forEach(y => {
+        const iv = [];
+        let inizio = null;
+        for (let x = xa; x <= xb + 1e-9; x += ds) {
+          const ok = libero(x, y);
+          if (ok && inizio === null) inizio = x;
+          if ((!ok || x + ds > xb + 1e-9) && inizio !== null) { const fine = ok ? x : x - ds; if (fine - inizio > 0.01 || iv.length === 0 && fine >= inizio) iv.push([inizio, fine]); inizio = null; }
+        }
+        if (iv.length) righe.push({ y, iv });
+      });
+      if (!righe.length) return err('La fresa e troppo grande per la tasca.');
+      const collegaLibero = (x0, y0, x1, y1) => { const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 0.25)); for (let i = 0; i <= n; i++) if (!libero(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false; return true; };
+      // giro di pulizia lungo le pareti: il profilo spostato dentro di marg (vertici lungo la bisettrice), senza i punti
+      // che finirebbero troppo vicini a una parete; i tratti che non si possono collegare restano separati
+      const ccw = O.areaProfilo(poli) > 0, bordo = [];
+      for (let i = 0; i < poli.length - 1; i++) {
+        const prec = poli[(i - 1 + poli.length - 1) % (poli.length - 1)], cur = poli[i], suc = poli[i + 1];
+        const nrm = (a, b) => { const dx = b.a - a.a, dy = b.b - a.b, l = Math.hypot(dx, dy) || 1; return ccw ? [-dy / l, dx / l] : [dy / l, -dx / l]; };
+        const n1 = nrm(prec, cur), n2 = nrm(cur, suc);
+        let nx = n1[0] + n2[0], ny = n1[1] + n2[1];
+        const ln = Math.hypot(nx, ny);
+        if (ln < 1e-6) continue;
+        nx /= ln; ny /= ln;
+        const k = Math.min(3, 1 / Math.max(0.33, nx * n1[0] + ny * n1[1]));
+        const x = cur.a + nx * marg * k, y = cur.b + ny * marg * k;
+        if (libero(x, y)) bordo.push([x, y]);
+      }
+      const percorsi = [];
+      let corr = [];
+      bordo.forEach(q => {
+        if (corr.length && !collegaLibero(corr[corr.length - 1][0], corr[corr.length - 1][1], q[0], q[1])) { percorsi.push(corr); corr = []; }
+        corr.push(q);
+      });
+      if (corr.length) percorsi.push(corr);
+      if (percorsi.length > 1 && bordo.length > 2 && collegaLibero(bordo[bordo.length - 1][0], bordo[bordo.length - 1][1], bordo[0][0], bordo[0][1])) {
+        const ult = percorsi.pop(); percorsi[0] = ult.concat(percorsi[0]);
+      } else if (percorsi.length === 1 && bordo.length > 2 && collegaLibero(bordo[bordo.length - 1][0], bordo[bordo.length - 1][1], bordo[0][0], bordo[0][1])) percorsi[0].push(bordo[0]);
+      const semplifica = pt => {
+        if (pt.length < 3) return pt;
+        const out = [pt[0]];
+        let ancora = 0;
+        for (let i = 2; i < pt.length; i++) {
+          let ok = true;
+          const a = pt[ancora], b = pt[i], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1;
+          for (let j = ancora + 1; j < i && ok; j++) if (Math.abs(dx * (a[1] - pt[j][1]) - (a[0] - pt[j][0]) * dy) / l > 0.02) ok = false;
+          if (ok && !collegaLibero(a[0], a[1], b[0], b[1])) ok = false;
+          if (!ok) { out.push(pt[i - 1]); ancora = i - 1; }
+        }
+        out.push(pt[pt.length - 1]);
+        return out;
+      };
+      const giriPulizia = percorsi.map(semplifica).filter(q => q.length > 1);
+      testa();
+      avvicina((giriPulizia[0] || [[righe[0].iv[0][0], righe[0].y]])[0][0], (giriPulizia[0] || [[righe[0].iv[0][0], righe[0].y]])[0][1]);
+      let zPrima = 0;
+      for (const z of livelli(c.prof, c.ap)) {
+        let px = null, py = null;
+        giriPulizia.forEach(q => {
+          if (px !== null || Z > zR) rap(null, null, zR);
+          rap(q[0][0], q[0][1], null);
+          if (px === null) rap(null, null, zPrima + 1);
+          lav(null, null, z, fp);
+          for (let i = 1; i < q.length; i++) lav(q[i][0], q[i][1], null, c.f);
+          px = q[q.length - 1][0]; py = q[q.length - 1][1];
+        });
+        righe.forEach((r, k) => {
+          const ivs = k % 2 ? r.iv.slice().reverse().map(q => [q[1], q[0]]) : r.iv;
+          ivs.forEach(([x0, x1]) => {
+            if (px !== null && collegaLibero(px, py, x0, r.y)) lav(x0, r.y, null, c.f);
+            else {
+              if (px !== null || Z > zR) rap(null, null, zR);
+              rap(x0, r.y, null);
+              if (px === null) rap(null, null, zPrima + 1);
+              lav(null, null, z, fp);
+            }
+            lav(x1, null, null, c.f);
+            px = x1; py = r.y;
+          });
+        });
+        rap(null, null, zR);
+        zPrima = z;
+      }
+      coda();
+      pezzo = { x0: xa - 10, y0: ya - 10, x1: xb + 10, y1: yb + 10, z0: -c.prof - 8, z1: 0, tasca: { x0: xa, y0: ya, x1: xb, y1: yb } };
+      avvisi.push(righe.length + ' righe per livello piu un giro lungo le pareti, passo laterale ' + gc(step) + ' mm, a ' + gc(marg) + ' mm dalle pareti. Il resto lo toglie la finitura del profilo.');
+      avvisi.push('Discesa dritta: la fresa deve tagliare al centro, oppure preforare nel punto di partenza.');
     } else if (op === 'tascaCircolare') {
       const { cx = 0, cy = 0, dt, prof, ap, d } = c;
       if (!pos(dt) || !pos(d)) return err('Diametro della tasca e della fresa mancanti.');
@@ -390,10 +513,10 @@
   // lamature, fori a fresa, alesature, smusso d'imbocco e maschiatura, smussi, profili. Lo stesso utensile di seguito
   // non fa il cambio; un ordine che non si puo lavorare non si accetta.
   const ORDINE = { spianatura: 0, centrino: 1, puntaIns: 2, puntaMD: 3, lamatore: 4, tascaCircolare: 5, alesatore: 6, bareno: 6,
-    smussoMaschio: 7, maschio: 7.5, filettoFresa: 7.5, smussatore: 8, contorno: 9, profilo: 9, tasca: 9, asola: 9 };
+    smussoMaschio: 7, maschio: 7.5, filettoFresa: 7.5, smussatore: 8, contorno: 9, profilo: 9, tasca: 9, tascaLibera: 8.5, asola: 9 };
   const NOME_FASE = { spianatura: 'Spianatura', centrino: 'Centrinatura', puntaIns: 'Punta a inserti', puntaMD: 'Foratura', lamatore: 'Lamatura',
     tascaCircolare: 'Tasca circolare', alesatore: 'Alesatura', bareno: 'Barenatura', smussoMaschio: 'Smusso d\'imbocco', maschio: 'Maschiatura',
-    filettoFresa: 'Filetto a fresa', smussatore: 'Smusso', contorno: 'Contornatura', profilo: 'Profilo', tasca: 'Tasca', asola: 'Asola' };
+    filettoFresa: 'Filetto a fresa', smussatore: 'Smusso', contorno: 'Contornatura', profilo: 'Profilo', tasca: 'Tasca', tascaLibera: 'Tasca libera', asola: 'Asola' };
   const PREFORO = ['puntaMD', 'puntaIns', 'tascaCircolare'];
   const DOPO_PREFORO = ['maschio', 'alesatore', 'bareno', 'filettoFresa', 'smussoMaschio'];
   /** Chiave dei punti di una fase (per sapere se due fasi lavorano gli stessi fori). */

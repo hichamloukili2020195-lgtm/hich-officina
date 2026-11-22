@@ -304,3 +304,77 @@ body.contrasto small,body.contrasto .leggenda{color:var(--testo)}
   padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
 .toast.vedi{opacity:1}
 @media (prefers-reduced-motion: reduce){.toast{transition:none}}
+
+/* ----- tabella filetti ----- */
+.chips.fam{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.chips.fam .chip{flex:0 0 auto}
+.fil-testa{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 0}
+.fil-testa b{font-size:1.05rem}
+.tab-fil td.evid{color:var(--accento2);font-weight:700}
+.tab-fil td:first-child,.tab-fil th:first-child{position:sticky;left:0;background:var(--pannello)}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;background:var(--pannello2,rgba(127,127,127,.18));font-size:.75rem;color:var(--tenue)}
+
+/* ----- mini CAD/CAM ----- */
+.cad{display:flex;flex-direction:column;gap:12px}
+.cad-area{display:flex;flex-direction:column;gap:6px;position:relative}
+.cad-tela-box{position:relative;height:min(58vh,480px);min-height:300px;border:1px solid var(--bordo);border-radius:14px;overflow:hidden;background:var(--campo);touch-action:none}
+.cad-tela{width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none}
+.cad-lettura{position:absolute;left:8px;bottom:6px;font:600 12px system-ui;color:var(--testo);background:color-mix(in srgb,var(--pannello) 88%,transparent);padding:3px 8px;border-radius:8px;pointer-events:none}
+.cad-lettura:empty{display:none}
+.cad-strum,.cad-azioni{display:flex;gap:6px;overflow-x:auto;padding:2px 0;scrollbar-width:none}
+.cad-strum::-webkit-scrollbar,.cad-azioni::-webkit-scrollbar{display:none}
+.cad-b{flex:0 0 auto;width:56px;min-height:52px;border-radius:12px;border:1px solid var(--bordo);background:var(--pannello);color:var(--testo);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;padding:4px 0;cursor:pointer;line-height:1.1}
+.cad-b svg{width:22px;height:22px}
+.cad-b.attiva{background:var(--accento);border-color:var(--accento);color:#fff}
+.cad-b:disabled{opacity:.35}
+.cad-b.cad-fine{border-color:var(--ok);color:var(--ok)}
+.cad-solopieno{display:none}
+.cad-pannello{display:flex;flex-direction:column;gap:2px}
+.cad-ent{display:flex;flex-direction:column;gap:6px}
+.cad-lav{border:1px solid var(--bordo);border-left:4px solid var(--accento2);border-radius:12px;padding:6px 10px 2px;margin:6px 0;background:var(--pannello)}
+.cad-lav.tasca,.cad-lav.asola{border-left-color:var(--ok)}
+.cad-lav.foro,.cad-lav.maschio,.cad-lav.alesato{border-left-color:var(--avviso)}
+.cad-lav-testa{display:flex;align-items:center;justify-content:space-between}
+.cad-aggiungi{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0}
+.cad-op{text-align:left;border:1px dashed var(--accento);background:transparent;color:var(--testo);border-radius:12px;padding:10px 12px;cursor:pointer;min-height:52px}
+.cad-op b{display:block;color:var(--accento2)}
+.cad-op small{display:block;color:var(--tenue);font-size:12px}
+.cad-frecce{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.cad-d{display:flex;gap:6px}
+.cad-d .icona-pul{width:48px;height:48px}
+/* schermo intero: il disegno prende tutto, gli strumenti stanno sopra */
+body.cad-pieno #testata,body.cad-pieno #barra{display:none}
+body.cad-pieno{overflow:hidden}
+.cad.pieno{position:fixed;inset:0;z-index:40;background:var(--fondo);display:block}
+.cad.pieno .cad-area{position:absolute;inset:0;display:block}
+.cad.pieno .cad-tela-box{position:absolute;inset:0;height:auto;min-height:0;border:0;border-radius:0}
+.cad.pieno .cad-strum{position:absolute;left:max(8px,env(safe-area-inset-left));top:8px;bottom:8px;flex-direction:column;flex-wrap:wrap;align-content:flex-start;overflow:visible;z-index:2;pointer-events:none}
+.cad.pieno .cad-azioni{position:absolute;right:max(8px,env(safe-area-inset-right));top:8px;bottom:8px;flex-direction:column;flex-wrap:wrap-reverse;align-content:flex-start;overflow:visible;z-index:2;pointer-events:none}
+.cad.pieno .cad-b{pointer-events:auto;background:color-mix(in srgb,var(--pannello) 90%,transparent)}
+.cad.pieno .cad-b.attiva{background:var(--accento)}
+.cad.pieno .cad-solopieno{display:flex}
+.cad.pieno .cad-lettura{left:calc(max(8px,env(safe-area-inset-left)) + 64px)}
+.cad.pieno .cad-pannello{position:absolute;top:0;right:0;bottom:0;width:min(380px,92vw);overflow:auto;background:var(--fondo);border-left:1px solid var(--bordo);padding:10px 12px calc(14px + env(safe-area-inset-bottom));transform:translateX(105%);transition:transform .2s;z-index:3;visibility:hidden}
+.cad.pieno.pannello-aperto .cad-pannello{transform:none;visibility:visible}
+@media (max-height:520px){.cad.pieno .cad-b{width:46px;min-height:44px}.cad.pieno .cad-b span{display:none}}
+
+/* ----- home a tessere ----- */
+.menu-sezioni .sez{margin:16px 2px 8px}
+.tessere{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tessera{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;background:var(--riga);border:1px solid var(--bordo);border-radius:16px;padding:12px;min-height:116px;color:var(--testo);cursor:pointer;position:relative;overflow:hidden}
+.tessera:active{border-color:var(--accento)}
+.tessera .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--accento) 18%,transparent);color:var(--accento2);margin-bottom:4px}
+.tessera .ic svg{width:24px;height:24px}
+.tessera b{font-size:15px;font-weight:650;line-height:1.15}
+.tessera small{color:var(--tenue);font-size:12px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tessera.evid{background:linear-gradient(145deg,color-mix(in srgb,var(--accento) 26%,var(--riga)),var(--riga));border-color:color-mix(in srgb,var(--accento) 55%,var(--bordo))}
+.tessera.evid .ic{background:var(--accento);color:#fff}
+@media (min-width:760px){.tessere{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1100px){.tessere{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* schermo intero del disegno da tornio */
+body.cad-pieno #schermo.pieno{padding:0;max-width:none}
+body.cad-pieno #schermo.pieno>*:not(.disegno-tela):not(.chips):not(.barra-vista){display:none}
+body.cad-pieno #schermo.pieno .disegno-tela{position:fixed;inset:0;width:100vw;height:100vh;z-index:40;border-radius:0;margin:0}
+body.cad-pieno #schermo.pieno .barra-vista{position:fixed;z-index:41;left:8px;right:8px;bottom:8px;display:flex;flex-wrap:wrap;gap:6px;background:color-mix(in srgb,var(--pannello) 92%,transparent);padding:6px;border-radius:12px;margin:0}
+body.cad-pieno #schermo.pieno .chips{position:fixed;z-index:41;left:8px;right:8px;top:8px;margin:0;flex-wrap:wrap;background:color-mix(in srgb,var(--pannello) 92%,transparent);padding:6px;border-radius:12px}

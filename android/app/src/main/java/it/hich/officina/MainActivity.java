@@ -7,6 +7,7 @@ import android.content.ClipboardManager;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -74,6 +75,20 @@ public class MainActivity extends Activity {
                 boolean immagini = false;
                 for (String t : p.getAcceptTypes()) if (t != null && t.startsWith("image")) immagini = true;
                 fotoCamera = null;
+                // "Scatta una foto": il campo ha capture, si apre subito la fotocamera
+                if (immagini && p.isCaptureEnabled() && Build.VERSION.SDK_INT >= 29) {
+                    try {
+                        ContentValues cv = new ContentValues();
+                        cv.put(MediaStore.MediaColumns.DISPLAY_NAME, "pezzo_" + System.currentTimeMillis() + ".jpg");
+                        cv.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+                        cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Hich-Officina");
+                        fotoCamera = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv);
+                        Intent foto = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                        foto.putExtra(MediaStore.EXTRA_OUTPUT, fotoCamera);
+                        startActivityForResult(foto, SCEGLI_INPUT);
+                        return true;
+                    } catch (Exception e) { fotoCamera = null; }
+                }
                 if (immagini && Build.VERSION.SDK_INT >= 29) {
                     try {
                         ContentValues cv = new ContentValues();
@@ -132,6 +147,7 @@ public class MainActivity extends Activity {
                 } else if (dati != null && dati.getData() != null) scelti = new Uri[]{dati.getData()};
                 else if (fotoCamera != null) scelti = new Uri[]{fotoCamera};
             }
+            if (scelti == null && fotoCamera != null) { try { getContentResolver().delete(fotoCamera, null, null); } catch (Exception e) { /* niente */ } }
             if (attesaInput != null) attesaInput.onReceiveValue(scelti);
             attesaInput = null;
             return;
@@ -222,6 +238,12 @@ public class MainActivity extends Activity {
 
     /** Le funzioni che la pagina chiama con window.Android. */
     private class Ponte {
+        /** Schermo intero del disegno: "orizzontale" o "verticale" blocca lo schermo, "libero" segue il sensore. */
+        @JavascriptInterface
+        public void orientamento(String modo) {
+            runOnUiThread(() -> setRequestedOrientation("orizzontale".equals(modo) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : "verticale".equals(modo) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+        }
+
         @JavascriptInterface
         public String salvaFile(String nome, String testo) {
             byte[] dati = testo.getBytes(StandardCharsets.UTF_8);
