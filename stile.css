@@ -253,6 +253,9 @@ canvas.disegno-tela{height:330px;touch-action:none}
 .chip:disabled{opacity:.4}
 canvas.angolo-tela{height:380px;touch-action:none;background:#0a0f18}
 @media (min-width:760px){canvas.angolo-tela{height:560px}}
+.carta-det{background:var(--pannello);border:1px solid var(--bordo);border-radius:14px;padding:10px 14px;margin-bottom:12px}
+.carta-det summary{cursor:pointer;font-weight:600}
+.carta-det .pannello{margin-top:10px}
 .toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--testo);color:var(--fondo);
   padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;max-width:90vw}
 .toast.vedi{opacity:1}

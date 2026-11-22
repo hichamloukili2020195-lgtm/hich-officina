@@ -35,6 +35,7 @@
       if (e) fUltimo = f;
       muovi('G1', x, y, z, e);
     };
+    { const k = O.campoNonValido(c); if (k) return err('Il valore di "' + k + '" non e valido (numero infinito, non numerico o enorme).'); }
     if (!pos(c.n)) return err('Giri mancanti.');
     if (!pos(c.f)) return err('Avanzamento mancante.');
     const fp = pos(c.fp) ? c.fp : Math.round(c.f * 0.3);

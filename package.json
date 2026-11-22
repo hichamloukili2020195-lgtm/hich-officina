@@ -1,0 +1,13 @@
+{
+  "name": "hich-officina",
+  "version": "2.14.0",
+  "description": "App per officina: calcoli di taglio, programmi ISO, macro, simulazione",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node prove/tutte.js",
+    "calcoli": "node prove/prove.js",
+    "tappeto": "node prove/tappeto.js",
+    "interfaccia": "node prove/ui.js"
+  }
+}

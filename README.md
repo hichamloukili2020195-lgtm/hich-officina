@@ -64,6 +64,8 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
   simulazione animata passo per passo (3D, dall'alto, di fronte, sezione del tornio), quote massime di lavoro,
   utensili con giri e avanzamenti, tempo stimato. Legge anche le macro (variabili, IF, WHILE, G65, M98) e i cicli
   del tornio G71/G70, G74, G75, G76.
+- **Centro fresa** (G41/G42 calcolato con il raggio) nella simulazione; **grezzo e staffe** nel controllo: urti e tagli
+  sotto il fondo del grezzo.
 - **Listato**: ricerca, modifica, simulazione, file `.nc`, "Salva in..." (anche cartelle offerte da altre app),
   **invio alla macchina via FTP** (solo nell'APK), foglio di attrezzaggio.
 - **Post-processor**: il programma nasce in ISO e si traduce nel linguaggio della macchina (Impostazioni, o al volo nel

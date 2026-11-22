@@ -314,6 +314,16 @@
     return 'oltre N12';
   }
 
+  /** Un valore numerico non valido (NaN, infinito, enorme) in un'impostazione: ritorna il nome del campo. */
+  function campoNonValido(c) {
+    for (const k in c) {
+      const v = c[k];
+      // un campo vuoto (NaN) e "non scritto": lo gestiscono i controlli dei dati mancanti; qui solo infiniti ed enormi
+      if (typeof v === 'number' && !isNaN(v) && (!isFinite(v) || Math.abs(v) > 1e6)) return k;
+    }
+    return null;
+  }
+
   // ----- G-code tornio (ISO, diametri in X, avanzamento al giro) -----
   /** Numero per il G-code: sempre con il punto, al massimo 3 decimali. */
   function gc(x) {
@@ -345,6 +355,7 @@
     };
     const err = e => ({ errore: e, righe: [], percorso: [], avvisi: [] });
     const pos = v => v > 0;
+    { const k = campoNonValido(c); if (k) return err('Il valore di "' + k + '" non e valido (numero infinito, non numerico o enorme).'); }
     if (!pos(c.dg)) return err('Diametro del grezzo mancante.');
     if (!pos(c.nmax)) return err('Giri massimi mancanti.');
 
@@ -685,7 +696,7 @@
   }
 
   const Officina = {
-    num, MATERIALI, UTENSILI, datiTaglio, leggiMateriali, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
+    campoNonValido, num, MATERIALI, UTENSILI, datiTaglio, leggiMateriali, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
     FILETTI_GROSSI, FILETTI_FINI, filetto, passateFiletto,
     tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT,
     cono, foriSuCerchio, rugositaN, gc, gcodeTornio

@@ -147,16 +147,42 @@
         el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('codice') + 'Controlla e simula', onclick: () => analizza() })]), esito);
       const f = A.modulo(pan, [{ id: 'modo', et: 'Macchina', tipo: 'scelta', scelte: [['auto', 'La riconosce da sola'], ['fresa', 'Fresa'], ['tornio', 'Tornio']] },
         { id: 'testo', et: 'Programma (incollalo qui)', tipo: 'area', mono: true, righe: 10 }], v, () => {});
+      const det = el('details', { class: 'carta-det' }, [el('summary', { testo: 'Grezzo e staffe (facoltativo, per la fresa)' })]);
+      const panIng = el('div', { class: 'pannello' });
+      det.appendChild(panIng);
+      pan.parentNode.insertBefore(det, pan.nextSibling);
+      A.modulo(panIng, [{ id: 'glx', et: 'Grezzo X', u: 'mm', sub: 'angolo in basso a sinistra in X0 Y0' }, { id: 'gly', et: 'Grezzo Y', u: 'mm' }, { id: 'glz', et: 'Spessore del grezzo', u: 'mm', sub: 'Z0 e la faccia sopra' },
+        { id: 'staffe', et: 'Staffe: X1 Y1 X2 Y2 altezza, una per riga', tipo: 'area', mono: true, righe: 3, sub: 'altezza sopra Z0 della parte alta' },
+        { id: 'raggioDef', et: 'Raggio fresa se non e in tabella', u: 'mm', sub: 'serve alla compensazione G41/G42 e agli urti' }], v, () => {});
       const analizza = () => {
         esito.innerHTML = '';
         if (!String(v.testo || '').trim()) { esito.appendChild(A.info('Incolla un programma o scegli un file.')); return; }
         const r = O.controllaISO(v.testo, { modo: v.modo });
-        mostraAnalisi(esito, r, v.testo, 'Programma aperto', true);
+        const ing = ingombriDa(v);
+        if (r.modo === 'fresa' && ing) {
+          if (r.segmenti.some(q => q.comp)) r.segmentiCentro = O.centroFresa(r.segmenti, raggioDi(v.raggioDef));
+          ing.raggio = raggioDi(v.raggioDef);
+          r.segnalazioni = r.segnalazioni.concat(O.controllaIngombri(r, ing)).sort((a, b) => (a.livello === b.livello ? 0 : a.livello === 'errore' ? -1 : 1) || a.riga - b.riga);
+        }
+        mostraAnalisi(esito, r, v.testo, 'Programma aperto', true, { ingombri: v });
       };
       if (String(v.testo || '').trim()) analizza();
     }
   };
   /** Riassunto di un programma letto: quote, utensili, tempo, avvisi, pulsanti. */
+  /** Il raggio della fresa dal T: tabella utensili (diametro / 2), altrimenti il raggio scritto. */
+  function raggioDi(def) {
+    const tab = A.tabellaUt ? A.tabellaUt() : [];
+    return t => { const u = tab.find(x => Number(x.t) === Number(t) && Number(x.d) > 0); return u ? Number(u.d) / 2 : (O.num(def) > 0 ? O.num(def) : 0); };
+  }
+  function ingombriDa(v) {
+    const lx = O.num(v.glx), ly = O.num(v.gly), lz = O.num(v.glz);
+    const staffe = String(v.staffe || '').split('\n').map(r => r.trim().replace(/,/g, '.').split(/\s+/).map(Number)).filter(q => q.length >= 5 && q.slice(0, 5).every(isFinite))
+      .map(q => ({ x0: Math.min(q[0], q[2]), y0: Math.min(q[1], q[3]), x1: Math.max(q[0], q[2]), y1: Math.max(q[1], q[3]), z: q[4] }));
+    if (!(lz > 0) && !staffe.length) return null;
+    return { grezzo: lz > 0 ? { lx: lx || 0, ly: ly || 0, lz } : null, staffe };
+  }
+  A.ingombriDa = ingombriDa; A.raggioDi = raggioDi;
   /** Il controllo del programma: errori e avvisi riga per riga. */
   function mostraControllo(m, r) {
     const S = r.segnalazioni || [];
@@ -174,7 +200,7 @@
     m.appendChild(lista);
   }
   A.mostraControllo = mostraControllo;
-  function mostraAnalisi(m, r, testo, titolo, controllo) {
+  function mostraAnalisi(m, r, testo, titolo, controllo, extra) {
     if (r.errore) m.appendChild(el('p', { class: 'errore', testo: 'Il programma si ferma: ' + r.errore }));
     if (controllo) mostraControllo(m, r);
     const Lm = r.limiti, q = (k, w) => (Lm[k][w] === null ? '—' : fmt(Lm[k][w], 3));
@@ -193,7 +219,7 @@
     if (r.messaggi.length) m.appendChild(A.info(r.messaggi.map(x => '<b>' + esc(x.testo) + '</b> (riga ' + (x.riga + 1) + ')').join('<br>'), 'avviso'));
     if (!controllo && r.segnalazioni && r.segnalazioni.length) mostraControllo(m, r);
     m.appendChild(el('div', { class: 'pulsanti' }, [
-      el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Simula', onclick: () => { A.param.sim = { testo, modo: r.modo, titolo }; A.vai('simula'); } }),
+      el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Simula', onclick: () => { A.param.sim = { testo, modo: r.modo, titolo, ingombri: extra && extra.ingombri }; A.vai('simula'); } }),
       el('button', { class: 'pul sec', html: A.icona('codice') + 'Listato', onclick: () => {
         const righe = String(testo).replace(/\r/g, '').split('\n');
         const nome = (righe.find(x => /^\s*O\d+/i.test(x)) || 'O0001').trim().split(/\s|\(/)[0];
@@ -217,8 +243,10 @@
       if (!P) { m.appendChild(el('div', { class: 'vuoto', testo: 'Apri o genera un programma, poi premi Simula.' })); return; }
       const r = P.risultato && P.risultato.testo === P.testo ? P.risultato.r : O.eseguiISO(P.testo, { modo: P.modo, vars: P.vars });
       P.risultato = { testo: P.testo, r };
-      const S = r.segmenti, N = S.length;
       const sv = A.sezione('simVista');
+      const haComp = r.segmenti.some(q => q.comp);
+      if (haComp && !r.segmentiCentro) r.segmentiCentro = O.centroFresa(r.segmenti, raggioDi(P.ingombri ? P.ingombri.raggioDef : sv.raggio));
+      const S = sv.centro && haComp && r.segmentiCentro ? r.segmentiCentro : r.segmenti, N = S.length;
       const modo = r.modo;
       if (!viste(modo).some(x => x[0] === sv.vista)) sv.vista = viste(modo)[0][0];
       const cv = el('canvas', { class: 'vista sim-tela', 'aria-label': 'Simulazione del percorso' });
@@ -253,6 +281,11 @@
       righe.innerHTML = r.righe.slice(0, NR).map((x, i) => '<div data-r="' + i + '"><span class="n">' + (i + 1) + '</span><span>' + (A.colora ? A.colora(x) : esc(x)) + '</span></div>').join('');
       const pannello = el('div', { class: 'sim-pannello' }, [el('div', { class: 'dro' }, [tor ? null : quota('X'), tor ? quota('X') : quota('Y'), quota('Z')].filter(Boolean)), el('div', { class: 'dro-sotto' }, [giriBox, info]), righe]);
       if (tor) pannello.firstChild.insertBefore(el('div', { class: 'dro-nota', testo: 'X in diametro' }), pannello.firstChild.firstChild);
+      if (haComp) {
+        const rin = el('input', { id: 'f-raggioComp', inputmode: 'decimal', placeholder: 'raggio', value: sv.raggio || '5', style: 'width:70px', 'aria-label': 'Raggio della fresa' });
+        rin.addEventListener('change', () => { sv.raggio = rin.value; r.segmentiCentro = null; A.salva(); A.ridisegna(); });
+        m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (sv.centro ? ' attiva' : ''), testo: sv.centro ? 'Centro fresa: si' : 'Centro fresa (G41/G42)', onclick: () => { sv.centro = !sv.centro; A.salva(); A.ridisegna(); } }), el('span', { class: 'leggenda', style: 'margin:0 4px;align-self:center', testo: 'raggio' }), rin]));
+      }
       m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, cv, cursore, comandi, stato]), pannello]));
       let rigaVista = -1;
       const aggiornaPannello = (cur, px, riga) => {

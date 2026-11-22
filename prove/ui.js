@@ -573,6 +573,23 @@ const server = http.createServer((q, r) => {
   ok((await pg.$$eval('.elem.fase', x => x.length)) === nf, 'piastra nella sequenza');
   await largo('fine 2.10.0');
 
+  // ===== 2.14.0: centro fresa e urti con le staffe =====
+  await vai('apri'); await pg.waitForTimeout(80);
+  const profilo = ['%', 'O0001 (PROVA)', 'G21 G17 G40 G90', 'T3 M6', 'G54', 'S3000 M3', 'G0 X50 Y-10', 'G43 H3 Z50. M8', 'G0 Z2', 'G1 Z-5 F180', 'G1 G41 D3 X40 Y0 F600', 'G1 X0', 'G1 Y50', 'G1 X80', 'G1 Y0', 'G1 X40', 'G1 G40 Y-10', 'G0 Z50', 'M5 M9', 'M30', '%'].join('\n');
+  await pg.fill('#f-testo', profilo);
+  await pg.click('summary:has-text("Grezzo e staffe")');
+  await pg.fill('#f-glz', '10'); await pg.fill('#f-glx', '80'); await pg.fill('#f-gly', '50'); await pg.fill('#f-raggioDef', '5');
+  await pg.fill('#f-staffe', '30 -20 50 -3.5 3');
+  await pg.click('text=Controlla e simula'); await pg.waitForTimeout(150);
+  ok((await pg.textContent('.controllo')).includes('urto con la staffa 1'), 'urto con la staffa non segnalato: ' + (await pg.textContent('#schermo')).slice(-300));
+  await pg.click('button.pul:text-is("Simula")'); await pg.waitForTimeout(300);
+  ok(await pg.$('#f-raggioComp'), 'raggio della compensazione');
+  await pg.click('text=Centro fresa (G41/G42)'); await pg.waitForTimeout(250);
+  ok((await pg.textContent('.chips')).includes('Centro fresa: si'), 'centro fresa attivo');
+  await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(60);
+  ok(!(await pg.$('#schermo .errore')), 'simulazione con il centro fresa');
+  await largo('centro fresa');
+
   // impostazioni: tema chiaro
   await vai('impostazioni');
   await pg.selectOption('#f-tema', 'chiaro');

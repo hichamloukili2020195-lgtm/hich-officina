@@ -157,7 +157,7 @@
       return st.giriMax ? Math.min(n, st.giriMax) : n;
     };
     function muovi(x, y, z, rapido, riga, taglio) {
-      const s = { x0: st.x, y0: st.y, z0: st.z, x, y, z, rapido, riga, t: st.t, f: st.f, n: Math.round(st.g96 ? giriAttuali(x) : st.s), g96: st.g96, taglio: !!taglio };
+      const s = { x0: st.x, y0: st.y, z0: st.z, x, y, z, rapido, riga, t: st.t, comp: st.comp || 0, f: st.f, n: Math.round(st.g96 ? giriAttuali(x) : st.s), g96: st.g96, taglio: !!taglio };
       const l = Math.hypot((x - st.x) / (tornio ? 2 : 1), y - st.y, z - st.z);
       if (l < 1e-9) return;
       segmenti.push(s);
@@ -169,7 +169,8 @@
       if (!rapido && !(st.f > 0)) avvisa('movimento di lavoro senza avanzamento F', riga, 'errore');
       if (!rapido && !st.mandrino && !st.mandrinoAvvisato && opz.controlloMandrino !== false) { avvisa('taglio con il mandrino fermo: manca M3 o M4 (o la S)', riga, 'errore'); st.mandrinoAvvisato = true; }
       if (rapido && !tornio && z < -1e-6 && st.z < -1e-6 && Math.hypot(x - st.x, y - st.y) > 1e-6) avvisa('rapido in X Y sotto Z0: possibile urto con il pezzo', riga, 'errore');
-      if (rapido && !tornio && !st.inCiclo && z < -1e-6 && st.z >= -1e-6) avvisa('rapido che scende sotto Z0: controlla che li non ci sia materiale', riga, 'avviso');
+      if (!rapido) st.zTaglioMin = Math.min(st.zTaglioMin === undefined ? 0 : st.zTaglioMin, z, st.z);
+      if (rapido && !tornio && !st.inCiclo && z < Math.min(0, st.zTaglioMin === undefined ? 0 : st.zTaglioMin) - 1e-6 && st.z >= Math.min(0, st.zTaglioMin === undefined ? 0 : st.zTaglioMin) - 1e-6) avvisa('rapido che scende sotto Z0: controlla che li non ci sia materiale', riga, 'avviso');
       if ([x, y, z].some(v => Math.abs(v) > 3000)) avvisa('quota oltre 3000 mm: forse un numero letto male', riga, 'errore');
       if (utAtt && !rapido) utAtt.lunghezza += l;
       st.x = x; st.y = y; st.z = z;
@@ -527,7 +528,8 @@
           else if (gg === 28 || gg === 30 || gg === 53) { numG = gg; }
           else if (gg === 31) { st.moto = 31; mossa = 31; }
           else if ([40, 41, 42, 43, 44, 49, 15, 16, 61, 64, 68, 69, 69.1, 54, 55, 56, 57, 58, 59, 54.1, 40.1, 5, 5.1, 8, 9].includes(gg)) {
-            if (gg === 41 || gg === 42) avvisa('compensazione raggio G' + gg + ': la simulazione mostra il profilo programmato, non il centro utensile', riga, 'nota');
+            if (gg === 40) st.comp = 0;
+            if (gg === 41 || gg === 42) { st.comp = gg; avvisa('compensazione raggio G' + gg + ': la simulazione mostra il profilo programmato; il centro fresa si vede con il raggio', riga, 'nota'); }
           }
           else avvisa('G' + gg + ' non simulato', riga);
         }
@@ -646,6 +648,105 @@
     return tor > fre ? 'tornio' : 'fresa';
   }
 
+  // ----- compensazione del raggio calcolata: il centro fresa -----
+  /**
+   * Sposta i movimenti fatti con G41 (a sinistra) o G42 (a destra) di un raggio, con gli angoli raccordati dall'incontro delle rette.
+   * raggio = numero oppure funzione (T) => raggio. Ritorna i segmenti con il percorso del centro fresa (x0 y0 x y cambiati).
+   */
+  function centroFresa(segmenti, raggio) {
+    const R = t => (typeof raggio === 'function' ? raggio(t) : raggio) || 0;
+    const out = segmenti.map(s => Object.assign({}, s));
+    const lungo = s => Math.hypot(s.x - s.x0, s.y - s.y0);
+    let i = 0;
+    while (i < out.length) {
+      if (!out[i].comp || out[i].rapido && false) { i++; continue; }
+      // una serie di movimenti compensati e con lunghezza in XY
+      let j = i;
+      while (j < out.length && out[j].comp === out[i].comp && lungo(out[j]) > 1e-9) j++;
+      if (j === i) { i++; continue; }
+      const lato = out[i].comp === 41 ? 1 : -1, r = R(out[i].t);
+      if (r > 0) {
+        const seg = out.slice(i, j).map(s => { const L = lungo(s); const d = { a: (s.x - s.x0) / L, b: (s.y - s.y0) / L }; return { d, n: { a: -d.b * lato, b: d.a * lato } }; });
+        const orig = segmenti.slice(i, j);
+        const fine = [];
+        for (let k = 0; k < seg.length; k++) {
+          const s = orig[k];
+          let v;
+          if (k === 0 && seg.length > 1 && !orig[0].comp) v = null;
+          const prossimo = seg[k + 1];
+          if (k === 0 && seg.length > 1) {
+            // l'avvicinamento termina sul profilo spostato dalla normale del primo tratto di profilo
+            v = { x: s.x + prossimo.n.a * r, y: s.y + prossimo.n.b * r };
+          } else if (prossimo) {
+            // incontro delle due rette spostate; se sono quasi parallele o l'angolo e troppo aperto si usa la bisettrice
+            const n1 = seg[k].n, n2 = prossimo.n, d1 = seg[k].d, d2 = prossimo.d;
+            const c = d1.a * d2.b - d1.b * d2.a;
+            if (Math.abs(c) < 1e-6) v = { x: s.x + n1.a * r, y: s.y + n1.b * r };
+            else {
+              const p1 = { x: s.x + n1.a * r, y: s.y + n1.b * r }, p2 = { x: s.x + n2.a * r, y: s.y + n2.b * r };
+              const t = ((p2.x - p1.x) * d2.b - (p2.y - p1.y) * d2.a) / c;
+              v = { x: p1.x + d1.a * t, y: p1.y + d1.b * t };
+              if (Math.hypot(v.x - s.x, v.y - s.y) > 4 * r) { const m = { a: n1.a + n2.a, b: n1.b + n2.b }, L = Math.hypot(m.a, m.b) || 1; v = { x: s.x + m.a / L * r, y: s.y + m.b / L * r }; }
+            }
+          } else v = { x: s.x + seg[k].n.a * r, y: s.y + seg[k].n.b * r };
+          fine.push(v);
+        }
+        for (let k = 0; k < seg.length; k++) { out[i + k].x = fine[k].x; out[i + k].y = fine[k].y; out[i + k].x0 = k ? fine[k - 1].x : segmenti[i].x0; out[i + k].y0 = k ? fine[k - 1].y : segmenti[i].y0; }
+        // il movimento dopo la serie (uscita con G40) parte dal centro fresa
+        if (j < out.length) { out[j].x0 = fine[fine.length - 1].x; out[j].y0 = fine[fine.length - 1].y; }
+      }
+      i = j;
+    }
+    return out;
+  }
+
+  // ----- urti con grezzo e staffe -----
+  /** Il segmento attraversa la scatola? (lati con valori infiniti ammessi) */
+  function segmentoInScatola(s, b) {
+    let t0 = 0, t1 = 1;
+    for (const [p0, p1, lo, hi] of [[s.x0, s.x, b.x0, b.x1], [s.y0, s.y, b.y0, b.y1], [s.z0, s.z, b.z0, b.z1]]) {
+      const d = p1 - p0;
+      if (Math.abs(d) < 1e-12) { if (p0 < lo || p0 > hi) return false; continue; }
+      let a = (lo - p0) / d, c = (hi - p0) / d;
+      if (a > c) { const tmp = a; a = c; c = tmp; }
+      t0 = Math.max(t0, a); t1 = Math.min(t1, c);
+      if (t0 > t1) return false;
+    }
+    return true;
+  }
+  /**
+   * Controllo degli ingombri (fresa): segnala i movimenti che toccano una staffa o scendono sotto il fondo del grezzo.
+   * ing = {grezzo:{lx, ly, lz} (angolo in basso a sinistra in X0 Y0, Z0 sopra), staffe:[{x0,y0,x1,y1,z}] (z = altezza sopra Z0 della parte alta),
+   *        raggio: numero o funzione (T) => raggio}. Ritorna [{riga, livello, testo}].
+   */
+  function controllaIngombri(r, ing) {
+    const out = [], visti = new Set();
+    const R = t => (typeof ing.raggio === 'function' ? ing.raggio(t) : ing.raggio) || 0;
+    const segs = r.segmentiCentro || r.segmenti;
+    const metti = (riga, livello, testo) => { const k = riga + testo; if (!visti.has(k) && out.length < 60) { visti.add(k); out.push({ riga, livello, testo }); } };
+    (ing.staffe || []).forEach((q, n) => {
+      segs.forEach(s => {
+        const rr = R(s.t);
+        const b = { x0: q.x0 - rr, y0: q.y0 - rr, x1: q.x1 + rr, y1: q.y1 + rr, z0: -Infinity, z1: q.z - 1e-6 };
+        if (segmentoInScatola(s, b)) metti(s.riga, 'errore', 'urto con la staffa ' + (n + 1) + (s.rapido ? ' in rapido' : ' in lavoro') + ' (la fresa e sotto la sua quota alta Z' + q.z + ')');
+      });
+    });
+    const g = ing.grezzo;
+    if (g && g.lz > 0) {
+      segs.forEach(s => {
+        if (s.rapido) return;
+        const zmin = Math.min(s.z0, s.z);
+        if (zmin < -g.lz - 3) metti(s.riga, 'errore', 'taglio sotto il fondo del grezzo: Z' + zmin.toFixed(2) + ' contro uno spessore di ' + g.lz + ' (si taglia la morsa o la parallela)');
+        else if (zmin < -g.lz - 0.01) metti(s.riga, 'avviso', 'taglio sotto il fondo del grezzo di ' + (-g.lz - zmin).toFixed(2) + ' mm: va bene solo per i fori passanti con la parallela libera');
+        const fuori = (v, lo, hi, tol) => v < lo - tol || v > hi + tol;
+        if (g.lx > 0 && g.ly > 0 && zmin < 0 && (fuori(s.x, 0, g.lx, R(s.t) + 0.5) || fuori(s.y, 0, g.ly, R(s.t) + 0.5)) && (s.x !== s.x0 || s.y !== s.y0 || true)) {
+          if (fuori(s.x, -R(s.t) - 80, g.lx + R(s.t) + 80, 0) || fuori(s.y, -R(s.t) - 80, g.ly + R(s.t) + 80, 0)) metti(s.riga, 'avviso', 'lavoro molto lontano dal grezzo (X' + s.x.toFixed(1) + ' Y' + s.y.toFixed(1) + '): origine o quota sbagliata?');
+        }
+      });
+    }
+    return out;
+  }
+
   /** Controllo del programma: esecuzione piu i controlli sul testo. Ritorna il risultato di esegui con le segnalazioni. */
   function controlla(testo, opz) {
     const r = esegui(testo, opz);
@@ -712,7 +813,7 @@
     return { testo: out.join('\n'), cambiate, tolte, numeri };
   }
 
-  const Iso = { eseguiISO: esegui, controllaISO: controlla, pulisciLettura, indovinaModo, pulisciRiga: pulisci };
+  const Iso = { centroFresa, controllaIngombri, eseguiISO: esegui, controllaISO: controlla, pulisciLettura, indovinaModo, pulisciRiga: pulisci };
   Object.assign(O, Iso);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

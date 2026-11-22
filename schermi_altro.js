@@ -98,6 +98,23 @@
         h += '<tr><td>' + (d <= 16 ? '<b>' + t + '</b>' : t) + '</td><td>' + fmt(k / 64, 4) + '</td><td>' + fmt(k / 64 * 25.4, 3) + '</td></tr>'; }
       return h + '</table></div></div>';
     },
+    linguaggi(S) {
+      const STATO = {
+        iso: { fa: 'G0-G3, G17-G19, G40-G43, G54, G65, G73, G80-G89, G32/G33, G50, G71/G70/G74/G75/G76 (tornio), M3-M9, M30, macro con variabili', non: 'cicli fissi del tornio G72, G73, G90, G92, G94; tastatura G31 solo simulata', prova: 'Letto e simulato dall\'app; non provato su una macchina' },
+        cicli: { fa: 'T D M6, G17 G90 G71 G40, G96 con LIMS, G33 K, MCALL CYCLE81-85 con parametri, commenti con ;', non: 'macro, cicli fissi del tornio (G71...), profili in programma', prova: 'Tradotto in modo meccanico, mai provato su un controllo vero: i parametri dei cicli vanno controllati sul manuale della macchina' },
+        dialogo: { fa: 'BEGIN PGM, BLK FORM, TOOL CALL, L X Y Z R0 F, CYCL DEF 200 (foratura), 201 (alesatura), 207 (maschiatura rigida), M99', non: 'tornio, G41/G42 (RL/RR), archi, macro, profili con raccordi', prova: 'Tradotto in modo meccanico, mai provato su un controllo vero: nomi dei cicli e riga finale da verificare' }
+      };
+      const b2 = { n: 3000, f: 600, t: 3, zSic: 50, zR: 2 };
+      const g = O.gcodeFresa('fori', Object.assign({ punti: O.schemaFori({ tipo: 'cerchio', dc: 60, n: 3 }), prof: 12, ciclo: 'G83', q: 4, d: 8 }, b2));
+      let h = '<p class="leggenda">I programmi nascono in ISO e si traducono. Nessun linguaggio e stato provato su una macchina: la prima volta si prova sempre a vuoto.</p>';
+      for (const k of Object.keys(O.LINGUAGGI)) {
+        const L = O.LINGUAGGI[k], st = STATO[k], t = O.postProcessor(g.righe, { linguaggio: k, modo: 'fresa', nome: 'esempio' });
+        h += '<div class="carta-det" style="padding:12px 14px"><b>' + esc(L.nome) + '</b>' +
+          '<p style="margin:8px 0 4px"><b>Traduce:</b> ' + esc(st.fa) + '.</p><p style="margin:4px 0"><b>Non traduce:</b> ' + esc(st.non) + '.</p><p style="margin:4px 0"><b>Stato:</b> ' + esc(st.prova) + '.</p>' +
+          '<div class="sez" style="margin:10px 0 4px">Esempio: 3 fori a beccate</div><pre class="listato" style="max-height:220px;margin:0">' + esc((t.righe || []).join('\n')) + '</pre></div>';
+      }
+      return h;
+    },
     codici() {
       const G = [['G0', 'Rapido'], ['G1', 'Interpolazione lineare'], ['G2 / G3', 'Arco orario / antiorario'], ['G4', 'Sosta'], ['G17 / G18', 'Piano XY / ZX'], ['G21', 'Millimetri'],
         ['G28', 'Ritorno al punto di riferimento'], ['G32 / G33', 'Filettatura (tornio)'], ['G40 / G41 / G42', 'Compensazione raggio: via / sinistra / destra'], ['G43 / G49', 'Correzione lunghezza / via'],
@@ -117,7 +134,7 @@
       const S = A.sezione('tabelleVista');
       const chips = el('div', { class: 'chips' }), corpo = el('div');
       m.append(chips, corpo);
-      const nomi = { filetti: 'Filetti', tolleranze: 'Tolleranze', rugosita: 'Rugosita', pollici: 'Pollici', codici: 'Codici G e M' };
+      const nomi = { filetti: 'Filetti', tolleranze: 'Tolleranze', rugosita: 'Rugosita', pollici: 'Pollici', codici: 'Codici G e M', linguaggi: 'Linguaggi macchina' };
       const mostra = k => {
         S.tab = TAB[k] ? k : 'filetti'; A.salva();
         chips.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.tab));

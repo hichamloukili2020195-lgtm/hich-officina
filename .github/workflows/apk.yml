@@ -28,8 +28,8 @@ jobs:
           rm -f android/app/src/main/assets/www/sw.js
           cp icone/* android/app/src/main/assets/www/icone/
           echo "VERSIONE_APP=$(grep -o "VERSIONE: '[0-9.]*'" app.js | grep -o '[0-9.]\+')" >> "$GITHUB_ENV"
-      - name: Prove dei calcoli
-        run: node prove/prove.js
+      - name: Prove (sintassi, calcoli, prova a tappeto): se falliscono non si costruisce l'APK
+        run: node prove/tutte.js
       - name: Costruisci l'APK
         run: gradle -p android assembleRelease --no-daemon
       - name: Pubblica l'APK

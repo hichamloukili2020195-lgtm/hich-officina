@@ -288,7 +288,7 @@
   const App = {
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.13.0'
+    schermi: {}, param: {}, VERSIONE: '2.14.0'
   };
   window.App = App;
 

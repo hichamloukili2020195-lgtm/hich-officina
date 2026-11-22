@@ -449,4 +449,55 @@ prova('quote lette da un disegno', () => {
   assert.ok(tipo('smusso', '1x45°') && tipo('raggio', 'R2') && tipo('tolleranza', 'H7') && tipo('lunghezza', '120') && tipo('lunghezza', '35'));
   assert.ok(!q.some(x => x.tipo === 'lunghezza' && (x.valore === 20 || x.valore === 45)));
 });
+prova('norme: tolleranze ISO 286 e filetti metrici', () => {
+  // valori ufficiali (micrometri) per alcuni diametri: scostamento superiore e inferiore
+  const T = [[6, 'H7', 12, 0], [12, 'H7', 18, 0], [25, 'H7', 21, 0], [40, 'H7', 25, 0], [65, 'H7', 30, 0], [100, 'H7', 35, 0], [25, 'H6', 13, 0], [25, 'H8', 33, 0], [25, 'H11', 130, 0],
+    [25, 'h6', 0, -13], [25, 'h7', 0, -21], [25, 'h9', 0, -52], [25, 'g6', -7, -20], [25, 'f7', -20, -41], [25, 'e8', -40, -73], [25, 'd9', -65, -117],
+    [25, 'k6', 15, 2], [25, 'm6', 21, 8], [25, 'n6', 28, 15], [25, 'p6', 35, 22], [40, 'js7', 12.5, -12.5], [50, 'G7', 34, 9], [25, 'F7', 41, 20], [25, 'E8', 73, 40]];
+  T.forEach(([d, c, sup, inf]) => { const r = O.tolleranza(d, c); assert.deepStrictEqual([r.sup, r.inf], [sup, inf], c + ' su ' + d); });
+  // il campo IT non cala mai all'aumentare del diametro, e cresce con il grado
+  ['H6', 'H7', 'H8', 'H9'].forEach(c => { let prima = 0; [3, 6, 10, 18, 30, 50, 80, 120, 180, 250, 315, 400, 500].forEach(d => { const it = O.tolleranza(d, c).it; assert.ok(it >= prima, c + ' ' + d); prima = it; }); });
+  // filetti metrici ISO: D1, d2, d3 (mm)
+  const F = [[10, 1.5, 8.376, 9.026, 8.160], [8, 1.25, 6.647, 7.188, 6.466], [12, 1.75, 10.106, 10.863, 9.853], [20, 2.5, 17.294, 18.376, 16.933], [6, 1, 4.917, 5.350, 4.773]];
+  F.forEach(([d, p, D1, d2, d3]) => { const f = O.filetto(d, p); vicino(f.nocciolo, D1, 0.002); vicino(f.medio, d2, 0.002); vicino(f.nocciolo_vite, d3, 0.002); vicino(f.preforo, d - p, 1e-9); });
+  // passi grossi ISO
+  const G = { 3: 0.5, 4: 0.7, 5: 0.8, 6: 1, 8: 1.25, 10: 1.5, 12: 1.75, 14: 2, 16: 2, 20: 2.5, 24: 3, 30: 3.5, 36: 4, 42: 4.5, 48: 5 };
+  for (const d in G) assert.strictEqual(O.FILETTI_GROSSI.find(f => f[0] === Number(d))[1], G[d], 'M' + d);
+  // rugosita e cono
+  assert.strictEqual(O.rugositaN(0.8), 'N6'); assert.strictEqual(O.rugositaN(3.2), 'N8');
+  vicino(O.cono(40, 20, 100).semiangolo, 5.7106, 1e-3);   // 1:5 su Ø
+  // giri: Vc 100 m/min su D50 = 637 giri/min
+  vicino(O.giri(100, 50), 636.62, 0.01);
+});
+prova('valori vuoti o non validi: messaggio, mai NaN nel programma', () => {
+  assert.ok(O.gcodeFresa('spianatura', { n: Infinity, f: 1, lx: 1, ly: 1, prof: 1, ap: 1, d: 1 }).errore.includes('non e valido'));
+  assert.ok(O.gcodeTornio('sgrossatura', { dg: 1e9, df: 1, l: 1, ap: 1, vc: 1, f: 1, nmax: 1 }).errore.includes('non e valido'));
+  // campi facoltativi vuoti (NaN) non bloccano un programma valido
+  const r = O.gcodeFresa('spianatura', { n: 3000, f: 600, lx: 100, ly: 60, prof: 2, ap: 1, d: 50, nome: NaN, num: NaN, sovra: NaN });
+  assert.ok(!r.errore && !/NaN/.test(r.righe.join('\n')));
+  assert.ok(O.gcodeFresa('spianatura', { n: NaN, f: 600, lx: 100, ly: 60, prof: 2, ap: 1, d: 50 }).errore);
+});
+prova('compensazione G41/G42 calcolata e urti con le staffe', () => {
+  const b2 = { n: 3000, f: 600, t: 3, zSic: 50, zR: 2 };
+  const g = O.gcodeFresa('profilo', Object.assign({ punti: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 50 }, { x: 0, y: 50 }], chiuso: true, lato: 'esterno', prof: 5, ap: 5, d: 10 }, b2));
+  const s = O.eseguiISO(g.righe.join('\n'));
+  assert.ok(s.segmenti.some(q => q.comp === 41) && s.segmenti.some(q => q.comp === 0));
+  const c = O.centroFresa(s.segmenti, 5);
+  const lav = c.filter((q, i) => s.segmenti[i].comp && Math.hypot(q.x - q.x0, q.y - q.y0) > 30);   // i lati lunghi, senza le uscite
+  vicino(Math.min(...lav.map(q => q.x)), -5); vicino(Math.max(...lav.map(q => q.x)), 85);
+  vicino(Math.min(...lav.map(q => q.y)), -5); vicino(Math.max(...lav.map(q => q.y)), 55);
+  // interno: il centro sta dentro
+  const gi = O.gcodeFresa('profilo', Object.assign({ punti: [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 80, y: 50 }, { x: 0, y: 50 }], chiuso: true, lato: 'interno', prof: 5, ap: 5, d: 10 }, b2));
+  const si = O.eseguiISO(gi.righe.join('\n'));
+  const ci = O.centroFresa(si.segmenti, 5).filter((q, i) => si.segmenti[i].comp && Math.hypot(q.x - q.x0, q.y - q.y0) > 30);
+  vicino(Math.min(...ci.map(q => q.x)), 5); vicino(Math.max(...ci.map(q => q.x)), 75);
+  // urto con una staffa: lo vede solo con il centro fresa (raggio 5)
+  s.segmentiCentro = c;
+  const ing = { grezzo: { lx: 80, ly: 50, lz: 5 }, staffe: [{ x0: 30, y0: -20, x1: 50, y1: -3.5, z: 3 }], raggio: 5 };
+  const u = O.controllaIngombri(s, ing);
+  assert.ok(u.some(x => x.livello === 'errore' && /staffa 1/.test(x.testo)), 'urto con la staffa');
+  assert.strictEqual(O.controllaIngombri(s, { staffe: [{ x0: 30, y0: -20, x1: 50, y1: -3.5, z: -8 }], raggio: 5 }).length, 0);   // staffa piu bassa del taglio
+  // sotto il fondo del grezzo
+  assert.ok(O.controllaIngombri(s, { grezzo: { lx: 80, ly: 50, lz: 1 }, raggio: 5 }).some(x => x.livello === 'errore' && /sotto il fondo/.test(x.testo)));
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');
