@@ -35,7 +35,10 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
   rotella, pulsanti + e -, Adatta), griglia che segue lo zoom, quote Ø e lunghezze sul disegno, quote vive mentre si
   trascina; tocco su un tratto per mettere un punto in mezzo; **smussi e raggi con un tocco** sul punto scelto o su
   tutti gli spigoli; **punto con le quote**: avanti di una lunghezza, spallamento fino a un Ø, cono con lunghezza e
-  semiangolo, quote esatte.
+  semiangolo, quote esatte. Dalla 2.12.0 il disegno ragiona a **linee**: tocchi una linea e la elimini (un cilindro
+  tolto fa accostare il resto), le cambi Ø e lunghezza (il resto si sposta), la dividi, la fai diventare arco; l'elenco
+  delle linee in parole ("Cilindro Ø20 lungo 25", "Cono da Ø30 a Ø38") con la ✕; le linee nuove con i bottoni
+  Cilindro, Spallamento, Cono, Arco (bombato o incavato), Punto a quote; Annulla e Ripeti.
 - **Simulazione a pannello**: quote X Y Z grandi, giri con l'indicatore, avanzamento, utensile, righe del programma che
   scorrono con la riga in lavoro; su tablet in orizzontale grafico e pannello affiancati.
 - **Ricerca veloce dalla home**: M10 (filetto e preforo), H7 25 (tolleranza), 316 (materiale), G83 (codice), T5

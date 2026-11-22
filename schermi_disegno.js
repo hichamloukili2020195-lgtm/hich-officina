@@ -81,18 +81,21 @@
       if (S.passo === undefined) S.passo = '1';
       S.modo = S.modo || 'punti'; S.vista = S.vista || '2D';
       const storia = [];
-      const ricorda = () => { storia.push(JSON.stringify(S.punti)); if (storia.length > 50) storia.shift(); };
+      const futuro = [];
+      const ricorda = () => { storia.push(JSON.stringify(S.punti)); if (storia.length > 80) storia.shift(); futuro.length = 0; };
       const v3 = { yaw: -0.55, pitch: 0.42, zoom: 1 };
-      let sel = null;
+      let sel = null, selL = null;   // punto scelto oppure linea scelta (la linea i va dal punto i-1 al punto i)
 
       const schede = el('div', { class: 'schede' });
       [['2D', 'Disegno'], ['3D', 'Pezzo 3D']].forEach(([id, t]) => schede.appendChild(el('button', { 'data-id': id, testo: t, onclick: () => { S.vista = id; A.salva(); tutto(); } })));
       const cv = el('canvas', { class: 'vista disegno-tela', 'aria-label': 'Disegno del profilo: tocca per mettere i punti' });
       const chips = el('div', { class: 'chips' });
-      const [cPunti, cMano] = [['punti', 'Un tocco = un punto'], ['mano', 'A mano libera']].map(([id, t]) => { const b = el('button', { class: 'chip', 'data-id': id, testo: t, onclick: () => { S.modo = id; A.salva(); tutto(); } }); chips.appendChild(b); return b; });
-      const bAnnulla = el('button', { class: 'chip', testo: 'Annulla', onclick: () => { if (!storia.length) return; S.punti = JSON.parse(storia.pop()); sel = null; A.salva(); tutto(); } });
-      const bCancella = el('button', { class: 'chip', testo: 'Cancella tutto', onclick: () => { ricorda(); S.punti = []; sel = null; A.salva(); tutto(); } });
-      chips.append(bAnnulla, bCancella);
+      if (S.modo !== 'mano') S.modo = 'punti';
+      const [cPunti, cMano] = [['punti', 'Tocca: punti e linee'], ['mano', 'A mano libera']].map(([id, t]) => { const b = el('button', { class: 'chip', 'data-id': id, testo: t, onclick: () => { S.modo = id; A.salva(); tutto(); } }); chips.appendChild(b); return b; });
+      const bAnnulla = el('button', { class: 'chip', testo: '↶ Annulla', 'aria-label': 'Annulla', onclick: () => { if (!storia.length) return; futuro.push(JSON.stringify(S.punti)); S.punti = JSON.parse(storia.pop()); sel = selL = null; A.salva(); tutto(); } });
+      const bRipeti = el('button', { class: 'chip', testo: '↷ Ripeti', 'aria-label': 'Ripeti', onclick: () => { if (!futuro.length) return; storia.push(JSON.stringify(S.punti)); S.punti = JSON.parse(futuro.pop()); sel = selL = null; A.salva(); tutto(); } });
+      const bCancella = el('button', { class: 'chip', testo: 'Cancella tutto', onclick: () => { ricorda(); S.punti = []; sel = selL = null; A.salva(); tutto(); } });
+      chips.append(bAnnulla, bRipeti, bCancella);
       const editor = el('div'), msg = el('div'), panGrezzo = el('div', { class: 'pannello' });
       const crea = el('button', { class: 'pul', html: A.icona('codice') + 'Crea il programma' });
       m.append(schede, cv, chips, msg, editor, el('div', { class: 'sez', testo: 'Grezzo e griglia' }), panGrezzo, el('div', { class: 'pulsanti' }, [crea]));
@@ -177,6 +180,14 @@
           linea(1, 2.6, errore ? col('--errore') : col('--accento2'), 1);
           linea(-1, 1.2, col('--accento2'), 0.45);
         }
+        // la linea scelta
+        if (selL !== null && S.punti[selL] && S.punti[selL - 1]) {
+          const a = S.punti[selL - 1], b = S.punti[selL];
+          const g2 = O.trattiTornio([{ x: num(a.x), z: num(a.z) }, { x: num(b.x), z: num(b.z), tratto: b.tratto, r: num(b.r) }]);
+          const pl = g2.errore ? [{ a: num(a.z), b: num(a.x) / 2 }, { a: num(b.z), b: num(b.x) / 2 }] : O.polilineaProfilo(g2.tratti, 0.25);
+          g.strokeStyle = col('--avviso'); g.lineWidth = 6; g.globalAlpha = 0.85; g.lineCap = 'round';
+          g.beginPath(); pl.forEach((q, k) => (k ? g.lineTo(X(q.a), Y(q.b)) : g.moveTo(X(q.a), Y(q.b)))); g.stroke(); g.globalAlpha = 1; g.lineCap = 'butt';
+        }
         // quote: Ø sopra i tratti cilindrici, lunghezza sotto lo specchio
         g.font = '600 11px system-ui'; g.textAlign = 'center';
         for (let i = 1; i < S.punti.length; i++) {
@@ -253,7 +264,7 @@
         const k = vicino(px, py);
         if (S.modo === 'mano' && k < 0) { tratto = [[px, py]]; premuto = { mano: true }; return; }
         premuto = { k, px, py, mosso: false };
-        if (k >= 0) { sel = k; ricorda(); }
+        if (k >= 0) { sel = k; selL = null; ricorda(); }
       });
       cv.addEventListener('pointermove', e => {
         if (attivi.has(e.pointerId)) attivi.set(e.pointerId, posizione(e));
@@ -300,18 +311,16 @@
           sel = null; A.salva(); tutto(); return;
         }
         if (p.k >= 0) { if (!p.mosso) storia.pop(); A.salva(); tutto(); return; }
-        // un tocco su un tratto: punto in mezzo; altrove: punto nuovo alla fine
+        // un tocco su una linea: si sceglie (per eliminarla, misurarla, dividerla); nel vuoto: punto nuovo in fondo
         const tr = suTratto(px, py);
+        if (tr) { selL = tr.i; sel = null; ricorda(); storia.pop(); A.salva(); tutto(); return; }
+        if (selL !== null || (sel !== null && sel !== S.punti.length - 1)) { sel = selL = null; tutto(); return; }
         ricorda();
-        if (tr) {
-          const a = aggancia(vis.zDa(px), Math.abs(vis.rDa(py)), null);
-          S.punti.splice(tr.i, 0, { x: String(a.r * 2), z: String(a.z) });
-          sel = tr.i;
-        } else {
+        {
           const ult = S.punti[S.punti.length - 1];
           const a = aggancia(vis.zDa(px), Math.abs(vis.rDa(py)), ult ? { z: num(ult.z), r: num(ult.x) / 2 } : null);
           S.punti.push({ x: String(a.r * 2), z: String(a.z) });
-          sel = S.punti.length - 1;
+          sel = S.punti.length - 1; selL = null;
         }
         A.salva(); tutto();
       };
@@ -319,30 +328,56 @@
       cv.addEventListener('pointercancel', e => { attivi.delete(e.pointerId); if (attivi.size < 2) pinch = null; premuto = null; mira = null; tratto = []; disegna(); });
       cv.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = posizione(e); zoomA(e.deltaY < 0 ? 1.25 : 1 / 1.25, px, py); }, { passive: false });
 
-      // ----- punto con le quote: esatte o relative al punto scelto (o all'ultimo) -----
-      S.qv = S.qv || { tipo: 'lungo', a: '20', b: '', ang: '15' };
+      // ----- aggiungi una linea: cilindro, spallamento, cono, arco o quote esatte -----
+      S.qv = S.qv || {};
+      S.qv.qtipo = ['cil', 'spalla', 'cono', 'arco', 'esatto'].includes(S.qv.qtipo) ? S.qv.qtipo : 'cil';
       const panQuote = el('div', { class: 'pannello' });
-      const fQ = A.modulo(panQuote, [{ id: 'qtipo', et: 'Nuovo punto', tipo: 'scelta', scelte: [['lungo', 'Avanti verso il mandrino di'], ['spalla', 'Spallamento fino a Ø'], ['cono', 'Cono: lunghezza e semiangolo'], ['esatto', 'Quote esatte Ø e Z']] },
-        { id: 'qa', et: 'Lunghezza', u: 'mm', se: q => q.qtipo === 'lungo' || q.qtipo === 'cono' || !q.qtipo },
-        { id: 'qd', et: 'Diametro Ø', u: 'mm', se: q => q.qtipo === 'spalla' || q.qtipo === 'esatto' },
-        { id: 'qz', et: 'Z', u: 'mm', se: q => q.qtipo === 'esatto' },
-        { id: 'qang', et: 'Semiangolo', sub: 'positivo: il diametro cresce', u: '°', se: q => q.qtipo === 'cono' }], S.qv, () => { fQ.aggiorna(); });
+      const tipiLinea = el('div', { class: 'tipi-linea' });
+      const ICONE = { cil: '<path d="M3 15h18"/><path d="M3 9h18" opacity=".35"/>', spalla: '<path d="M6 17V7h12"/>', cono: '<path d="M4 17l16-8"/>', arco: '<path d="M4 18c2-9 7-12 16-12"/>', esatto: '<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>' };
+      const NOMI = { cil: 'Cilindro', spalla: 'Spallamento', cono: 'Cono', arco: 'Arco', esatto: 'Punto a quote' };
+      Object.keys(NOMI).forEach(k => tipiLinea.appendChild(el('button', { class: 'tipo-linea', 'data-id': k, html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONE[k] + '</svg><span>' + NOMI[k] + '</span>', onclick: () => { S.qv.qtipo = k; A.salva(); mostraQuote(); } })));
+      const campiQuote = el('div');
+      const mostraQuote = () => {
+        tipiLinea.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.qv.qtipo));
+        const t = S.qv.qtipo;
+        const campi = t === 'cil' ? [{ id: 'qa', et: 'Lunghezza', u: 'mm' }]
+          : t === 'spalla' ? [{ id: 'qd', et: 'Fino al diametro Ø', u: 'mm' }]
+          : t === 'cono' ? [{ id: 'qa', et: 'Lunghezza', u: 'mm' }, { id: 'qd', et: 'Diametro alla fine Ø', sub: 'oppure il semiangolo', u: 'mm' }, { id: 'qang', et: 'Semiangolo', sub: 'se il Ø e vuoto', u: '°' }]
+          : t === 'arco' ? [{ id: 'qd', et: 'Diametro alla fine Ø', u: 'mm' }, { id: 'qa', et: 'Lunghezza', u: 'mm' }, { id: 'qr', et: 'Raggio', u: 'mm' }, { id: 'qforma', et: 'Forma', tipo: 'scelta', scelte: [['bombato', 'Bombato (convesso)'], ['incavato', 'Incavato (concavo)']] }]
+          : [{ id: 'qd', et: 'Diametro Ø', u: 'mm' }, { id: 'qz', et: 'Z', u: 'mm' }];
+        A.modulo(campiQuote, campi, S.qv, () => {});
+      };
       const aggiungiQuote = () => {
-        const q = S.qv, base = sel !== null && S.punti[sel] ? S.punti[sel] : S.punti[S.punti.length - 1];
+        const q = S.qv;
+        const dopo = selL !== null ? selL : sel !== null && S.punti[sel] ? sel : S.punti.length - 1;
+        const base = S.punti[dopo];
         const bx = base ? num(base.x) : 0, bz = base ? num(base.z) : 0;
-        let x, z;
-        const t = q.qtipo || 'lungo';
-        if (t === 'lungo') { const L = num(q.qa); if (!(L > 0)) { A.avviso('Scrivi la lunghezza'); return; } x = bx; z = bz - L; }
-        else if (t === 'spalla') { const D = num(q.qd); if (!(D >= 0)) { A.avviso('Scrivi il diametro'); return; } x = D; z = bz; }
-        else if (t === 'cono') { const L = num(q.qa), an = num(q.qang); if (!(L > 0) || !isFinite(an) || Math.abs(an) >= 89) { A.avviso('Scrivi lunghezza e semiangolo'); return; } z = bz - L; x = bx + 2 * L * Math.tan(an * Math.PI / 180); }
-        else { const D = num(q.qd), Z = num(q.qz); if (!(D >= 0) || !isFinite(Z)) { A.avviso('Scrivi Ø e Z'); return; } x = D; z = Z; }
+        let x, z, extra = {};
+        const t = q.qtipo;
+        const L = num(q.qa), D = num(q.qd);
+        if (t === 'cil') { if (!(L > 0)) { A.avviso('Scrivi la lunghezza'); return; } x = bx; z = bz - L; }
+        else if (t === 'spalla') { if (!(D >= 0)) { A.avviso('Scrivi il diametro'); return; } x = D; z = bz; }
+        else if (t === 'cono') {
+          if (!(L > 0)) { A.avviso('Scrivi la lunghezza'); return; }
+          z = bz - L;
+          if (D >= 0) x = D; else { const an = num(q.qang); if (!isFinite(an) || Math.abs(an) >= 89) { A.avviso('Scrivi il Ø alla fine o il semiangolo'); return; } x = bx + 2 * L * Math.tan(an * Math.PI / 180); }
+        } else if (t === 'arco') {
+          const R = num(q.qr);
+          if (!(D >= 0) || !(L >= 0) || !(R > 0)) { A.avviso('Scrivi Ø alla fine, lunghezza e raggio'); return; }
+          x = D; z = bz - L;
+          const corda = Math.hypot(L, (D - bx) / 2);
+          if (R < corda / 2 - 1e-6) { A.avviso('Raggio troppo piccolo: almeno ' + fmt(corda / 2, 3)); return; }
+          extra = { tratto: q.qforma === 'incavato' ? 'cw' : 'ccw', r: String(R) };
+        } else { const Z = num(q.qz); if (!(D >= 0) || !isFinite(Z)) { A.avviso('Scrivi Ø e Z'); return; } x = D; z = Z; }
         if (x < 0) { A.avviso('Il diametro verrebbe negativo'); return; }
         ricorda();
-        const idx = sel !== null && S.punti[sel] ? sel + 1 : S.punti.length;
-        S.punti.splice(idx, 0, { x: String(Math.round(x * 1000) / 1000), z: String(Math.round(z * 1000) / 1000) });
-        sel = idx; A.salva(); tutto();
+        const idx = dopo + 1;
+        S.punti.splice(Math.max(0, idx), 0, Object.assign({ x: String(Math.round(x * 1000) / 1000), z: String(Math.round(z * 1000) / 1000) }, extra));
+        sel = null; selL = Math.max(1, idx); if (!S.punti[selL - 1]) selL = null;
+        A.salva(); tutto();
       };
-      panQuote.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('piu') + 'Aggiungi il punto', onclick: aggiungiQuote })]));
+      panQuote.append(tipiLinea, campiQuote, el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('piu') + 'Aggiungi', onclick: aggiungiQuote })]));
+      mostraQuote();
       const tuttiSpigoli = el('div', { class: 'chips' }, [el('span', { class: 'leggenda', style: 'margin:0 4px 0 2px;align-self:center', testo: 'Tutti gli spigoli:' })].concat(
         [['C0.5', 'smusso', '0.5'], ['C1', 'smusso', '1'], ['R1', 'raccordo', '1'], ['vivi', null, null]].map(([t, k, v]) => el('button', { class: 'chip', testo: t, onclick: () => {
           ricorda();
@@ -355,12 +390,111 @@
           }
           A.salva(); tutto();
         } }))));
-      panGrezzo.previousSibling.before(el('div', { class: 'sez', testo: 'Punto con le quote' }), panQuote, tuttiSpigoli);
+      const elenco = el('div', { class: 'elenco-linee' });
+      panGrezzo.previousSibling.before(el('div', { class: 'sez', testo: 'Aggiungi una linea (dopo quella scelta, o in fondo)' }), panQuote, el('div', { class: 'sez', testo: 'Linee del profilo' }), elenco, tuttiSpigoli);
+
+      // ----- le linee in parole -----
+      const tipoLinea = i => {
+        const a = S.punti[i - 1], b = S.punti[i];
+        const xa = num(a.x), xb = num(b.x), za = num(a.z), zb = num(b.z);
+        if ((b.tratto || 'retta') !== 'retta') return 'arco';
+        if (Math.abs(xa - xb) < 1e-9 && Math.abs(za - zb) < 1e-9) return 'doppio';
+        if (Math.abs(xa - xb) < 1e-9) return 'cil';
+        if (Math.abs(za - zb) < 1e-9) return xa === 0 ? 'faccia' : 'spalla';
+        return 'cono';
+      };
+      const descrivi = i => {
+        const a = S.punti[i - 1], b = S.punti[i], t = tipoLinea(i);
+        const xa = num(a.x), xb = num(b.x), L = Math.abs(num(a.z) - num(b.z));
+        if (t === 'cil') return 'Cilindro Ø' + fmt(xa, 3) + ' lungo ' + fmt(L, 3);
+        if (t === 'faccia') return 'Faccia fino a Ø' + fmt(xb, 3);
+        if (t === 'spalla') return 'Spallamento da Ø' + fmt(xa, 3) + ' a Ø' + fmt(xb, 3);
+        if (t === 'cono') return 'Cono da Ø' + fmt(xa, 3) + ' a Ø' + fmt(xb, 3) + ', lungo ' + fmt(L, 3) + ' (' + fmt(Math.atan(Math.abs(xb - xa) / 2 / L) * 180 / Math.PI, 2) + '°)';
+        if (t === 'arco') return 'Arco R' + fmt(num(b.r), 3) + ' ' + (b.tratto === 'cw' ? 'incavato' : 'bombato') + ' fino a Ø' + fmt(xb, 3) + ', lungo ' + fmt(L, 3);
+        return 'Punto doppio (da togliere)';
+      };
+      const ICONA_TIPO = { cil: ICONE.cil, spalla: ICONE.spalla, faccia: ICONE.spalla, cono: ICONE.cono, arco: ICONE.arco, doppio: ICONE.esatto };
+      /** Elimina la linea i: un cilindro si toglie e il resto si accosta; le altre linee uniscono i punti vicini. */
+      const eliminaLinea = i => {
+        ricorda();
+        const t = tipoLinea(i), a = S.punti[i - 1], b = S.punti[i];
+        if (t === 'cil' && i < S.punti.length - 1) {
+          const dz = num(a.z) - num(b.z);
+          for (let k = i + 1; k < S.punti.length; k++) S.punti[k].z = String(Math.round((num(S.punti[k].z) + dz) * 1000) / 1000);
+        }
+        S.punti.splice(i === 1 && S.punti.length > 2 && t !== 'cil' ? 0 : i, 1);
+        sel = selL = null; A.salva(); tutto();
+      };
+      const disegnaElenco = () => {
+        elenco.innerHTML = '';
+        if (S.punti.length < 2) { elenco.appendChild(el('div', { class: 'vuoto', testo: 'Ancora nessuna linea: tocca il disegno o usa Aggiungi.' })); return; }
+        for (let i = 1; i < S.punti.length; i++) {
+          const t = tipoLinea(i);
+          elenco.appendChild(el('div', { class: 'linea-riga' + (i === selL ? ' attiva' : '') }, [
+            el('button', { class: 'linea-testo', onclick: () => { selL = i; sel = null; tutto(); } }, [el('span', { class: 'ic', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONA_TIPO[t] + '</svg>' }), el('span', { testo: i + '. ' + descrivi(i) })]),
+            el('button', { class: 'icona-pul', 'aria-label': 'Elimina la linea ' + i, html: A.icona('cestino'), onclick: () => eliminaLinea(i) })]));
+        }
+      };
+
+      // ----- riquadro della linea scelta -----
+      const mostraLinea = () => {
+        const i = selL, a = S.punti[i - 1], b = S.punti[i], t = tipoLinea(i);
+        editor.appendChild(el('div', { class: 'sez', testo: 'Linea ' + i + ': ' + descrivi(i) }));
+        const pan = el('div', { class: 'pannello' });
+        editor.appendChild(pan);
+        const v = { d: b.x, L: String(Math.abs(num(a.z) - num(b.z))), r: b.r || '', forma: b.tratto === 'cw' ? 'incavato' : 'bombato' };
+        const cambiaL = nuova => {   // lunghezza: si sposta tutto quello che viene dopo
+          const L0 = Math.abs(num(a.z) - num(b.z)), dz = nuova - L0;
+          if (!(nuova >= 0)) return;
+          for (let k = i; k < S.punti.length; k++) S.punti[k].z = String(Math.round((num(S.punti[k].z) - dz) * 1000) / 1000);
+        };
+        const cambiaD = nuovo => {   // diametro alla fine: segue anche il cilindro che c'e dopo
+          if (!(nuovo >= 0)) return;
+          const vecchio = num(b.x);
+          for (let k = i; k < S.punti.length && (k === i || (num(S.punti[k].x) === vecchio && (S.punti[k].tratto || 'retta') === 'retta')); k++) S.punti[k].x = String(nuovo);
+          if (t === 'cil') a.x = String(nuovo);
+        };
+        const campi = t === 'cil' ? [{ id: 'd', et: 'Diametro Ø', u: 'mm' }, { id: 'L', et: 'Lunghezza', sub: 'quello che viene dopo si sposta', u: 'mm' }]
+          : t === 'spalla' || t === 'faccia' ? [{ id: 'd', et: 'Fino al diametro Ø', u: 'mm' }]
+          : t === 'cono' ? [{ id: 'd', et: 'Diametro alla fine Ø', u: 'mm' }, { id: 'L', et: 'Lunghezza', u: 'mm' }]
+          : t === 'arco' ? [{ id: 'd', et: 'Diametro alla fine Ø', u: 'mm' }, { id: 'L', et: 'Lunghezza', u: 'mm' }, { id: 'r', et: 'Raggio', u: 'mm' }, { id: 'forma', et: 'Forma', tipo: 'scelta', scelte: [['bombato', 'Bombato (convesso)'], ['incavato', 'Incavato (concavo)']] }] : [];
+        A.modulo(pan, campi, v, id => {
+          if (id === 'd') cambiaD(num(v.d));
+          if (id === 'L') cambiaL(num(v.L));
+          if (id === 'r') b.r = v.r;
+          if (id === 'forma') b.tratto = v.forma === 'incavato' ? 'cw' : 'ccw';
+          A.salva(); disegna(); disegnaElenco();
+        });
+        const ultimo = i === S.punti.length - 1;
+        if (!ultimo) {
+          const metti = (k, val) => { ricorda(); delete b.smusso; delete b.raccordo; if (k) b[k] = val; A.salva(); tutto(); };
+          editor.appendChild(el('div', { class: 'leggenda', style: 'margin:6px 2px', testo: 'Spigolo alla fine della linea:' }));
+          editor.appendChild(el('div', { class: 'chips' }, [['C0.5', 'smusso', '0.5'], ['C1', 'smusso', '1'], ['R1', 'raccordo', '1'], ['R2', 'raccordo', '2'], ['Vivo', null, null]]
+            .map(([tt, k, val]) => el('button', { class: 'chip' + ((k && String(b[k]) === val) || (!k && !(num(b.smusso) > 0) && !(num(b.raccordo) > 0)) ? ' attiva' : ''), testo: tt, onclick: () => metti(k, val) }))));
+        }
+        editor.appendChild(el('div', { class: 'pulsanti' }, [
+          el('button', { class: 'pul peric', html: A.icona('cestino') + (t === 'cil' && !ultimo ? 'Elimina (il resto si accosta)' : 'Elimina la linea'), onclick: () => eliminaLinea(i) }),
+          el('button', { class: 'pul sec', html: A.icona('piu') + 'Dividi a meta', onclick: () => {
+            ricorda();
+            const m = { x: String(Math.round((num(a.x) + num(b.x)) / 2 * 1000) / 1000), z: String(Math.round((num(a.z) + num(b.z)) / 2 * 1000) / 1000) };
+            if ((b.tratto || 'retta') !== 'retta') { A.avviso('Un arco non si divide: trasformalo prima in retta'); storia.pop(); return; }
+            S.punti.splice(i, 0, m); selL = i; A.salva(); tutto();
+          } })]));
+        editor.appendChild(el('div', { class: 'pulsanti' }, [
+          el('button', { class: 'pul sec', html: A.icona('modifica') + (t === 'arco' ? 'Diventa una retta' : 'Diventa un arco'), onclick: () => {
+            ricorda();
+            if (t === 'arco') { b.tratto = 'retta'; delete b.r; }
+            else { const corda = Math.hypot(num(a.z) - num(b.z), (num(a.x) - num(b.x)) / 2); b.tratto = 'ccw'; b.r = String(Math.round(corda * 1000) / 1000); }
+            A.salva(); tutto();
+          } })]));
+      };
 
       // ----- riquadro del punto scelto -----
       const mostraEditor = () => {
         editor.innerHTML = '';
-        if (sel === null || !S.punti[sel]) { editor.appendChild(A.info(S.modo === 'mano' ? 'Disegna il profilo con il dito dalla testa (a destra) verso il mandrino: il tratto diventa rette sulla griglia. Tocca un punto per correggerlo.' : 'Tocca per mettere i punti, dalla testa (a destra) verso il mandrino. Trascina un punto per spostarlo, toccalo per scrivere le quote, il raccordo o lo smusso.')); return; }
+        if (selL !== null && S.punti[selL] && S.punti[selL - 1]) { mostraLinea(); return; }
+        selL = null;
+        if (sel === null || !S.punti[sel]) { editor.appendChild(A.info(S.modo === 'mano' ? 'Disegna il profilo con il dito dalla testa (a destra) verso il mandrino: il tratto diventa rette sulla griglia. Tocca una linea o un punto per correggerlo.' : '<b>Tocca nel vuoto</b> per mettere un punto in fondo, <b>tocca una linea</b> per eliminarla, misurarla o dividerla, <b>trascina un punto</b> per spostarlo. Oppure usa <b>Aggiungi una linea</b> qui sotto.')); return; }
         const p = S.punti[sel];
         const pan = el('div', { class: 'pannello' });
         const metti = (k, v) => { ricorda(); delete p.smusso; delete p.raccordo; if (k) p[k] = v; A.salva(); tutto(); };
@@ -373,7 +507,7 @@
           { id: 'raccordo', et: 'Raccordo nello spigolo', u: 'R' }, { id: 'smusso', et: 'Smusso nello spigolo', u: 'C' }], p, id => { if (id === 'tratto') { A.salva(); tutto(); } else { A.salva(); disegna(); } });
         editor.appendChild(el('div', { class: 'pulsanti' }, [
           el('button', { class: 'pul sec', html: A.icona('piu') + 'Punto dopo', onclick: () => { ricorda(); const q = S.punti[sel + 1]; const nuovo = q ? { x: String((num(p.x) + num(q.x)) / 2), z: String((num(p.z) + num(q.z)) / 2) } : { x: p.x, z: String(num(p.z) - 10) }; S.punti.splice(sel + 1, 0, nuovo); sel++; A.salva(); tutto(); } }),
-          el('button', { class: 'pul peric', html: A.icona('cestino') + 'Togli', onclick: () => { ricorda(); S.punti.splice(sel, 1); sel = null; A.salva(); tutto(); } })]));
+          el('button', { class: 'pul peric', html: A.icona('cestino') + 'Elimina il punto', onclick: () => { ricorda(); S.punti.splice(sel, 1); sel = null; A.salva(); tutto(); } })]));
       };
       const disegna = () => {
         const { poli, errore, avvisi } = poliDi(S.punti);
@@ -391,6 +525,8 @@
           schede.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.vista));
           [cPunti, cMano].forEach(b => b.classList.toggle('attiva', b.dataset.id === S.modo));
           chips.hidden = S.vista === '3D';
+          bAnnulla.disabled = !storia.length; bRipeti.disabled = !futuro.length;
+          disegnaElenco();
           cv.setAttribute('aria-label', S.vista === '3D' ? 'Pezzo tornito in 3D: trascina per girarlo' : 'Disegno del profilo: tocca per mettere i punti');
           mostraEditor();
         }

@@ -378,7 +378,7 @@ const server = http.createServer((q, r) => {
   ok(mano >= 2 && mano <= 8, 'tratto a mano semplificato: ' + mano);
   await foto('21-disegno');
   // modifica di un punto con le quote
-  await pg.click('text=Un tocco = un punto');
+  await pg.click('text=Tocca: punti e linee');
   await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '16', z: '0' }, { x: '20', z: '-2' }, { x: '20', z: '-20' }, { x: '30', z: '-25', tratto: 'ccw', r: '5' }, { x: '30', z: '-40' }, { x: '40', z: '-40' }]; });
   await vai('home'); await vai('disegno'); await pg.waitForTimeout(60);
   await pg.click('.schede button[data-id="3D"]'); await pg.waitForTimeout(80);
@@ -411,16 +411,55 @@ const server = http.createServer((q, r) => {
   await pg.click('.schede button[data-id="2D"]');
   await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '20', z: '0' }, { x: '20', z: '-20' }, { x: '30', z: '-20' }, { x: '30', z: '-40' }]; App.salva(); });
   await vai('home'); await vai('disegno'); await pg.waitForTimeout(80);
-  // punti con le quote, relativi all'ultimo
-  await pg.selectOption('#f-qtipo', 'lungo'); await pg.fill('#f-qa', '10'); await pg.click('text=Aggiungi il punto'); await pg.waitForTimeout(40);
+  // linee aggiunte con i bottoni, dopo l'ultima
+  const aggiungi = async () => { await pg.click('.pannello button.pul:has-text("Aggiungi")'); await pg.waitForTimeout(40); };
+  await pg.click('.tipo-linea[data-id="cil"]'); await pg.fill('#f-qa', '10'); await aggiungi();
   let ult = await pg.evaluate(() => App.mem.disegno.punti.slice(-1)[0]);
-  ok(ult.x === '30' && ult.z === '-50', 'avanti di 10: ' + JSON.stringify(ult));
-  await pg.selectOption('#f-qtipo', 'spalla'); await pg.fill('#f-qd', '36'); await pg.click('text=Aggiungi il punto'); await pg.waitForTimeout(40);
+  ok(ult.x === '30' && ult.z === '-50', 'cilindro lungo 10: ' + JSON.stringify(ult));
+  await pg.click('.tipo-linea[data-id="spalla"]'); await pg.fill('#f-qd', '36'); await aggiungi();
   ult = await pg.evaluate(() => App.mem.disegno.punti.slice(-1)[0]);
   ok(ult.x === '36' && ult.z === '-50', 'spallamento: ' + JSON.stringify(ult));
-  await pg.selectOption('#f-qtipo', 'cono'); await pg.fill('#f-qa', '10'); await pg.fill('#f-qang', '5,71059'); await pg.click('text=Aggiungi il punto'); await pg.waitForTimeout(40);
+  await pg.click('.tipo-linea[data-id="cono"]'); await pg.fill('#f-qa', '10'); await pg.fill('#f-qd', ''); await pg.fill('#f-qang', '5,71059'); await aggiungi();
   ult = await pg.evaluate(() => App.mem.disegno.punti.slice(-1)[0]);
   ok(Math.abs(Number(ult.x) - 38) < 0.01 && ult.z === '-60', 'cono: ' + JSON.stringify(ult));
+  await pg.click('.tipo-linea[data-id="arco"]'); await pg.fill('#f-qd', '40'); await pg.fill('#f-qa', '1'); await pg.fill('#f-qr', '1'); await aggiungi();
+  ult = await pg.evaluate(() => App.mem.disegno.punti.slice(-1)[0]);
+  ok(ult.tratto === 'ccw' && ult.r === '1' && ult.z === '-61', 'arco: ' + JSON.stringify(ult));
+  ok(!(await pg.$('#schermo .errore')), 'linee aggiunte con errore');
+  // elenco delle linee e eliminazione di un cilindro: il resto si accosta
+  const righe0 = await pg.$$eval('.linea-riga', x => x.map(e => e.textContent));
+  ok(righe0.some(t => t.includes('Cilindro Ø20 lungo 20')) && righe0.some(t => t.includes('Cono da Ø36 a Ø38')), 'elenco delle linee: ' + righe0.join(' | '));
+  await pg.click('.linea-testo:has-text("Cilindro Ø20 lungo 20")'); await pg.waitForTimeout(40);
+  ok((await pg.textContent('#schermo')).includes('Linea 2: Cilindro Ø20 lungo 20'), 'linea scelta dall\'elenco');
+  await pg.click('text=Elimina (il resto si accosta)'); await pg.waitForTimeout(40);
+  let pp = await pg.evaluate(() => App.mem.disegno.punti.map(p => p.x + '/' + p.z).join(' '));
+  ok(pp.startsWith('0/0 20/0 30/0 30/-20'), 'cilindro tolto e resto accostato: ' + pp);
+  await pg.click('[aria-label="Annulla"]'); await pg.waitForTimeout(40);
+  pp = await pg.evaluate(() => App.mem.disegno.punti.map(p => p.x + '/' + p.z).join(' '));
+  ok(pp.startsWith('0/0 20/0 20/-20 30/-20'), 'annulla: ' + pp);
+  await pg.click('[aria-label="Ripeti"]'); await pg.waitForTimeout(40);
+  ok((await pg.evaluate(() => App.mem.disegno.punti[2].z)) === '0', 'ripeti');
+  await pg.click('[aria-label="Annulla"]'); await pg.waitForTimeout(40);
+  // modifica della lunghezza di una linea: il resto si sposta
+  await pg.click('.linea-testo:has-text("Cilindro Ø20 lungo 20")'); await pg.waitForTimeout(40);
+  await pg.fill('#f-L', '25'); await pg.waitForTimeout(40);
+  ok((await pg.evaluate(() => App.mem.disegno.punti[4].z)) === '-45', 'lunghezza cambiata e resto spostato');
+  await pg.fill('#f-d', '22'); await pg.waitForTimeout(40);
+  ok((await pg.evaluate(() => App.mem.disegno.punti[1].x + '/' + App.mem.disegno.punti[2].x)) === '22/22', 'diametro del cilindro cambiato');
+  await pg.click('text=Dividi a meta'); await pg.waitForTimeout(40);
+  ok((await pg.evaluate(() => App.mem.disegno.punti[2].z)) === '-12.5', 'dividi a meta');
+  // toccare una linea sul disegno la sceglie (non aggiunge punti)
+  const nPunti = await pg.evaluate(() => App.mem.disegno.punti.length);
+  await pg.click('text=Adatta');
+  const tela1 = await pg.$('.disegno-tela'); await tela1.scrollIntoViewIfNeeded(); const bb1 = await tela1.boundingBox();
+  const xyL = await pg.evaluate(() => { const c = document.querySelector('.disegno-tela'); const W = c.clientWidth, H = c.clientHeight; const S = App.mem.disegno; const dg = Number(S.dg) || 40, lg = Number(S.lg) || 50;
+    const rMax = Math.max(dg / 2, ...S.punti.map(p => Number(p.x) / 2)) + 4, zMin = Math.min(-lg, ...S.punti.map(p => Number(p.z))) - 4, zMax = 4; const sc = Math.min((W - 24) / (zMax - zMin), (H - 24) / (2 * rMax));
+    const a = S.punti[4], b = S.punti[5]; const z = (Number(a.z) + Number(b.z)) / 2, r = (Number(a.x) + Number(b.x)) / 4; return [W - 12 - (zMax - z) * sc, H / 2 - r * sc]; });
+  await pg.mouse.click(bb1.x + xyL[0], bb1.y + xyL[1]); await pg.waitForTimeout(60);
+  ok((await pg.evaluate(() => App.mem.disegno.punti.length)) === nPunti && (await pg.$$eval('.linea-riga.attiva', x => x.length)) === 1, 'tocco su una linea: scelta');
+  await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '20', z: '0' }, { x: '20', z: '-20' }, { x: '30', z: '-20' }, { x: '30', z: '-40' }, { x: '30', z: '-50' }, { x: '36', z: '-50' }, { x: '38', z: '-60' }]; App.salva(); });
+  await vai('home'); await vai('disegno'); await pg.waitForTimeout(80);
+  await foto('30-disegno-linee');
   // smusso e raggio con un tocco sul punto scelto (P3 e il punto scelto dopo la modifica? si sceglie toccandolo)
   await pg.evaluate(() => {});
   const tela2 = await pg.$('.disegno-tela'); const b2 = await tela2.boundingBox();
