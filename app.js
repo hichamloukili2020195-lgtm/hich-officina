@@ -67,7 +67,7 @@
     const lista = k => { if (!Array.isArray(m[k])) m[k] = []; };
     // 2.5.0: la tabella utensili sta a parte (prima nello stesso posto dei campi della schermata utensili)
     if (Array.isArray(m.utensili)) { if (!Array.isArray(m.tabellaUt)) m.tabellaUt = m.utensili; delete m.utensili; }
-    ['salvati', 'pezzi', 'macro', 'preferiti', 'recenti', 'tabellaUt'].forEach(lista);
+    ['salvati', 'pezzi', 'macro', 'preferiti', 'recenti', 'tabellaUt', 'lavori'].forEach(lista);
     if (m.materiali !== undefined && !Array.isArray(m.materiali)) delete m.materiali;
     if (Array.isArray(m.materiali) && !m.materiali.length) delete m.materiali;
     if (!m.imp || typeof m.imp !== 'object' || Array.isArray(m.imp)) m.imp = {};
@@ -109,7 +109,7 @@
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
     tema: 'scuro', guanti: false, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
-    codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1,
+    codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1, costoOra: 60,
     postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
   const imp = () => Object.assign({}, IMPOSTAZIONI_SERIE, mem.imp || {});
@@ -439,7 +439,7 @@
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino,
-    schermi: {}, param: {}, VERSIONE: '2.20.0'
+    schermi: {}, param: {}, VERSIONE: '2.21.0'
   };
   window.App = App;
 

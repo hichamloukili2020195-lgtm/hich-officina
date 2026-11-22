@@ -626,4 +626,36 @@ prova('lavoro guidato: tornio a tratti, fresa a forme, fasi spente e corrette', 
   assert.ok(O.proponiLavoro({ modo: 'fresa', grezzo: { lx: 100, ly: 60, lz: 20 }, forme: [] }, { mat: mt }).errore.includes('Aggiungi'));
   assert.ok(O.proponiLavoro({ modo: 'fresa', grezzo: { lx: 100 }, forme: [] }, { mat: mt }).errore.includes('misure'));
 });
+prova('lavoro: barenatura interna, modelli, costo del pezzo, rampa della tasca', () => {
+  const mt = O.MATERIALI.find(m => m.n === 'C40');
+  const T = { modo: 'tornio', grezzo: { dg: 50, lg: 80 }, tratti: [{ tipo: 'cil', d: 40, l: 30 }, { tipo: 'cil', d: 46, l: 20 }], troncatura: true, foroD: 20, interno: { di: 24, l: 25, fil: 2 } };
+  const p = O.proponiLavoro(T, { mat: mt, nmax: 3000 });
+  assert.ok(!p.errore, p.errore);
+  const ops = p.fasi.map(f => f.op);
+  assert.ok(ops.indexOf('foratura') < ops.indexOf('interna') && ops.indexOf('interna') < ops.indexOf('profilo') && ops.indexOf('profilo') < ops.indexOf('filettoInt') && ops.indexOf('filettoInt') < ops.indexOf('troncatura'), 'ordine: ' + ops.join());
+  assert.ok(O.proponiLavoro(Object.assign({}, T, { interno: { di: 15, l: 10 } }), { mat: mt }).errore.includes('piu grande del foro'));
+  assert.ok(O.proponiLavoro(Object.assign({}, T, { interno: { di: 49, l: 10 } }), { mat: mt }).errore.includes('poca parete'));
+  assert.ok(O.proponiLavoro(Object.assign({}, T, { foroD: '', interno: { di: 24, l: 10 } }), { mat: mt }).errore.includes('foro in asse'));
+  assert.ok(!O.eseguiISO(O.programmaLavoro(p, {}, { num: 1, nome: 'A' }).righe.join('\n'), { modo: 'tornio' }).errore);
+  // ogni modello da un programma senza errori
+  assert.strictEqual(O.MODELLI_LAVORO.length, 8);
+  O.MODELLI_LAVORO.forEach(m => {
+    const q = O.proponiLavoro(Object.assign({ modo: m.modo }, m.dati()), { mat: mt, nmax: m.modo === 'tornio' ? 3000 : 8000 });
+    assert.ok(!q.errore, m.id + ': ' + q.errore);
+    const r = O.programmaLavoro(q, {}, { num: 1, nome: 'X' });
+    assert.ok(!r.errore && !O.eseguiISO(r.righe.join('\n'), { modo: m.modo }).errore, m.id);
+  });
+  // costo
+  const c = O.costoPezzo({ tempo: 4, utensili: 5, costoOra: 60, materiale: 3, pezzi: 10 });
+  vicino(c.tempoPezzo, 5); vicino(c.lavorazione, 5); vicino(c.pezzo, 8); vicino(c.lotto, 80); vicino(c.tempoLotto, 50);
+  vicino(O.costoPezzo({ tempo: NaN, utensili: 0, costoOra: 60, materiale: '', pezzi: '' }).pezzo, 0);
+  // rampa: la discesa non e mai dritta nelle righe lunghe, e dentro il profilo
+  const pts = [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 30 }, { x: 30, y: 30 }, { x: 30, y: 60 }, { x: 0, y: 60 }];
+  const r = O.gcodeFresa('tascaLibera', { n: 3000, f: 600, t: 1, d: 8, prof: 6, ap: 3, ae: 50, sovra: 0.2, punti: pts });
+  const scese = r.percorso.filter(s => !s.rapido && s.z < s.z0 - 1e-9);
+  const rampe = scese.filter(s => Math.hypot(s.x - s.x0, s.y - s.y0) > 1);
+  assert.ok(rampe.length > 4 && scese.every(s => Math.hypot(s.x - s.x0, s.y - s.y0) > 1 || s.z0 - s.z <= 1.01), 'discese a rampa, non dritte');
+  rampe.forEach(s => { const m = Math.atan2(s.z0 - s.z, Math.hypot(s.x - s.x0, s.y - s.y0)) * 180 / Math.PI; assert.ok(m <= 3.01, 'pendenza ' + m); });
+  assert.ok(!O.eseguiISO(r.righe.join('\n')).errore);
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

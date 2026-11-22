@@ -655,6 +655,54 @@ const server = http.createServer((q, r) => {
     await vai('home');
   }
 
+  // ===== 2.21.0: modelli, lavori salvati, tornio interno, costo, foglio, quote =====
+  {
+    await pg.evaluate(() => { delete App.mem.lavoro; App.mem.lavori = []; App.salva(); });
+    await vai('lavoro'); await pg.waitForTimeout(80);
+    await pg.click('.lav-macchina[data-modo="tornio"]');
+    ok((await pg.$$eval('.lav-modello', x => x.length)) === 4, 'quattro modelli del tornio');
+    await pg.click('.lav-modello[data-modello="boccola"]'); await pg.waitForTimeout(100);
+    if (await pg.isVisible('.dialogo-box')) { await pg.click('.dialogo-box .pul:text-is("Usa il modello")'); await pg.waitForTimeout(100); }
+    ok((await pg.evaluate(() => App.lavoroStato.S.passo)) === 1 && (await pg.evaluate(() => App.lavoroStato.S.tornio.foroD)) === 20, 'modello Boccola applicato');
+    ok((await pg.textContent('#schermo')).includes('Barenatura interna'), 'campi della barenatura interna');
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    const fasiI = await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave));
+    ok(fasiI.some(k => /^Barenatura interna/.test(k)), 'barenatura interna proposta: ' + fasiI.join(', '));
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    ok((await pg.textContent('#lav-costo')).includes('€'), 'costo del pezzo');
+    await pg.click('#lav-foglio'); await pg.waitForTimeout(200);
+    ok((await pg.evaluate(() => location.hash)) === '#foglio' && (await pg.evaluate(() => App.param.foglio.html)).includes('Utensili:'), 'foglio di attrezzaggio dal lavoro');
+    await pg.goBack(); await pg.waitForTimeout(150);
+    // salva con un nome, duplica, riapri
+    await pg.click('.lav-passi button[data-passo="0"]'); await pg.waitForTimeout(60);
+    await pg.click('#lav-salva'); await pg.waitForTimeout(60);
+    await pg.fill('#f-chiedi', 'Boccola D40'); await pg.click('.dialogo-box .pul:text-is("OK")'); await pg.waitForTimeout(100);
+    ok((await pg.$$eval('.lav-salvato', x => x.length)) === 1, 'lavoro salvato con un nome');
+    await pg.click('.lav-salvato button[aria-label="Duplica Boccola D40"]'); await pg.waitForTimeout(60);
+    ok((await pg.$$eval('.lav-salvato', x => x.length)) === 2, 'lavoro duplicato');
+    await pg.click('.lav-modello[data-modello="disco"]'); await pg.waitForTimeout(60);
+    if (await pg.isVisible('.dialogo-box')) { await pg.click('.dialogo-box .pul:text-is("Usa il modello")'); await pg.waitForTimeout(80); }
+    ok((await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0].d)) === 80, 'altro modello');
+    await pg.click('.lav-passi button[data-passo="0"]'); await pg.waitForTimeout(60);
+    await pg.click('.lav-salvato .pul:text-is("Apri") >> nth=0'); await pg.waitForTimeout(100);
+    ok((await pg.evaluate(() => App.lavoroStato.S.tornio.foroD)) === 20, 'lavoro salvato riaperto');
+    await pg.click('.lav-passi button[data-passo="0"]'); await pg.waitForTimeout(60);
+    await pg.click('.lav-salvato button[aria-label^="Elimina"] >> nth=0'); await pg.waitForTimeout(60);
+    await pg.click('.dialogo-box .pul:text-is("Elimina")'); await pg.waitForTimeout(80);
+    ok((await pg.$$eval('.lav-salvato', x => x.length)) === 1, 'lavoro eliminato');
+    // fresa: modello e quote sul disegno
+    await pg.click('.lav-macchina[data-modo="fresa"]');
+    await pg.click('.lav-modello[data-modello="piastraTasca"]'); await pg.waitForTimeout(60);
+    if (await pg.isVisible('.dialogo-box')) { await pg.click('.dialogo-box .pul:text-is("Usa il modello")'); await pg.waitForTimeout(80); }
+    await pg.click('.lav-card[data-i="0"] .lav-card-apri');
+    await pg.waitForTimeout(100);
+    await foto('45-lavoro-quote');
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(100); await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    await pg.click('#lav-programma'); await pg.waitForTimeout(150);
+    ok(/G1 X[\d.]+ Z-/.test(await pg.textContent('.listato')), 'discesa a rampa nel programma della tasca');
+    await vai('home');
+  }
+
   // ===== 2.19.0: mini CAD/CAM per la fresa =====
   {
   await vai('cad'); await pg.waitForTimeout(150);

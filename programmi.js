@@ -354,8 +354,15 @@
         giriPulizia.forEach(q => {
           if (px !== null || Z > zR) rap(null, null, zR);
           rap(q[0][0], q[0][1], null);
-          if (px === null) rap(null, null, zPrima + 1);
-          lav(null, null, z, fp);
+          rap(null, null, zPrima + 1);
+          const Lr = Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]);
+          if (Lr >= c.d) {   // discesa a rampa lungo il primo tratto
+            const dzMax = Lr * Math.tan(3 * Math.PI / 180);
+            let zz = zPrima + 0.5, verso = 1;
+            lav(null, null, zz, fp);
+            while (zz > z + 1e-9) { zz = Math.max(zz - dzMax, z); lav(verso > 0 ? q[1][0] : q[0][0], verso > 0 ? q[1][1] : q[0][1], zz, fp); verso = -verso; }
+            if (verso < 0) lav(q[0][0], q[0][1], null, c.f);
+          } else lav(null, null, z, fp);
           for (let i = 1; i < q.length; i++) lav(q[i][0], q[i][1], null, c.f);
           px = q[q.length - 1][0]; py = q[q.length - 1][1];
         });
@@ -366,10 +373,18 @@
             else {
               if (px !== null || Z > zR) rap(null, null, zR);
               rap(x0, r.y, null);
-              if (px === null) rap(null, null, zPrima + 1);
-              lav(null, null, z, fp);
+              rap(null, null, zPrima + 1);
+              // discesa a rampa (3 gradi) avanti e indietro dentro la riga, se e lunga abbastanza; altrimenti dritta
+              const Lr = Math.abs(x1 - x0);
+              if (Lr >= c.d) {
+                const dzMax = Lr * Math.tan(3 * Math.PI / 180);
+                let zz = zPrima + 0.5, verso = 1;
+                lav(null, null, zz, fp);
+                while (zz > z + 1e-9) { zz = Math.max(zz - dzMax, z); lav(verso > 0 ? x1 : x0, null, zz, fp); verso = -verso; }
+                if (verso < 0) lav(x0, null, null, c.f);   // finito sulla destra: si riparte da sinistra
+              } else lav(null, null, z, fp);
             }
-            lav(x1, null, null, c.f);
+            if (Math.abs(X - x1) > 1e-9) lav(x1, null, null, c.f);
             px = x1; py = r.y;
           });
         });
@@ -379,7 +394,7 @@
       coda();
       pezzo = { x0: xa - 10, y0: ya - 10, x1: xb + 10, y1: yb + 10, z0: -c.prof - 8, z1: 0, tasca: { x0: xa, y0: ya, x1: xb, y1: yb } };
       avvisi.push(righe.length + ' righe per livello piu un giro lungo le pareti, passo laterale ' + gc(step) + ' mm, a ' + gc(marg) + ' mm dalle pareti. Il resto lo toglie la finitura del profilo.');
-      avvisi.push('Discesa dritta: la fresa deve tagliare al centro, oppure preforare nel punto di partenza.');
+      avvisi.push('Discesa a rampa di 3° dentro le righe lunghe; nelle righe corte la discesa e dritta (la fresa deve tagliare al centro).');
     } else if (op === 'tascaCircolare') {
       const { cx = 0, cy = 0, dt, prof, ap, d } = c;
       if (!pos(dt) || !pos(d)) return err('Diametro della tasca e della fresa mancanti.');

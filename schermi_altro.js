@@ -312,7 +312,7 @@
       blocco('Tornio', [{ id: 'nmaxTornio', et: 'Giri massimi mandrino', u: 'giri/min' }, { id: 'codLimite', et: 'Limite giri', tipo: 'scelta', scelte: [['G50', 'G50 S...'], ['G92', 'G92 S...']] },
         { id: 'codFiletto', et: 'Filettatura', tipo: 'scelta', scelte: [['G32', 'G32'], ['G33', 'G33']] }, { id: 'xCambio', et: 'X cambio utensile', sub: 'vuoto = grezzo + 22', u: 'mm' },
         { id: 'zCambio', et: 'Z cambio utensile', u: 'mm' }]);
-      blocco('Programmi', [{ id: 'numProg', et: 'Numero programma di partenza', u: 'O' }, { id: 'refrig', et: 'Refrigerante M8', tipo: 'spunta' }, { id: 'numerare', et: 'Numeri di riga N10, N20...', tipo: 'spunta' }, { id: 'promemoriaCopia', et: 'Promemoria della copia di sicurezza ogni settimana', tipo: 'spunta' }]);
+      blocco('Programmi', [{ id: 'numProg', et: 'Numero programma di partenza', u: 'O' }, { id: 'costoOra', et: 'Costo orario della macchina', sub: 'per la stima del costo del pezzo', u: '€/h' }, { id: 'refrig', et: 'Refrigerante M8', tipo: 'spunta' }, { id: 'numerare', et: 'Numeri di riga N10, N20...', tipo: 'spunta' }, { id: 'promemoriaCopia', et: 'Promemoria della copia di sicurezza ogni settimana', tipo: 'spunta' }]);
       blocco('Linguaggio della macchina (post-processor)', [
         { id: 'postFresa', et: 'Fresa', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].fresa).map(k => [k, O.LINGUAGGI[k].nome]) },
         { id: 'postTornio', et: 'Tornio', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].tornio).map(k => [k, O.LINGUAGGI[k].nome]) }]);

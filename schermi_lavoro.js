@@ -111,7 +111,7 @@
       };
       const disegnaFresa = (g, W, H) => {
         const F = L(), lx = num(F.grezzo.lx) || 100, ly = num(F.grezzo.ly) || 60;
-        const m0 = 20, sc = Math.min((W - 2 * m0) / lx, (H - 2 * m0) / ly);
+        const m0 = 30, sc = Math.min((W - 2 * m0) / lx, (H - 2 * m0) / ly);
         const ox = (W - lx * sc) / 2, oy = (H + ly * sc) / 2;
         const X = x => ox + x * sc, Y = y => oy - y * sc;
         g.fillStyle = col('--campo'); g.strokeStyle = col('--bordo'); g.lineWidth = 1.5;
@@ -142,6 +142,24 @@
             g.globalAlpha = 0.18; g.fill(); g.globalAlpha = 1; g.strokeStyle = gg.errore ? col('--errore') : c; g.stroke();
             poli.forEach(p => box(X(p.a), Y(p.b), 0));
           });
+          // quote sul disegno della forma scelta
+          if (sel && mie.length) {
+            const lim = O.limitiCAD(mie);
+            const dim = (xa, ya, xb, yb, t) => {
+              g.strokeStyle = col('--avviso'); g.fillStyle = col('--avviso'); g.lineWidth = 1;
+              g.beginPath(); g.moveTo(xa, ya); g.lineTo(xb, yb); g.stroke();
+              [[xa, ya], [xb, yb]].forEach(([x, y]) => { g.beginPath(); g.moveTo(x - (yb === ya ? 0 : 4), y - (yb === ya ? 4 : 0)); g.lineTo(x + (yb === ya ? 0 : 4), y + (yb === ya ? 4 : 0)); g.stroke(); });
+              quota(g, t, (xa + xb) / 2, (ya + yb) / 2 - (yb === ya ? 8 : 0), col('--avviso'));
+            };
+            if (/^foro$|^fori/.test(f.tipo)) {
+              mie.slice(0, 12).forEach(e => { const d = num(e.lav[0].d); quota(g, (f.foro === 'maschio' ? 'M' : 'Ø') + fmt(d, 2) + '  X' + fmt(e.x, 2) + ' Y' + fmt(e.y, 2), X(e.x), Y(e.y) + Math.max(14, d / 2 * sc + 12), col('--avviso')); });
+            } else if (lim) {
+              const wx = lim.x1 - lim.x0, wy = lim.y1 - lim.y0;
+              dim(X(lim.x0), Y(lim.y0) + 16, X(lim.x1), Y(lim.y0) + 16, fmt(wx, 2));
+              dim(X(lim.x1) + 16, Y(lim.y1), X(lim.x1) + 16, Y(lim.y0), fmt(wy, 2));
+              quota(g, 'da origine X' + fmt(lim.x0, 2) + ' Y' + fmt(lim.y0, 2), Math.min(Math.max(X(lim.x0) + 48, 60), 330), Math.min(Y(lim.y0) + 32, H - 8), col('--avviso'));
+            }
+          }
           if (isFinite(bx0)) { zone.push({ x0: bx0 - 4, y0: by0 - 4, x1: bx1 + 4, y1: by1 + 4, i }); quota(g, String(i + 1) + ' ' + NOMI_FORMA[f.tipo], (bx0 + bx1) / 2, Math.max(10, by0 - 8), sel ? col('--avviso') : col('--testo')); }
         });
       };
@@ -177,6 +195,28 @@
         }
         corpo.appendChild(box);
         corpo.appendChild(el('p', { class: 'leggenda', testo: S.modo === 'tornio' ? 'Z0 sulla faccia di testa, X in diametro.' : 'Origine nello spigolo in basso a sinistra, Z0 sulla faccia finita.' }));
+        // modelli pronti
+        corpo.appendChild(el('div', { class: 'sez', testo: 'Parti da un modello' }));
+        corpo.appendChild(el('div', { class: 'lav-modelli' }, O.MODELLI_LAVORO.filter(x => x.modo === S.modo).map(x => el('button', { class: 'lav-modello', 'data-modello': x.id, onclick: async () => {
+          const pieno = S.modo === 'tornio' ? L().tratti.length : L().forme.length;
+          if (pieno && !(await A.conferma('Usare il modello?', 'Il disegno di adesso viene sostituito da "' + x.nome + '". Puoi salvarlo prima con un nome.', 'Usa il modello'))) return;
+          S[S.modo] = x.dati(); scelta = null; S.aperta = null; S.passo = 1; A.salva(); tutto(); A.avviso('Modello "' + x.nome + '": correggi le quote');
+        } }, [el('b', { testo: x.nome }), el('small', { testo: x.descr })]))));
+        // lavori salvati
+        corpo.appendChild(el('div', { class: 'sez', testo: 'Lavori salvati' }));
+        const salvati = A.mem.lavori = A.mem.lavori || [];
+        corpo.appendChild(el('button', { class: 'pul sec', id: 'lav-salva', html: A.icona('salva') + 'Salva questo lavoro con un nome', onclick: async () => {
+          const nome = await A.chiedi('Nome del lavoro', { nota: 'Per esempio il codice del disegno.' });
+          if (nome === null || !String(nome).trim()) return;
+          salvati.unshift({ id: 'l' + Date.now(), nome: String(nome).trim(), data: new Date().toISOString().slice(0, 10), stato: JSON.parse(JSON.stringify({ modo: S.modo, mat: S.mat, fresa: S.fresa, tornio: S.tornio })) });
+          A.salva(); tutto(); A.avviso('Lavoro salvato');
+        } }));
+        if (!salvati.length) corpo.appendChild(el('p', { class: 'leggenda', testo: 'Nessun lavoro salvato: salva il primo e lo ritrovi qui.' }));
+        salvati.forEach(w => corpo.appendChild(el('div', { class: 'lav-salvato', 'data-lavoro': w.id }, [
+          el('div', { class: 't' }, [el('b', { testo: w.nome }), el('small', { testo: (w.stato.modo === 'tornio' ? 'Tornio' : 'Fresa') + ' · ' + w.data })]),
+          el('button', { class: 'pul sec', testo: 'Apri', 'aria-label': 'Apri ' + w.nome, onclick: () => { const st = JSON.parse(JSON.stringify(w.stato)); S.modo = st.modo; S.mat = st.mat; S.fresa = st.fresa; S.tornio = st.tornio; scelta = null; S.aperta = null; S.passo = 1; A.salva(); tutto(); } }),
+          el('button', { class: 'icona-pul', 'aria-label': 'Duplica ' + w.nome, html: A.icona('copia'), onclick: () => { salvati.unshift({ id: 'l' + Date.now(), nome: w.nome + ' (copia)', data: new Date().toISOString().slice(0, 10), stato: JSON.parse(JSON.stringify(w.stato)) }); A.salva(); tutto(); } }),
+          el('button', { class: 'icona-pul', 'aria-label': 'Elimina ' + w.nome, html: A.icona('cestino'), onclick: async () => { if (!(await A.conferma('Eliminare il lavoro?', '"' + w.nome + '" viene tolto dall\'elenco.', 'Elimina', true))) return; A.mem.lavori = salvati.filter(x => x.id !== w.id); A.salva(); tutto(); } })])));
       };
       const interruttore = (testo, on, cambia, id) => el('button', { class: 'lav-int' + (on ? ' on' : ''), role: 'switch', 'aria-checked': on ? 'true' : 'false', id, onclick: () => cambia(!on) }, [el('span', { class: 't', testo }), el('span', { class: 'sw', 'aria-hidden': 'true' })]);
       const chips = (valori, attuale, cambia, etichetta) => el('div', { class: 'chips lav-chips', role: 'group', 'aria-label': etichetta }, valori.map(([v, t]) => el('button', { class: 'chip' + (String(attuale) === String(v) ? ' attiva' : ''), testo: t, onclick: () => cambia(v) })));
@@ -233,7 +273,12 @@
         corpo.appendChild(el('div', { class: 'sez', testo: 'Testa e fine' }));
         corpo.append(el('div', { class: 'lav-et', testo: 'Smusso sulla testa' }), chips([['', 'Vivo'], ['C0.5', 'C0,5'], ['C1', 'C1'], ['C2', 'C2']], T.smussoTesta === undefined ? 'C0.5' : T.smussoTesta, v => { T.smussoTesta = v; A.salva(); tutto(); }, 'Smusso di testa'));
         const box = el('div', { class: 'lav-campi' }, [A.campoNum(T, 'foroD', 'Foro in asse Ø (vuoto = no)', 'mm', (k, f) => { A.salva(); if (f) tutto(); })]);
-        corpo.append(box, interruttore('Troncatura alla fine', !!T.troncatura, v => { T.troncatura = v; A.salva(); tutto(); }, 'lav-tronca'));
+        if (num(T.foroD) > 0) {
+          T.interno = T.interno || {};
+          corpo.append(box, el('div', { class: 'lav-et', testo: 'Barenatura interna (vuoto = solo il foro)' }), el('div', { class: 'lav-campi' }, [A.campoNum(T.interno, 'di', 'Ø finito del foro', 'mm', (k, f) => { A.salva(); if (f) tutto(); }), A.campoNum(T.interno, 'l', 'Profondita', 'mm', (k, f) => { A.salva(); if (f) tutto(); })]));
+          if (num(T.interno.di) > 0) corpo.append(el('div', { class: 'lav-et', testo: 'Filetto interno' }), chips([['', 'No'], [O.passoGrosso(num(T.interno.di)) || 1.5, 'M' + fmt(num(T.interno.di)) + 'x' + fmt(O.passoGrosso(num(T.interno.di)) || 1.5)]], T.interno.fil || '', v => { if (v) T.interno.fil = v; else delete T.interno.fil; A.salva(); tutto(); }, 'Filetto interno'));
+        } else corpo.append(box);
+        corpo.append( interruttore('Troncatura alla fine', !!T.troncatura, v => { T.troncatura = v; A.salva(); tutto(); }, 'lav-tronca'));
       };
       const passoFormaFresa = () => {
         const F = L();
@@ -326,8 +371,27 @@
         corpo.append(el('div', { class: 'lav-azioni' }, [
           el('button', { class: 'pul grande', id: 'lav-simula', html: svg('<path d="M7 4l12 8-12 8z"/>') + 'Simula', onclick: () => apri('simula') }),
           el('button', { class: 'pul sec grande', id: 'lav-programma', html: A.icona('codice') + 'Programma ISO', onclick: () => apri('listato') })]));
+        // costo del pezzo
+        const K = L().costo = L().costo || { pezzi: 1, materiale: '' };
+        const ris = el('div', { class: 'lav-costo', id: 'lav-costo' });
+        const calcCosto = () => {
+          const c = O.costoPezzo({ tempo: r.tempo, utensili: r.utensili.length, costoOra: A.imp().costoOra, materiale: K.materiale, pezzi: K.pezzi });
+          ris.innerHTML = '';
+          ris.append(el('div', { class: 'lav-kpi' }, [el('div', {}, [el('b', { testo: fmt(c.pezzo, 2) + ' €' }), el('small', { testo: 'a pezzo' })]), el('div', {}, [el('b', { testo: fmt(c.lotto, 2) + ' €' }), el('small', { testo: c.pezzi + (c.pezzi === 1 ? ' pezzo' : ' pezzi') })]), el('div', {}, [el('b', { testo: fmt(c.tempoLotto, 1) }), el('small', { testo: 'minuti totali' })])]),
+            el('p', { class: 'leggenda', testo: 'Stima: tempo di taglio piu 0,2 minuti a cambio utensile, a ' + fmt(A.imp().costoOra, 2) + ' €/h (cambialo in Impostazioni). Il costo del materiale lo scrivi tu.' }));
+        };
+        corpo.append(el('div', { class: 'sez', testo: 'Costo del pezzo' }), el('div', { class: 'lav-campi' }, [A.campoNum(K, 'pezzi', 'Numero di pezzi', 'n.', calcCosto), A.campoNum(K, 'materiale', 'Materiale a pezzo', '€', calcCosto)]), ris);
+        calcCosto();
         corpo.appendChild(el('div', { class: 'sez', testo: 'Utensili da montare' }));
         corpo.appendChild(el('div', { class: 'lav-utensili' }, r.utensili.map(u => el('div', { class: 'lav-ut' }, [el('b', { testo: 'T' + u.t }), el('span', { testo: u.uso })]))));
+        corpo.appendChild(el('button', { class: 'pul sec', id: 'lav-foglio', html: A.icona('salva') + 'Foglio di attrezzaggio', onclick: () => {
+          const g = L().grezzo, mt = A.materiale(S.mat || 0);
+          const note = 'Utensili: ' + r.utensili.map(u => 'T' + u.t + ' ' + u.uso).join('; ');
+          const pz = { nome: S.modo === 'tornio' ? 'ALBERO' : 'PIASTRA', materiale: mt ? mt.n : '', grezzo: S.modo === 'tornio' ? 'barra Ø' + fmt(num(g.dg)) : fmt(num(g.lx)) + ' x ' + fmt(num(g.ly)) + ' x ' + fmt(num(g.lz)), origine: S.modo === 'tornio' ? 'Z0 sulla faccia di testa, X sull\'asse' : 'Spigolo in basso a sinistra, Z0 sulla faccia finita', misure: (prop.misure || []).map(x => ({ nome: x.nome, nominale: x.nominale, toll: x.toll })), note, foto: [] };
+          const html = O.htmlFoglio(pz, [{ righe: r.righe, nome: pz.nome, tipo: S.modo }], []);
+          A.param.foglio = { titolo: 'Attrezzaggio ' + pz.nome, html, nome: 'attrezzaggio-' + String(pz.nome).replace(/[^A-Za-z0-9_-]+/g, '_') + '.html' };
+          A.vai('foglio');
+        } }));
         corpo.appendChild(el('p', { class: 'leggenda lav-fiducia', testo: 'Programma indicativo: controllalo e provalo a vuoto prima di lavorare.' }));
       };
 

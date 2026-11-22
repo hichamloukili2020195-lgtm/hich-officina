@@ -109,7 +109,29 @@
       const a = O.pianificaAlbero({ dg, lg: Math.max(num(g.lg) || 0, pr.lunghezza + 5), smusso: 0, tratti: [{ d: dg, l: pr.lunghezza }], foro: pos(num(L.foroD)) ? { d: num(L.foroD), prof: num(L.foroP) || 2 * num(L.foroD) } : null, troncatura: !!L.troncatura }, ctx);
       const extra = a.errore ? [] : a.fasi.filter(f => f.op !== 'profilo');
       const prima = extra.filter(f => f.op === 'sfacciatura' || f.op === 'foratura'), dopo = extra.filter(f => f.op === 'troncatura');
-      const fasi = prima.concat(p.fasi, dopo);
+      // barenatura interna e filetto interno: dopo il foro in asse (la barenatura) e dopo il filetto esterno (il filetto)
+      const I = L.interno || {}, dpF = num(L.foroD), di = num(I.di), li = num(I.l);
+      const base = { nmax: ctx.nmax || 3000, codLimite: ctx.codLimite, codFiletto: ctx.codFiletto, refrig: ctx.refrig };
+      const mt = ctx.mat, tab = ctx.tab || [], nt = { testi: [], daControllare: new Set() };
+      let internaF = [], filettoI = [];
+      if (pos(di) && pos(li)) {
+        if (!pos(dpF)) return { errore: 'La barenatura interna parte dal foro in asse: scrivi il diametro del foro.' };
+        if (di <= dpF) return { errore: 'La barenatura (Ø' + di + ') deve essere piu grande del foro (Ø' + dpF + ').' };
+        if (di >= dg - 2) return { errore: 'La barenatura (Ø' + di + ') lascia troppo poca parete nel pezzo (Ø' + dg + ').' };
+        const tB = O.trovaT(tab, ['bareno'], 0, 7, nt);
+        internaF.push({ op: 'interna', titolo: 'Barenatura interna Ø' + di + ' T' + tB, c: Object.assign({}, base, { t: tB, dp: dpF, di, dg, l: li, ap: 1, sx: 0.3, sz: 0.1, finitura: true, ff: r3(Math.max(0.05, (mt.lf || 0.2) * 0.3)), smusso: 0.5, vc: r3((mt.lvc || 100) * 0.7), f: r3(Math.max(0.05, (mt.lf || 0.2) * 0.6)) }) });
+        if (pos(num(I.fil))) {
+          const tF = O.trovaT(tab, ['bareno', 'inserto'], 0, 8, nt), pF = num(I.fil);
+          const giri = Math.min(base.nmax, Math.max(100, Math.round(1000 * (mt.lvc || 100) * 0.4 / (Math.PI * di) / 10) * 10));
+          filettoI.push({ op: 'filettoInt', titolo: 'Filetto interno M' + di + 'x' + pF + ' T' + tF, c: Object.assign({}, base, { t: tF, d: di, dg: di, p: pF, l: li, n: pF <= 1 ? 5 : pF <= 1.5 ? 6 : pF <= 2 ? 8 : 10, giri, vc: Math.round((mt.lvc || 100) * 0.4), f: pF, metodo: 'passate' }) });
+          nt.testi.push('Filetto interno: la barenatura va a ' + r3(di - 1.082532 * pF) + ' (nocciolo), poi la fresa filetti o il filetto a passate.');
+        }
+        p.note = (p.note || []).concat(nt.testi);
+      }
+      const iForo = prima.findIndex(f => f.op === 'foratura');
+      const dopoForo = iForo >= 0 ? prima.slice(0, iForo + 1).concat(internaF, prima.slice(iForo + 1)) : prima.concat(internaF);
+      // il filetto interno va dopo i filetti e le gole esterne, prima della troncatura
+      const fasi = dopoForo.concat(p.fasi, filettoI, dopo);
       const note = (p.note || []).concat(a.errore ? [] : (a.note || []).filter(t => !/^Utensili non trovati/.test(t)));
       return { fasi: fasi.map((f, i) => Object.assign(f, { chiave: chiaveFase(f, i) })), note, misure: p.misure || [], punti: pr.punti, modo: 'tornio' };
     }
@@ -159,7 +181,41 @@
     return { righe: r.righe, avvisi: r.avvisi || [], tempo, utensili, fasi };
   }
 
-  const Lavoro = { puntiTornio, entitaFresa, proponiLavoro, programmaLavoro };
+
+  // ----- modelli pronti da cui partire (misure di esempio: si correggono) -----
+  const MODELLI = [
+    { id: 'perno', modo: 'tornio', nome: 'Perno con filetto', descr: 'Ø20 con filetto M20x2,5 e gola, Ø30 h6, Ø36',
+      dati: () => ({ grezzo: { dg: 40, lg: 80 }, tratti: [{ tipo: 'cil', d: 20, l: 25, fil: 2.5, gola: 4, spigolo: 'C1' }, { tipo: 'cil', d: 30, l: 20, toll: 'h6', spigolo: 'C0.5' }, { tipo: 'cil', d: 36, l: 15 }], troncatura: true, smussoTesta: 'C0.5', scelte: {} }) },
+    { id: 'albero', modo: 'tornio', nome: 'Albero a gradini', descr: 'Tre diametri con smussi e raccordo',
+      dati: () => ({ grezzo: { dg: 40, lg: 100 }, tratti: [{ tipo: 'cil', d: 20, l: 25, spigolo: 'C1' }, { tipo: 'cil', d: 25, l: 30, toll: 'g6', spigolo: 'R1' }, { tipo: 'cil', d: 32, l: 30 }], troncatura: true, smussoTesta: 'C1', scelte: {} }) },
+    { id: 'boccola', modo: 'tornio', nome: 'Boccola', descr: 'Ø40 con foro Ø20 barenato a Ø24',
+      dati: () => ({ grezzo: { dg: 45, lg: 60 }, tratti: [{ tipo: 'cil', d: 40, l: 30, spigolo: 'C1' }], troncatura: true, smussoTesta: 'C1', foroD: 20, interno: { di: 24, l: 25 }, scelte: {} }) },
+    { id: 'disco', modo: 'tornio', nome: 'Disco con foro', descr: 'Ø80 spesso 12 con foro centrale',
+      dati: () => ({ grezzo: { dg: 85, lg: 40 }, tratti: [{ tipo: 'cil', d: 80, l: 12, spigolo: 'C1' }], troncatura: true, smussoTesta: 'C1', foroD: 22, scelte: {} }) },
+    { id: 'piastraFori', modo: 'fresa', nome: 'Piastra con 4 fori M8', descr: '100x60x15, fori filettati e contorno',
+      dati: () => ({ grezzo: { lx: 100, ly: 60, lz: 15, sovraZ: 1, contorna: true, raggio: 4 }, forme: [{ tipo: 'foriGriglia', x0: 15, y0: 12, nx: 2, ny: 2, px: 70, py: 36, d: 8, foro: 'maschio', passo: 1.25, passante: true }], scelte: {} }) },
+    { id: 'piastraTasca', modo: 'fresa', nome: 'Piastra con tasca', descr: 'Tasca 50x30 e 4 fori passanti',
+      dati: () => ({ grezzo: { lx: 100, ly: 60, lz: 20, sovraZ: 1, contorna: false }, forme: [{ tipo: 'tasca', cx: 50, cy: 30, lx: 50, ly: 30, r: 5, prof: 8 }, { tipo: 'foriGriglia', x0: 10, y0: 10, nx: 2, ny: 2, px: 80, py: 40, d: 6.6, foro: 'foro', passante: true }], scelte: {} }) },
+    { id: 'staffa', modo: 'fresa', nome: 'Staffa con asole', descr: '80x40x10, due asole e due fori',
+      dati: () => ({ grezzo: { lx: 80, ly: 40, lz: 10, sovraZ: 0, contorna: true, raggio: 5 }, forme: [{ tipo: 'asola', x1: 20, y1: 20, x2: 35, y2: 20, w: 8, prof: 10 }, { tipo: 'asola', x1: 45, y1: 20, x2: 60, y2: 20, w: 8, prof: 10 }, { tipo: 'foro', x: 8, y: 20, d: 5, foro: 'foro', passante: true }, { tipo: 'foro', x: 72, y: 20, d: 5, foro: 'foro', passante: true }], scelte: {} }) },
+    { id: 'flangia', modo: 'fresa', nome: 'Flangia a 6 fori', descr: '100x100x12, foro centrale e fori su cerchio',
+      dati: () => ({ grezzo: { lx: 100, ly: 100, lz: 12, sovraZ: 1, contorna: true, raggio: 10 }, forme: [{ tipo: 'tascaTonda', cx: 50, cy: 50, dt: 30, prof: 12 }, { tipo: 'foriCerchio', cx: 50, cy: 50, dc: 70, n: 6, a0: 0, d: 9, foro: 'foro', passante: true }], scelte: {} }) }
+  ];
+
+  /**
+   * Costo del pezzo: tempo di lavoro + cambi utensile (0,2 min l'uno, stima) per il costo orario, piu il materiale.
+   * c = {tempo (min), utensili, costoOra (€/h), materiale (€ a pezzo), pezzi}
+   */
+  function costoPezzo(c) {
+    const tempo = (isFinite(c.tempo) ? c.tempo : 0) + 0.2 * (c.utensili || 0);
+    const ora = pos(num(c.costoOra)) ? num(c.costoOra) : 0;
+    const mat = isFinite(num(c.materiale)) && num(c.materiale) > 0 ? num(c.materiale) : 0;
+    const n = Math.max(1, Math.round(num(c.pezzi) || 1));
+    const lav = tempo / 60 * ora;
+    return { tempoPezzo: tempo, lavorazione: lav, materiale: mat, pezzo: lav + mat, pezzi: n, lotto: (lav + mat) * n, tempoLotto: tempo * n };
+  }
+
+  const Lavoro = { puntiTornio, entitaFresa, proponiLavoro, programmaLavoro, MODELLI_LAVORO: MODELLI, costoPezzo };
   Object.assign(O, Lavoro);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

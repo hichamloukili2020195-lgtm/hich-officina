@@ -2,6 +2,16 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.21.0 - Modelli, lavori salvati, barenatura, costo e rampa
+- **Modelli pronti** per partire: perno con filetto, albero a gradini, boccola, disco con foro (tornio); piastra con 4 fori M8, piastra con tasca, staffa con asole, flangia a 6 fori (fresa).
+- **Lavori salvati con un nome**: salva, apri, duplica ed elimina, dal primo passo.
+- **Tornio: barenatura interna e filetto interno** nel lavoro guidato, dopo il foro in asse.
+- **Fresa: quote sul disegno** della forma scelta (larghezza, altezza, distanza dall'origine; Ø e coordinate di ogni foro).
+- **Tasca libera con discesa a rampa** (3°) lungo le righe e lungo il primo tratto del giro, invece della discesa dritta.
+- **Costo del pezzo**: numero pezzi e materiale; costo orario della macchina in Impostazioni.
+- **Foglio di attrezzaggio** con un tocco dal passo 4: utensili, quote di lavoro, tempo.
+- Ripasso grafico leggero delle schermate vecchie (raggi, spazi, schede piu grandi, stati vuoti).
+
 ## 2.20.0 - Disegna e lavora: dal pezzo al programma in 4 passi
 - **Lavoro guidato**, uguale per fresa e tornio: 1 Grezzo, 2 Forma, 3 Lavorazioni, 4 Programma. Un passo alla volta, con Indietro e Avanti sempre in basso.
 - La forma si scrive **a quote**. Tornio: un tratto dopo l'altro (cilindro, cono, arco) con filetto, gola, tolleranza e spigolo a un tocco. Fresa: forme pronte (tasca, tasca tonda, foro, fori a cerchio, fori a griglia, asola, profilo). Il disegno si aggiorna mentre scrivi; toccandolo si apre il tratto o la forma.
