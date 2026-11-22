@@ -2,6 +2,16 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.20.0 - Disegna e lavora: dal pezzo al programma in 4 passi
+- **Lavoro guidato**, uguale per fresa e tornio: 1 Grezzo, 2 Forma, 3 Lavorazioni, 4 Programma. Un passo alla volta, con Indietro e Avanti sempre in basso.
+- La forma si scrive **a quote**. Tornio: un tratto dopo l'altro (cilindro, cono, arco) con filetto, gola, tolleranza e spigolo a un tocco. Fresa: forme pronte (tasca, tasca tonda, foro, fori a cerchio, fori a griglia, asola, profilo). Il disegno si aggiorna mentre scrivi; toccandolo si apre il tratto o la forma.
+- **Tastierino numerico grande** dentro l'app: cifre, virgola, segno, Avanti al campo dopo, OK. Si puo tornare alla tastiera del telefono nelle Impostazioni.
+- Lavorazioni **proposte da sole** con le regole di officina di sempre: ognuna si spegne con un interruttore, giri e avanzamento si correggono. Tempo stimato, numero di utensili e lista da montare.
+- Passo 4: Simula e Programma ISO con un tocco.
+- **Home nuova**: quattro ingressi grandi (Disegna e lavora, Calcola, Controlla, Officina) e "Continua l'ultimo lavoro". Le altre funzioni stanno dentro i gruppi; CAD libero di fresa e tornio sono in Officina.
+- Primo avvio: una scheda con la macchina (fresa, tornio o tutte e due) e i giri massimi, senza bloccare niente.
+- Telefono girato o tablet: disegno e dati affiancati. Stile comune (spazi, raggi, interruttori) per le schermate nuove.
+
 ## 2.19.0 - Mini CAD/CAM, tabella dei filetti, foto e nuova icona
 - **CAD fresa** (nuova schermata): disegni profili, rettangoli, cerchi, fori e asole col dito e dai a ognuno la lavorazione (contorno, tasca, foro, maschio, alesatura, asola). L'app scrive il programma nell'ordine di officina, con i dati di taglio del materiale, e lo apri nella simulazione.
 - Gesti: un dito disegna e sposta (mirino sopra il dito, il punto si mette quando lo alzi, lente d'ingrandimento); due dita zoom e spostamento; un tocco con due dita annulla, con tre ripete. Aggancio ai punti, alla griglia e alle linee dritte; quote scritte e frecce di 0,1 / 1 / 10 mm per la precisione.

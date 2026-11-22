@@ -53,12 +53,13 @@ ${corpo}
 const FUNZIONI = [
   ['Programmi di fresa, foratura e tornio', 'Spianatura, tasche, profili con G41/G42, fori con tutti i cicli, filetti, troncatura e cicli fissi. Piu lavorazioni in un programma, nell\'ordine di officina.'],
   ['Controllo e simulazione', 'Trova gli errori riga per riga, anche da una foto dello schermo. Simulazione animata con quote, giri, centro fresa e urti con le staffe.'],
+  ['Disegna e lavora in 4 passi', 'Grezzo, forma a quote con il tastierino grande, lavorazioni proposte dalle regole di officina, programma con tempo e utensili. Uguale per fresa e tornio.'],
   ['Mini CAD/CAM per fresa e tornio', 'Disegni col dito, a schermo intero e girando il telefono: profili, fori, tasche, asole, filetti e gole. A ogni disegno dai la lavorazione e l\'app scrive il programma e lo simula.'],
   ['Ciclo di lavoro proposto', 'Dal pezzo, o dalle quote di un disegno, alla lavorazione completa con utensili e dati di taglio.'],
   ['Dati di taglio e tabelle', 'Giri e avanzamenti per utensile e materiale, tolleranze ISO, codici G e M e la tabella dei filetti: metrici, pollici, gas, NPT, trapezi, Whitworth e altri.'],
   ['Macro, pezzi, attrezzaggio', 'Modelli di macro con simulazione, fogli di attrezzaggio da stampare, foto e controllo delle misure.']
 ];
-const SCHERMATE = [['home', 'Home con il menu delle funzioni', 'Home'], ['listato', 'Programma ISO generato', 'Programma'], ['simulazione', 'Simulazione a pannello con quote e giri', 'Simulazione'],
+const SCHERMATE = [['home', 'Home con i quattro ingressi', 'Home'], ['lavoro', 'Lavoro guidato: la forma a quote', 'Disegna e lavora'], ['listato', 'Programma ISO generato', 'Programma'], ['simulazione', 'Simulazione a pannello con quote e giri', 'Simulazione'],
   ['cad', 'Disegno della fresa con le lavorazioni', 'CAD fresa'], ['disegno', 'Disegno del profilo del tornio', 'CAD tornio'], ['angolo', 'Angolo misurato su una foto', 'Angolo da una foto'], ['ciclo', 'Ciclo di lavoro proposto per una piastra', 'Ciclo proposto']];
 const DOMANDE = [
   ['Funziona senza internet?', 'Si. Dopo la prima apertura l\'app funziona senza rete. La rete serve solo per mandare un programma alla macchina o condividere un file.'],

@@ -37,13 +37,15 @@ const server = http.createServer((q, r) => {
   await vai('tabellaUtensili'); await erroreSchermo('tabella utensili con i dati vecchi');
   await vai('home');
   await foto('01-home');
-  const voci = await pg.$$eval('.menu-sezioni .tessera', x => x.length);
-  ok(voci === 16, 'voci del menu: ' + voci);
-  ok((await pg.$$eval('.menu-sezioni .sez', x => x.length)) === 5, 'sezioni della home');
+  ok((await pg.$$eval('.ingressi .ingresso', x => x.length)) === 4, 'quattro ingressi nella home');
+  let voci = 0;
+  for (const g of ['calcola', 'controlla', 'officina']) { await vai('g-' + g); voci += await pg.$$eval('#schermo .tessera', x => x.length); }
+  ok(voci === 16, 'funzioni dentro i gruppi: ' + voci);
+  await vai('home');
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['home', 'programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'cad', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
+  for (const s of ['home', 'programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'cad', 'lavoro', 'g-calcola', 'g-controlla', 'g-officina', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
     await vai(s); await erroreSchermo(s); await largo(s);
     // nessun "null", "undefined" o "NaN" scritto sullo schermo
     const sporco = await pg.evaluate(() => { const t = document.getElementById('schermo').innerText; const m = t.match(/\b(null|undefined|NaN)\b/); return m ? m[0] + ' in: ' + t.slice(Math.max(0, m.index - 30), m.index + 30).replace(/\n/g, ' ') : ''; });
@@ -561,6 +563,97 @@ const server = http.createServer((q, r) => {
   ok((await pg.textContent('#schermo')).includes('Fresa a V'), 'cava a V');
   await foto('32-angolo');
   await largo('fine 2.13.0');
+
+  // ===== 2.20.0: lavoro guidato in 4 passi, tastierino, home =====
+  {
+    await pg.evaluate(() => { delete App.mem.lavoro; delete App.mem.materiali; App.salva(); });
+    await vai('home');
+    await pg.click('.ingresso[data-gruppo="disegna"]'); await pg.waitForTimeout(120);
+    ok((await pg.evaluate(() => location.hash)) === '#lavoro', 'Disegna apre il lavoro guidato');
+    ok((await pg.$$eval('.lav-passi button', x => x.length)) === 4, 'quattro passi');
+    // passo 1: tornio, barra
+    await pg.click('.lav-macchina[data-modo="tornio"]');
+    const campo = async (et) => pg.locator('.cn', { hasText: et }).locator('input');
+    await (await campo('Diametro della barra')).click();
+    ok(await pg.isVisible('.tastierino'), 'il tastierino si apre toccando un campo');
+    await pg.click('.tast-k[aria-label="Cancella tutto"]'); await pg.click('.tast-k[aria-label="5"]'); await pg.click('.tast-k[aria-label="0"]');
+    await pg.click('.tast-k[aria-label="Conferma"]');
+    ok(!(await pg.isVisible('.tastierino')), 'OK chiude il tastierino');
+    ok((await pg.evaluate(() => App.lavoroStato.S.tornio.grezzo.dg)) === '50', 'quota scritta col tastierino: ' + (await pg.evaluate(() => App.lavoroStato.S.tornio.grezzo.dg)));
+    // passo 2: tratti
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(80);
+    await pg.evaluate(() => { const S = App.lavoroStato.S; S.tornio.tratti = []; App.lavoroStato.tutto(); });
+    await pg.click('#lav-agg-tratto'); await pg.waitForTimeout(60);
+    ok(await pg.isVisible('.tastierino'), 'tratto nuovo: il tastierino e gia sul diametro');
+    await pg.click('.tast-k[aria-label="2"]'); await pg.click('.tast-k[aria-label="0"]'); await pg.click('.tast-k[aria-label="Campo dopo"]'); await pg.waitForTimeout(30);
+    await pg.click('.tast-k[aria-label="2"]'); await pg.click('.tast-k[aria-label="5"]'); await pg.click('.tast-k[aria-label="Conferma"]'); await pg.waitForTimeout(40);
+    let tr = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti);
+    ok(tr.length === 1 && tr[0].d === '20' && tr[0].l === '25', 'tratto a quote col tastierino: ' + JSON.stringify(tr));
+    await pg.click('.lav-card.aperta .chip:text-is("M20x2,5")'); await pg.waitForTimeout(30);
+    await pg.click('#lav-agg-tratto'); await pg.waitForTimeout(40);
+    await pg.click('.tast-k[aria-label="Cancella tutto"]'); await pg.click('.tast-k[aria-label="3"]'); await pg.click('.tast-k[aria-label="0"]'); await pg.click('.tast-k[aria-label="Campo dopo"]'); await pg.waitForTimeout(30);
+    await pg.click('.tast-k[aria-label="2"]'); await pg.click('.tast-k[aria-label="0"]'); await pg.click('.tast-k[aria-label="Conferma"]'); await pg.waitForTimeout(30);
+    await pg.click('.lav-card.aperta .chip:text-is("h6")');
+    tr = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti);
+    ok(tr.length === 2 && tr[0].fil && tr[0].gola && tr[1].toll === 'h6', 'filetto con gola e tolleranza con un tocco: ' + JSON.stringify(tr));
+    // il disegno: toccare un tratto lo apre
+    const tb = await pg.$eval('.lav-tela', c => { const b = c.getBoundingClientRect(); return [b.x, b.y, b.width, b.height]; });
+    const z0 = await pg.evaluate(() => App.lavoroStato.zone.find(q => q.i === 0));
+    await pg.mouse.click(tb[0] + (z0.x0 + z0.x1) / 2, tb[1] + tb[3] / 2); await pg.waitForTimeout(60);
+    ok((await pg.evaluate(() => App.lavoroStato.S.aperta)) === 0, 'tocco sul disegno apre il tratto');
+    await foto('40-lavoro-forma');
+    // passo 3: lavorazioni proposte, una spenta
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    const fasi = await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave));
+    ok(fasi.length >= 4 && fasi.some(k => /^Filetto/.test(k)) && fasi.some(k => /^Gola/.test(k)), 'lavorazioni proposte: ' + fasi.join(', '));
+    ok((await pg.textContent('#lav-riassunto')).includes('minuti'), 'tempo stimato');
+    await pg.click('.lav-fase[data-chiave^="Troncatura"] .lav-int'); await pg.waitForTimeout(60);
+    ok(await pg.$eval('.lav-fase[data-chiave^="Troncatura"]', e => e.classList.contains('spenta')), 'lavorazione spenta');
+    await foto('41-lavoro-lavorazioni');
+    // passo 4: programma
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    ok((await pg.$$eval('.lav-ut', x => x.length)) >= 2 && (await pg.textContent('#schermo')).includes('provalo a vuoto'), 'utensili e avviso');
+    await foto('42-lavoro-programma');
+    await pg.click('#lav-programma'); await pg.waitForTimeout(150);
+    const lt = await pg.textContent('.listato');
+    ok(lt.includes('FILETTO') && !lt.includes('TRONCATURA'), 'programma senza la fase spenta');
+    await pg.goBack(); await pg.waitForTimeout(150);
+    await pg.click('#lav-simula'); await pg.waitForTimeout(250);
+    ok((await pg.evaluate(() => location.hash)) === '#simula', 'simulazione dal lavoro');
+    await erroreSchermo('simulazione dal lavoro');
+    // fresa: forme pronte
+    await vai('lavoro'); await pg.click('.lav-passi button[data-passo="0"]'); await pg.click('.lav-macchina[data-modo="fresa"]');
+    await pg.click('.lav-passi button[data-passo="1"]'); await pg.waitForTimeout(60);
+    await pg.evaluate(() => { App.lavoroStato.S.fresa.forme = []; App.lavoroStato.tutto(); });
+    await pg.click('#lav-agg-forma'); ok((await pg.$$eval('.lav-forma', x => x.length)) === 7, 'sette forme pronte');
+    await pg.click('.lav-forma[data-forma="foriCerchio"]'); await pg.waitForTimeout(40);
+    await pg.click('.lav-card.aperta .chip:text-is("Filettato")'); await pg.click('.lav-card.aperta .chip:text-is("M10")');
+    await pg.click('#lav-agg-forma'); await pg.click('.lav-forma[data-forma="tasca"]'); await pg.waitForTimeout(40);
+    const fo = await pg.evaluate(() => App.lavoroStato.S.fresa.forme);
+    ok(fo.length === 2 && fo[0].foro === 'maschio' && fo[0].d === 10 && fo[0].passo === 1.5, 'fori filettati M10: ' + JSON.stringify(fo[0]));
+    await foto('43-lavoro-fresa');
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    ok((await pg.$$eval('.lav-fase', x => x.length)) >= 5, 'fasi della fresa');
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    await pg.click('#lav-programma'); await pg.waitForTimeout(150);
+    ok((await pg.textContent('.listato')).includes('G84'), 'maschiatura nel programma della fresa');
+    // forma sbagliata: si torna al passo 2 con il messaggio
+    await vai('lavoro');
+    await pg.evaluate(() => { const S = App.lavoroStato.S; S.fresa.forme = []; S.fresa.grezzo.sovraZ = ''; S.fresa.grezzo.contorna = false; S.passo = 1; App.lavoroStato.tutto(); });
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(80);
+    ok((await pg.evaluate(() => App.lavoroStato.S.passo)) === 1, 'senza forme non si va avanti');
+    // home: continua l'ultimo lavoro
+    await vai('home');
+    ok(await pg.isVisible('#h-continua'), 'continua l\'ultimo lavoro');
+    await foto('44-home');
+    // telefono girato: disegno e dati affiancati
+    await vai('lavoro'); await pg.setViewportSize({ width: 844, height: 390 }); await pg.waitForTimeout(120);
+    const aff = await pg.evaluate(() => { const a = document.querySelector('.lav-disegno').getBoundingClientRect(), b = document.querySelector('.lav-corpo').getBoundingClientRect(); return b.left >= a.right - 1; });
+    ok(aff, 'in orizzontale disegno e dati affiancati');
+    await largo('lavoro in orizzontale');
+    await pg.setViewportSize({ width: 390, height: 844 });
+    await vai('home');
+  }
 
   // ===== 2.19.0: mini CAD/CAM per la fresa =====
   {

@@ -5,6 +5,7 @@ const O = require('../programmi.js');   // carica anche calcoli.js
 require('../profilo.js');
 require('../filetti.js');
 require('../cad.js');
+require('../lavoro.js');
 require('../iso.js');
 require('../post.js');
 require('../ciclo.js');
@@ -580,5 +581,49 @@ prova('mini CAD: dalle entita al programma con le regole di officina', () => {
   // i limiti del disegno
   const b = O.limitiCAD(modello.entita);
   vicino(b.x0, 0); vicino(b.x1, 100); vicino(b.y1, 60);
+});
+prova('lavoro guidato: tornio a tratti, fresa a forme, fasi spente e corrette', () => {
+  const mt = O.MATERIALI.find(m => m.n === 'C40');
+  const tr = [{ tipo: 'cil', d: 20, l: 25, fil: 2.5, gola: 4, spigolo: 'C1' }, { tipo: 'cil', d: 30, l: 20, toll: 'h6', spigolo: 'R1' }, { tipo: 'cono', d: 36, l: 8 }, { tipo: 'arco', d: 38, l: 4, r: 6 }];
+  const pt = O.puntiTornio(tr, { dg: 40 });
+  assert.ok(!pt.errore, pt.errore);
+  vicino(pt.lunghezza, 57); assert.strictEqual(pt.dMax, 40);
+  assert.deepStrictEqual(pt.punti.slice(0, 4).map(p => [p.x, p.z]), [[0, 0], [20, 0], [20, -25], [30, -25]]);
+  assert.strictEqual(pt.punti[2].fil, 2.5); assert.strictEqual(pt.punti[2].smusso, 1); assert.strictEqual(pt.punti[4].raccordo, 1); assert.strictEqual(pt.punti[4].toll, 'h6');
+  assert.strictEqual(pt.punti[6].tratto, 'ccw');
+  assert.ok(O.puntiTornio([{ tipo: 'arco', d: 30, l: 20, r: 1 }], {}).errore.includes('raggio troppo piccolo'));
+  assert.ok(O.puntiTornio([], {}).errore);
+  const T = { modo: 'tornio', grezzo: { dg: 40, lg: 80 }, tratti: tr, troncatura: true, foroD: 8 };
+  const p = O.proponiLavoro(T, { mat: mt, nmax: 3000 });
+  assert.ok(!p.errore, p.errore);
+  const ops = p.fasi.map(f => f.op);
+  assert.deepStrictEqual([ops[0], ops[1], ops[2], ops[ops.length - 1]], ['sfacciatura', 'foratura', 'profilo', 'troncatura']);
+  assert.ok(ops.includes('gola') && ops.includes('filetto') && ops.indexOf('gola') < ops.indexOf('filetto'));
+  assert.ok(O.proponiLavoro(Object.assign({}, T, { grezzo: { dg: 30 } }), { mat: mt }).errore.includes('piu grosso del grezzo'));
+  // spegnere una fase e correggere i giri
+  const kForo = p.fasi[1].chiave, kFil = p.fasi.find(f => f.op === 'filetto').chiave;
+  const r = O.programmaLavoro(p, { spente: { [kForo]: true } }, { num: 1, nome: 'A' });
+  assert.ok(!r.errore && !r.righe.some(l => /G83|G74|FORO IN ASSE/.test(l)), 'foro spento');
+  assert.ok(r.tempo > 0 && r.utensili.length >= 3);
+  const r2 = O.programmaLavoro(p, { correzioni: { [kFil]: { n: 777 } } }, { num: 1, nome: 'A' });
+  assert.ok(r2.righe.some(l => /S777\b/.test(l)), 'giri corretti nel filetto');
+  assert.ok(O.programmaLavoro(p, { spente: Object.fromEntries(p.fasi.map(f => [f.chiave, true])) }, {}).errore.includes('spente'));
+  // fresa
+  const F = { modo: 'fresa', grezzo: { lx: 100, ly: 60, lz: 20, sovraZ: 1, contorna: true }, forme: [{ tipo: 'tasca', cx: 50, cy: 30, lx: 40, ly: 20, r: 5, prof: 6 }, { tipo: 'foriCerchio', cx: 50, cy: 30, dc: 44, n: 4, a0: 45, d: 8, foro: 'maschio' },
+    { tipo: 'foriGriglia', x0: 10, y0: 10, nx: 2, ny: 2, px: 80, py: 40, d: 6.6 }, { tipo: 'asola', x1: 20, y1: 30, x2: 30, y2: 30, w: 8, prof: 4 }, { tipo: 'foro', x: 90, y: 30, d: 10, foro: 'alesato' }] };
+  const E = O.entitaFresa(F.forme, F.grezzo);
+  assert.strictEqual(E.filter(e => e.tipo === 'punto').length, 9);
+  vicino(E[1].x, 50 + 22 * Math.cos(Math.PI / 4), 1e-3);
+  const q = O.proponiLavoro(F, { mat: mt, nmax: 8000 });
+  assert.ok(!q.errore, q.errore);
+  const tit = q.fasi.map(f => f.titolo);
+  assert.ok(tit[0].startsWith('Spianatura'), 'spianatura per prima');
+  assert.ok(tit[tit.length - 1].startsWith('Contorno esterno'), 'contorno per ultimo');
+  assert.ok(tit.some(x => x.startsWith('Maschio M8')) && tit.some(x => x.startsWith('Alesatore')) && tit.some(x => x.startsWith('Asola')));
+  const s = O.programmaLavoro(q, {}, { num: 2, nome: 'B' });
+  assert.ok(!s.errore, s.errore);
+  assert.ok(!O.eseguiISO(s.righe.join('\n')).errore);
+  assert.ok(O.proponiLavoro({ modo: 'fresa', grezzo: { lx: 100, ly: 60, lz: 20 }, forme: [] }, { mat: mt }).errore.includes('Aggiungi'));
+  assert.ok(O.proponiLavoro({ modo: 'fresa', grezzo: { lx: 100 }, forme: [] }, { mat: mt }).errore.includes('misure'));
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

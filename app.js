@@ -71,7 +71,7 @@
     if (m.materiali !== undefined && !Array.isArray(m.materiali)) delete m.materiali;
     if (Array.isArray(m.materiali) && !m.materiali.length) delete m.materiali;
     if (!m.imp || typeof m.imp !== 'object' || Array.isArray(m.imp)) m.imp = {};
-    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo', 'cad'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
+    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo', 'cad', 'lavoro'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
     // programmi salvati e pezzi: solo voci complete
     m.salvati = m.salvati.filter(x => x && Array.isArray(x.righe)).map(x => Object.assign({ id: Date.now() + Math.random(), nome: 'O0001', data: '' }, x));
     m.pezzi = m.pezzi.filter(x => x && typeof x === 'object').map(x => Object.assign({ id: 'p' + Date.now() + Math.floor(Math.random() * 1e6), nome: 'Pezzo', programmi: [], foto: [], misure: [], controlli: [] }, x));
@@ -108,7 +108,7 @@
 
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
-    tema: 'scuro', guanti: false, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
+    tema: 'scuro', guanti: false, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
     codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1,
     postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
@@ -368,6 +368,50 @@
     return ORIENTA[App.orientaPieno];
   }
 
+  // ----- tastierino numerico dell'app: grande, sempre uguale, senza la tastiera del telefono -----
+  let tastAperto = null, contaCampi = 0;
+  function chiudiTastierino() { if (tastAperto) { tastAperto.box.remove(); document.body.classList.remove('con-tastierino'); tastAperto = null; } }
+  function apriTastierino(input, opz) {
+    if (tastAperto && tastAperto.input === input) return;
+    chiudiTastierino(); document.body.classList.remove('con-lav-barra');
+    const disp = el('div', { class: 'tast-val', 'aria-live': 'polite' });
+    const titolo = el('div', { class: 'tast-tit', testo: opz.etichetta || '' });
+    let v = String(input.value || ''), nuovo = true;
+    const mostraV = () => { disp.textContent = (v === '' ? '0' : v) + (opz.unita ? ' ' + opz.unita : ''); };
+    const scrivi = () => { input.value = v; input.dispatchEvent(new Event('input', { bubbles: true })); };
+    const tasto = (t, fz, cl, et) => el('button', { type: 'button', class: 'tast-k' + (cl ? ' ' + cl : ''), 'aria-label': et || t, testo: t, onclick: fz });
+    const cifra = c => () => { if (nuovo) { v = ''; nuovo = false; } if (c === ',' && v.includes(',')) return; if (c === ',' && v === '') v = '0'; v += c; mostraV(); scrivi(); };
+    const prossimo = () => {
+      const visibili = () => Array.from(document.querySelectorAll('input[data-tast]')).filter(x => x.offsetParent !== null);
+      const i = visibili().indexOf(input);
+      chiudiTastierino(); input.dispatchEvent(new Event('change', { bubbles: true }));
+      // la schermata puo essersi ridisegnata: si cerca il campo dopo per posizione
+      setTimeout(() => { const dopo = visibili()[i + 1]; if (dopo) { dopo.focus(); dopo.scrollIntoView({ block: 'center' }); } }, 0);
+    };
+    const box = el('div', { class: 'tastierino', role: 'dialog', 'aria-label': 'Tastierino numerico' }, [
+      el('div', { class: 'tast-testa' }, [titolo, disp]),
+      el('div', { class: 'tast-griglia' }, [
+        ...['7', '8', '9'].map(c => tasto(c, cifra(c))), tasto('⌫', () => { nuovo = false; v = v.slice(0, -1); mostraV(); scrivi(); }, 'fn', 'Cancella una cifra'),
+        ...['4', '5', '6'].map(c => tasto(c, cifra(c))), tasto('C', () => { nuovo = false; v = ''; mostraV(); scrivi(); }, 'fn', 'Cancella tutto'),
+        ...['1', '2', '3'].map(c => tasto(c, cifra(c))), tasto('±', () => { nuovo = false; v = v.startsWith('-') ? v.slice(1) : '-' + v; mostraV(); scrivi(); }, 'fn', 'Cambia segno'),
+        tasto(',', cifra(','), '', 'Virgola'), tasto('0', cifra('0')), tasto('Avanti', prossimo, 'fn', 'Campo dopo'), tasto('OK', () => { chiudiTastierino(); input.dispatchEvent(new Event('change', { bubbles: true })); input.blur(); }, 'ok', 'Conferma')])]);
+    mostraV();
+    document.body.appendChild(box); document.body.classList.add('con-tastierino');
+    tastAperto = { box, input };
+    setTimeout(() => input.scrollIntoView({ block: 'nearest' }), 30);
+  }
+  /** Campo numerico con il tastierino dell'app. o[k] e il valore (testo); dopo(k) dopo ogni cambio. */
+  function campoNum(o, k, etichetta, unita, dopo, extra) {
+    const id = 'n-' + k + '-' + (++contaCampi);
+    const i = el('input', Object.assign({ type: 'text', inputmode: imp().tastierino === false ? 'decimal' : 'none', autocomplete: 'off', 'data-tast': '1', id, class: 'campo-num', value: o[k] === undefined || o[k] === null || (typeof o[k] === 'number' && !isFinite(o[k])) ? '' : String(o[k]).replace('.', ','), 'aria-label': etichetta }, extra || {}));
+    i.addEventListener('focus', () => { if (imp().tastierino !== false) apriTastierino(i, { etichetta, unita }); });
+    i.addEventListener('click', () => { if (imp().tastierino !== false) apriTastierino(i, { etichetta, unita }); });
+    i.addEventListener('input', () => { o[k] = i.value.replace(',', '.'); if (dopo) dopo(k, false); });
+    i.addEventListener('change', () => { if (dopo) dopo(k, true); });
+    return el('label', { class: 'cn', for: i.id }, [el('span', { class: 'cn-et', testo: etichetta }), el('span', { class: 'cn-box' }, [i, unita ? el('span', { class: 'cn-u', testo: unita }) : null])]);
+  }
+  document.addEventListener('pointerdown', e => { if (tastAperto && !tastAperto.box.contains(e.target) && e.target !== tastAperto.input) chiudiTastierino(); }, true);
+
   // ----- dialoghi dentro la pagina (alert, confirm e prompt non esistono nell'APK) -----
   function dialogo(titolo, corpo, pulsanti) {
     return new Promise(ok => {
@@ -394,13 +438,14 @@
   const App = {
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
-    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo,
-    schermi: {}, param: {}, VERSIONE: '2.19.0'
+    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino,
+    schermi: {}, param: {}, VERSIONE: '2.20.0'
   };
   window.App = App;
 
   let attuale = null;
   function mostra() {
+    chiudiTastierino();
     if (document.body.classList.contains('cad-pieno')) { document.body.classList.remove('cad-pieno'); $('schermo').classList.remove('pieno'); App.esciPieno = null; App.orientaPieno = 0; if (window.Android && window.Android.orientamento) window.Android.orientamento('libero'); }
     const h = (location.hash || '').replace(/^#/, '');
     const id = App.schermi[h] ? h : 'home';
@@ -468,6 +513,7 @@
   const MARCHIO = '<svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#63b4ff"/><stop offset="1" stop-color="#1f5fe0"/></linearGradient><linearGradient id="ma" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#c9d4e6"/><stop offset="1" stop-color="#8a98b2"/></linearGradient><linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17305c"/><stop offset="1" stop-color="#091226"/></linearGradient><radialGradient id="ml" cx=".3" cy=".25" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><path d="M415.1,225.6 L454.4,230.9 L454.4,281.1 L415.1,286.4 L402.6,325.0 L431.3,352.4 L401.8,392.9 L366.9,374.1 L334.0,398.0 L341.2,437.0 L293.5,452.5 L276.3,416.7 L235.7,416.7 L218.5,452.5 L170.8,437.0 L178.0,398.0 L145.1,374.1 L110.2,392.9 L80.7,352.4 L109.4,325.0 L96.9,286.4 L57.6,281.1 L57.6,230.9 L96.9,225.6 L109.4,187.0 L80.7,159.6 L110.2,119.1 L145.1,137.9 L178.0,114.0 L170.8,75.0 L218.5,59.5 L235.7,95.3 L276.3,95.3 L293.5,59.5 L341.2,75.0 L334.0,114.0 L366.9,137.9 L401.8,119.1 L431.3,159.6 L402.6,187.0 Z" fill="url(#mg)"/><circle cx="256" cy="256" r="118.0" fill="#0b1830"/><circle cx="256" cy="256" r="118.0" fill="none" stroke="#5db0ff" stroke-width="5.0" opacity=".9"/><circle cx="256.0" cy="256.0" r="92.0" fill="url(#ma)"/><circle cx="319.8" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="319.8" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="256" cy="256" r="41.4" fill="none" stroke="#7d8aa6" stroke-width="3.0"/><circle cx="256" cy="256" r="12.9" fill="#2a3a5c"/></svg>';
 
   const MENU = [
+    ['lavoro', 'fresa', 'Disegna e lavora', 'Dal pezzo al programma in 4 passi: grezzo, forma, lavorazioni, programma'],
     ['programma', 'nuovo', 'Nuovo programma ISO', 'Fresatura, foratura e tornitura con anteprima'],
     ['calcoli', 'calcolo', 'Calcolatrice di taglio', 'Giri e avanzamenti per utensile e materiale, filetti, peso...'],
     ['tolleranze', 'tolleranza', 'Tolleranze e accoppiamenti', 'ISO 286: fori, alberi, gioco e interferenza'],
@@ -485,15 +531,22 @@
     ['tabelle', 'tabella', 'Tabelle', 'Filetti, tolleranze, rugosita, pollici'],
     ['materiali', 'materiale', 'Materiali', 'Velocita di taglio e avanzamenti per materiale']
   ];
-  // la home: le voci raggruppate per lavoro, a tessere
-  const SEZIONI = [['Disegna e programma', ['cad', 'disegno', 'programma', 'macro', 'ciclo']], ['Calcola e misura', ['calcoli', 'tolleranze', 'angolo', 'tabelle']],
-    ['Controlla', ['apri', 'galleria']], ['Officina', ['pezzi', 'tabellaUtensili', 'salvati', 'materiali']], ['Aiuto', ['guida']]];
-  const TITOLO_BREVE = { cad: 'CAD fresa', disegno: 'CAD tornio', programma: 'Programma ISO', macro: 'Macro CNC', ciclo: 'Ciclo di lavoro', calcoli: 'Calcolatrice', tolleranze: 'Tolleranze', angolo: 'Angolo da foto',
-    tabelle: 'Tabelle e filetti', apri: 'Controlla e simula', galleria: 'Esempi', pezzi: 'Pezzi', tabellaUtensili: 'Utensili', salvati: 'Programmi salvati', materiali: 'Materiali', guida: 'Come si fa' };
+  // la home: quattro ingressi grandi; dentro ogni gruppo le sue funzioni
+  const GRUPPI = {
+    disegna: { t: 'Disegna e lavora', s: 'Dal pezzo al programma in 4 passi', ic: 'fresa', vai: 'lavoro' },
+    calcola: { t: 'Calcola', s: 'Giri, tolleranze, filetti, angoli', ic: 'calcolo', voci: ['calcoli', 'tolleranze', 'tabelle', 'angolo', 'materiali'] },
+    controlla: { t: 'Controlla', s: 'Apri, simula, programmi salvati', ic: 'codice', voci: ['apri', 'salvati', 'galleria'] },
+    officina: { t: 'Officina', s: 'Utensili, pezzi, strumenti avanzati', ic: 'utensile', voci: ['tabellaUtensili', 'pezzi', 'programma', 'cad', 'disegno', 'macro', 'ciclo', 'guida'] }
+  };
+  const TITOLO_BREVE = { cad: 'CAD fresa libero', disegno: 'CAD tornio libero', programma: 'Programma ISO a mano', macro: 'Macro CNC', ciclo: 'Ciclo di lavoro', calcoli: 'Calcolatrice di taglio', tolleranze: 'Tolleranze',
+    angolo: 'Angolo da una foto', tabelle: 'Tabelle e filetti', apri: 'Controlla e simula', galleria: 'Esempi', pezzi: 'Pezzi e attrezzaggio', tabellaUtensili: 'Tabella utensili', salvati: 'Programmi salvati', materiali: 'Materiali', guida: 'Come si fa' };
   function tessera([id, ic, t, s]) {
-    return el('button', { class: 'tessera' + (id === 'cad' || id === 'disegno' ? ' evid' : ''), 'data-vai': id, 'aria-label': t, onclick: () => App.vai(id) }, [
+    return el('button', { class: 'tessera', 'data-vai': id, 'aria-label': t, onclick: () => App.vai(id) }, [
       el('span', { class: 'ic', html: icona(ic) }), el('b', { testo: TITOLO_BREVE[id] || t }), el('small', { testo: s })]);
   }
+  ['calcola', 'controlla', 'officina'].forEach(k => {
+    App.schermi['g-' + k] = { titolo: GRUPPI[k].t, render(m) { m.appendChild(el('div', { class: 'tessere' }, GRUPPI[k].voci.map(id => MENU.find(x => x[0] === id)).filter(Boolean).map(tessera))); } };
+  });
   function voceMenu([id, ic, t, s]) {
     return el('button', { class: 'voce', onclick: () => App.vai(id) }, [
       el('span', { class: 'ic', html: icona(ic) }), el('span', { class: 't' }, [el('b', { testo: t }), el('small', { testo: s })]),
@@ -508,10 +561,22 @@
       const cerca = el('input', { id: 'f-cerca-home', type: 'search', placeholder: 'Cerca: M10, H7 25, 316, G83, T5...', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search' });
       const risultati = el('div', { class: 'menu', hidden: true });
       const menu = el('div', { class: 'menu-sezioni' });
-      SEZIONI.forEach(([nome, ids]) => {
-        menu.appendChild(el('div', { class: 'sez', testo: nome }));
-        menu.appendChild(el('div', { class: 'tessere' }, ids.map(id => MENU.find(x => x[0] === id)).filter(Boolean).map(tessera)));
-      });
+      const L = mem.lavoro;
+      const haLavoro = L && L.usato && ((L.fresa && (L.fresa.forme || []).length) || (L.tornio && (L.tornio.tratti || []).length));
+      // primo avvio: una scheda (non blocca niente) con la macchina e i giri massimi
+      if (!mem.benvenuto && !haLavoro && !(mem.salvati || []).length) {
+        const I = imp(), v = { nmaxFresa: I.nmaxFresa, nmaxTornio: I.nmaxTornio };
+        let modo = 'fresa';
+        const scelte = el('div', { class: 'chips' }, [['fresa', 'Fresa'], ['tornio', 'Tornio'], ['entrambe', 'Tutte e due']].map(([k, t]) => el('button', { class: 'chip' + (k === modo ? ' attiva' : ''), 'data-macchina': k, testo: t, onclick: e => { modo = k; scelte.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b === e.currentTarget)); } })));
+        const chiudi = vai => { mem.benvenuto = true; mem.imp = Object.assign({}, mem.imp || {}, { nmaxFresa: Number(v.nmaxFresa) || I.nmaxFresa, nmaxTornio: Number(v.nmaxTornio) || I.nmaxTornio }); const Lv = sezione('lavoro'); Lv.modo = modo === 'tornio' ? 'tornio' : 'fresa'; salva(); if (vai) App.vai('lavoro'); else App.ridisegna(); };
+        menu.appendChild(el('div', { class: 'benvenuto', id: 'h-benvenuto' }, [el('b', { testo: 'Benvenuto' }), el('p', { testo: 'Disegni il pezzo scrivendo le quote, l\'app propone le lavorazioni e scrive il programma. Dimmi la tua macchina:' }), scelte,
+          el('div', { class: 'lav-campi due' }, [campoNum(v, 'nmaxFresa', 'Giri massimi fresa', 'giri'), campoNum(v, 'nmaxTornio', 'Giri massimi tornio', 'giri')]),
+          el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', id: 'h-inizia', testo: 'Prova con un esempio', onclick: () => chiudi(true) }), el('button', { class: 'pul sec', id: 'h-salta', testo: 'Salta', onclick: () => chiudi(false) })])]));
+      }
+      if (haLavoro) menu.appendChild(el('button', { class: 'continua', id: 'h-continua', onclick: () => App.vai('lavoro') }, [el('span', { class: 'ic', html: icona('avanti') }),
+        el('span', { class: 't' }, [el('b', { testo: 'Continua l\'ultimo lavoro' }), el('small', { testo: (L.modo === 'tornio' ? 'Tornio' : 'Fresa') + ' · passo ' + ((Number(L.passo) || 0) + 1) + ' di 4' })])]));
+      menu.appendChild(el('div', { class: 'ingressi' }, Object.entries(GRUPPI).map(([k, g]) => el('button', { class: 'ingresso' + (k === 'disegna' ? ' primo' : ''), 'data-gruppo': k, onclick: () => App.vai(g.vai || 'g-' + k) }, [
+        el('span', { class: 'ic', html: icona(g.ic) }), el('span', { class: 'tt' }, [el('b', { testo: g.t }), el('small', { testo: g.s })])]))));
       const rec = (mem.recenti || []).map(id => MENU.find(x => x[0] === id)).filter(Boolean).slice(0, 4);
       // promemoria della copia di sicurezza: una settimana dall'ultima copia (o dal primo uso) se ci sono dati
       const ha = ['salvati', 'pezzi', 'macro', 'tabellaUt'].some(k => (mem[k] || []).length) || Array.isArray(mem.materiali);

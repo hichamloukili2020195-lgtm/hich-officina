@@ -29,6 +29,8 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository). La pagina p
   programma; poi il programma, la Sequenza da modificare o il pezzo con le misure da controllare.
   **Quote da una foto del disegno** (nell'APK) o dal testo incollato: Ø con tolleranze, filetti, fori ripetuti
   (4xØ9, 6xM8), smussi, raggi, lunghezze diventano bottoni da toccare per riempire i campi.
+- **Disegna e lavora** (2.20.0): lavoro guidato in 4 passi (grezzo, forma a quote, lavorazioni proposte, programma) per fresa e
+  tornio, con il tastierino numerico grande dell'app.
 - **CAD fresa** col dito (2.19.0): profili, rettangoli, cerchi, fori e asole; a ognuno la sua lavorazione (contorno, tasca
   anche libera, foro, maschio, alesatura, asola); il programma esce nell'ordine di officina e si simula. Mirino sopra il dito,
   aggancio, frecce di precisione, due dita zoom, un tocco con due dita annulla, tre ripete; schermo intero e rotazione.
