@@ -90,6 +90,13 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
 
 I dati di taglio sono **di partenza**. Ogni programma va controllato prima di lavorare (simulazione, prova a vuoto).
 
+## Documentazione
+- **Come si fa** nell'app (Home, Come si fa): ogni funzione in pochi passi con un esempio, stampabile in PDF.
+- **Note legali e privacy** nell'app (Impostazioni).
+- `presentazione.html`: pagina di presentazione con le schermate (`docs/schermate`).
+- `docs/PUBBLICAZIONE.md`: i passi, da decidere, per pubblicare l'app su uno store.
+- `CHANGELOG.md`: cronologia delle versioni. `CLAUDE.md`: regole di lavoro.
+
 ## Installarla sul telefono
 Apri il sito con il browser del telefono e scegli **Installa app** (o **Aggiungi a schermata Home**) dal menu.
 Dopo la prima apertura funziona anche senza rete.
@@ -122,6 +129,7 @@ Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i fil
 - `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
 - `programmi.js`: programmi della fresatrice, sequenza, schemi dei fori, macro.
 - `ciclo.js`: ciclo di lavoro proposto (albero e piastra), quote lette da un disegno, programma del tornio a piu fasi.
+- `schermi_dati.js`: esporta e importa. `schermi_guida.js`: guida e note legali.
 - `schermi_angolo.js`: angolo misurato su una foto e utensile.
 - `schermi_disegno.js`: disegno del profilo col dito e vista 3D del pezzo tornito.
 - `profilo.js`: profili liberi (raccordi, smussi, archi), percorso con G41/G42, sgrossatura dei profili da tornio.

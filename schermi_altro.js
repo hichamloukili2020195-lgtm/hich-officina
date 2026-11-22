@@ -308,7 +308,7 @@
         el('button', { class: 'pul sec', html: A.icona('salvati') + 'Ripristina', onclick: () => A.ripristina() })]));
       m.appendChild(A.info('La copia contiene programmi, macro, pezzi con foto, utensili, materiali e impostazioni. Mandala su Drive o per posta con Condividi.'));
       m.appendChild(el('div', { class: 'sez', testo: 'Dati' }));
-      m.appendChild(el('div', { class: 'menu' }, [A.voceMenu(['materiali', 'materiale', 'Materiali', 'Modifica velocita di taglio e avanzamenti']), A.voceMenu(['scambio', 'salva', 'Esporta e importa', 'Utensili, macro e materiali (anche per Hich-CAM)'])]));
+      m.appendChild(el('div', { class: 'menu' }, [A.voceMenu(['materiali', 'materiale', 'Materiali', 'Modifica velocita di taglio e avanzamenti']), A.voceMenu(['scambio', 'salva', 'Esporta e importa', 'Utensili, macro e materiali (anche per Hich-CAM)']), A.voceMenu(['note', 'info', 'Note legali e privacy', 'Uso, responsabilita e dati'])]));
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('salva') + 'Esporta i miei dati', onclick: () => A.condividi('hich-officina-dati.json', JSON.stringify(A.mem, null, 1)) })]));
       m.appendChild(A.info('Hich-Officina ' + A.VERSIONE + ' · funziona anche senza rete. I dati restano su questo telefono. I valori di taglio sono di partenza: controlla sempre i programmi prima di lavorare.'));
     }

@@ -348,7 +348,7 @@
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.16.0'
+    schermi: {}, param: {}, VERSIONE: '2.17.0'
   };
   window.App = App;
 
@@ -433,6 +433,7 @@
     ['salvati', 'salvati', 'Programmi salvati', 'I programmi tenuti su questo telefono'],
     ['pezzi', 'galleria', 'Pezzi e attrezzaggio', 'Foglio di attrezzaggio, note, foto e controllo misure'],
     ['tabellaUtensili', 'utensile', 'Tabella utensili', 'I tuoi utensili: numero T, diametro, lunghezza, taglienti'],
+    ['guida', 'info', 'Come si fa', 'Ogni funzione in pochi passi, stampabile in PDF'],
     ['tabelle', 'tabella', 'Tabelle', 'Filetti, tolleranze, rugosita, pollici'],
     ['materiali', 'materiale', 'Materiali', 'Velocita di taglio e avanzamenti per materiale']
   ];

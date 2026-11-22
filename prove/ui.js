@@ -38,11 +38,11 @@ const server = http.createServer((q, r) => {
   await vai('home');
   await foto('01-home');
   const voci = await pg.$$eval('.menu .voce', x => x.length);
-  ok(voci === 14, 'voci del menu: ' + voci);
+  ok(voci === 15, 'voci del menu: ' + voci);
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo', 'angolo']) {
+  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
     await vai(s); await erroreSchermo(s); await largo(s);
     // accessibilita: ogni pulsante, campo e tela ha un nome per i lettori di schermo
     const senzaNome = await pg.evaluate(() => {
@@ -658,6 +658,19 @@ const server = http.createServer((q, r) => {
   await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(200);
   ok(!(await pg.$('#schermo .errore')), 'simulazione lunga senza errori');
   await pg.selectOption('#f-vel', '4');
+
+  // ===== 2.17.0: guida e note legali =====
+  await vai('guida'); await pg.waitForTimeout(80);
+  ok((await pg.$$eval('.carta-det summary', x => x.length)) >= 10, 'guida con le sezioni');
+  await pg.click('#guida-profilo summary'); await pg.waitForTimeout(40);
+  ok((await pg.textContent('#guida-profilo')).includes('29,994'), 'esempio nella guida');
+  const htmlG = await pg.evaluate(() => App.htmlGuida());
+  ok(htmlG.includes('Hich-Officina: come si fa') && htmlG.includes('Attenzione') && htmlG.includes('Esempio'), 'guida stampabile');
+  // ogni "Apri" della guida porta a una schermata che esiste
+  const vai2 = await pg.evaluate(() => App.GUIDA.map(g => !!App.schermi[g.vai]).every(Boolean));
+  ok(vai2, 'i collegamenti della guida');
+  await vai('note'); ok((await pg.textContent('#schermo')).includes('restano su questo telefono') && (await pg.textContent('#schermo')).includes('indicativi'), 'note legali e privacy');
+  await foto('36-guida');
 
   // ===== 2.16.0: migrazioni, promemoria, copia rovinata, password, esporta e importa =====
   const ctx3 = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, acceptDownloads: true });

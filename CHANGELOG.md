@@ -2,6 +2,11 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.17.0 - Guida, note legali e presentazione
+- "Come si fa": ogni funzione in pochi passi con un esempio, stampabile in PDF.
+- Note legali e privacy: valori indicativi, responsabilita, dati solo sul telefono, marchi e componenti.
+- Pagina di presentazione con le schermate (`presentazione.html`) e i passi per la pubblicazione su uno store (`docs/PUBBLICAZIONE.md`).
+
 ## 2.16.0 - Dati, sicurezza e prestazioni
 - Promemoria della copia di sicurezza (una settimana, rimandabile) in home.
 - La copia ha una somma di controllo: un file modificato o rovinato viene segnalato prima di ripristinare; il ripristino chiede conferma. La password della macchina non finisce mai nella copia.
@@ -129,7 +134,7 @@ Hich-Officina: una voce per versione, la piu recente in alto.
 - punta a inserti, alesatore, bareno, inserto da tornio, maschio rivestito. Prima le punte
 - e gli alesatori avevano valori da acciaio rapido.
 
-## 2.2.0 - APK per Android costruito da GitHub
+## 2.2.0 - APK per Android costruito dal repository
 - Progetto Android (WebView) che apre le pagine dell'app dagli asset, con salvataggio
   in Download/Hich-Officina, condivisione, appunti e scelta dei file.
 - Lavoro automatico: a ogni aggiornamento di main costruisce l'APK firmato sempre con
