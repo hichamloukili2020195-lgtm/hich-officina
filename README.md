@@ -31,7 +31,11 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
   (4xØ9, 6xM8), smussi, raggi, lunghezze diventano bottoni da toccare per riempire i campi.
 - **Disegna un profilo (tornio)** col dito: a punti o a mano libera (il tratto diventa rette), aggancio alla griglia e
   alle rette orizzontali e verticali, punti da trascinare, quote, raccordi e smussi da scrivere, **vista 3D del pezzo
-  tornito** da girare col dito; poi diventa il profilo libero di Nuovo programma ISO.
+  tornito** da girare col dito; poi diventa il profilo libero di Nuovo programma ISO. **Zoom con due dita** (e
+  rotella, pulsanti + e -, Adatta), griglia che segue lo zoom, quote Ø e lunghezze sul disegno, quote vive mentre si
+  trascina; tocco su un tratto per mettere un punto in mezzo; **smussi e raggi con un tocco** sul punto scelto o su
+  tutti gli spigoli; **punto con le quote**: avanti di una lunghezza, spallamento fino a un Ø, cono con lunghezza e
+  semiangolo, quote esatte.
 - **Simulazione a pannello**: quote X Y Z grandi, giri con l'indicatore, avanzamento, utensile, righe del programma che
   scorrono con la riga in lavoro; su tablet in orizzontale grafico e pannello affiancati.
 - **Ricerca veloce dalla home**: M10 (filetto e preforo), H7 25 (tolleranza), 316 (materiale), G83 (codice), T5

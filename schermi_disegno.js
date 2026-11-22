@@ -99,6 +99,15 @@
       A.modulo(panGrezzo, [{ id: 'dg', et: 'Diametro del grezzo', u: 'mm' }, { id: 'lg', et: 'Lunghezza da disegnare', u: 'mm' },
         { id: 'passo', et: 'Passo della griglia', tipo: 'scelta', scelte: [['0.5', '0,5 mm'], ['1', '1 mm'], ['2', '2 mm'], ['5', '5 mm']] }], S, () => tutto());
 
+      // ----- vista: zoom e spostamento (due dita, rotella, pulsanti) -----
+      const vista = { zoom: 1, dx: 0, dy: 0 };
+      const lettura = el('span', { class: 'lettura', 'aria-live': 'polite' });
+      const barraVista = el('div', { class: 'barra-vista' }, [
+        el('button', { class: 'icona-pul', 'aria-label': 'Rimpicciolisci', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/></svg>', onclick: () => zoomA(1 / 1.5) }),
+        el('button', { class: 'icona-pul', 'aria-label': 'Ingrandisci', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5v14"/></svg>', onclick: () => zoomA(1.5) }),
+        el('button', { class: 'chip', testo: 'Adatta', onclick: () => { vista.zoom = 1; vista.dx = 0; vista.dy = 0; v3.zoom = 1; disegna(); } }), lettura]);
+      cv.after(barraVista);
+
       // ----- coordinate: Z in orizzontale (0 a destra), raggio in verticale; mezzo pezzo sopra l'asse, specchio sotto -----
       let vis = null;
       const prepara = () => {
@@ -106,8 +115,19 @@
         const dg = num(S.dg) || 40, lg = num(S.lg) || 50;
         const rMax = Math.max(dg / 2, ...S.punti.map(p => (num(p.x) || 0) / 2)) + 4;
         const zMin = Math.min(-lg, ...S.punti.map(p => num(p.z) || 0)) - 4, zMax = 4;
-        const sc = Math.min((W - 24) / (zMax - zMin), (H - 24) / (2 * rMax));
-        vis = { W, H, sc, X: z => W - 12 - (zMax - z) * sc, Y: r => H / 2 - r * sc, zDa: px => zMax - (W - 12 - px) / sc, rDa: py => (H / 2 - py) / sc, dg, lg };
+        const sc = Math.min((W - 24) / (zMax - zMin), (H - 24) / (2 * rMax)) * vista.zoom;
+        const ox = W - 12 + vista.dx, oy = H / 2 + vista.dy;
+        vis = { W, H, sc, X: z => ox - (zMax - z) * sc, Y: r => oy - r * sc, zDa: px => zMax - (ox - px) / sc, rDa: py => (oy - py) / sc, dg, lg };
+      };
+      const zoomA = (f, cx, cy) => {
+        if (S.vista === '3D') { v3.zoom = Math.max(0.3, Math.min(6, v3.zoom * f)); disegna(); return; }
+        prepara();
+        cx = cx === undefined ? vis.W / 2 : cx; cy = cy === undefined ? vis.H / 2 : cy;
+        const z = vis.zDa(cx), r = vis.rDa(cy);
+        vista.zoom = Math.max(0.5, Math.min(60, vista.zoom * f));
+        prepara();
+        vista.dx += cx - vis.X(z); vista.dy += cy - vis.Y(r);
+        disegna();
       };
       const aggancia = (z, r, prima) => {
         const p = num(S.passo) || 1;
@@ -120,15 +140,21 @@
         }
         return { z: Math.round(z * 1000) / 1000, r: Math.round(r * 1000) / 1000 };
       };
+      const fq = v => fmt(v, 3);
+      let mira = null;   // punto che si sta trascinando o aggiungendo: si mostra con le quote
       const disegna2D = () => {
         prepara();
         const dpr = window.devicePixelRatio || 1, { W, H, X, Y, sc } = vis;
         cv.width = W * dpr; cv.height = H * dpr;
         const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-        // griglia ogni 5 mm, piu marcata ogni 10
-        g.lineWidth = 1;
-        for (let z = 0; X(z) > 0; z -= 5) { g.strokeStyle = col('--bordo'); g.globalAlpha = z % 10 === 0 ? 0.9 : 0.4; g.beginPath(); g.moveTo(X(z), 0); g.lineTo(X(z), H); g.stroke(); }
-        for (let r = 0; Y(r) > 0; r += 2.5) { g.globalAlpha = (r * 2) % 10 === 0 ? 0.9 : 0.4; g.beginPath(); g.moveTo(0, Y(r)); g.lineTo(W, Y(r)); g.moveTo(0, Y(-r)); g.lineTo(W, Y(-r)); g.stroke(); }
+        // griglia: il passo segue lo zoom (righe almeno 8 pixel)
+        const passi = [0.5, 1, 2, 5, 10, 20, 50];
+        const pg = passi.find(q => q * sc >= 8) || 50;
+        g.lineWidth = 1; g.strokeStyle = col('--bordo');
+        const zA = Math.floor(vis.zDa(0) / pg) * pg, zB = vis.zDa(W);
+        for (let z = zA; z <= zB; z += pg) { g.globalAlpha = Math.abs(z / (pg * 5) - Math.round(z / (pg * 5))) < 1e-6 ? 0.9 : 0.35; g.beginPath(); g.moveTo(X(z), 0); g.lineTo(X(z), H); g.stroke(); }
+        const rA = Math.floor(vis.rDa(H) / (pg / 2)) * (pg / 2), rB = vis.rDa(0);
+        for (let r = rA; r <= rB; r += pg / 2) { g.globalAlpha = Math.abs(r / (pg * 2.5) - Math.round(r / (pg * 2.5))) < 1e-6 ? 0.9 : 0.35; g.beginPath(); g.moveTo(0, Y(r)); g.lineTo(W, Y(r)); g.stroke(); }
         g.globalAlpha = 1;
         // grezzo
         g.fillStyle = col('--tenue'); g.globalAlpha = 0.16;
@@ -138,12 +164,12 @@
         g.strokeStyle = col('--tenue'); g.setLineDash([10, 4, 2, 4]); g.beginPath(); g.moveTo(0, Y(0)); g.lineTo(W, Y(0)); g.stroke(); g.setLineDash([]);
         // quote dell'asse Z
         g.fillStyle = col('--tenue'); g.font = '10px system-ui'; g.textAlign = 'center';
-        for (let z = 0; X(z) > 14; z -= 10) g.fillText(String(z), X(z), H - 4);
+        const pq = passi.find(q => q * sc >= 40) || 50;
+        for (let z = Math.ceil(zA / pq) * pq; z <= zB; z += pq) g.fillText(String(Math.round(z * 100) / 100), X(z), H - 4);
         // profilo con raccordi, e il suo specchio
         const { poli, errore } = poliDi(S.punti);
         const linea = (k, w, c, a) => { g.strokeStyle = c; g.lineWidth = w; g.globalAlpha = a; g.beginPath(); poli.forEach((p, i) => { const x = X(p.a), y = Y(k * p.b); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); g.globalAlpha = 1; };
         if (poli.length > 1) {
-          // pezzo pieno, colorato tra profilo e asse
           g.fillStyle = col('--accento'); g.globalAlpha = 0.14;
           g.beginPath(); g.moveTo(X(poli[0].a), Y(0)); poli.forEach(p => g.lineTo(X(p.a), Y(p.b))); g.lineTo(X(poli[poli.length - 1].a), Y(0)); g.closePath(); g.fill();
           g.beginPath(); g.moveTo(X(poli[0].a), Y(0)); poli.forEach(p => g.lineTo(X(p.a), Y(-p.b))); g.lineTo(X(poli[poli.length - 1].a), Y(0)); g.closePath(); g.fill();
@@ -151,31 +177,97 @@
           linea(1, 2.6, errore ? col('--errore') : col('--accento2'), 1);
           linea(-1, 1.2, col('--accento2'), 0.45);
         }
+        // quote: Ø sopra i tratti cilindrici, lunghezza sotto lo specchio
+        g.font = '600 11px system-ui'; g.textAlign = 'center';
+        for (let i = 1; i < S.punti.length; i++) {
+          const a = S.punti[i - 1], b = S.punti[i];
+          const xa = num(a.x), xb = num(b.x), za = num(a.z), zb = num(b.z);
+          if (Math.abs(xa - xb) < 1e-9 && Math.abs(za - zb) > 1e-9 && xa > 0 && (b.tratto || 'retta') === 'retta') {
+            const xm = (X(za) + X(zb)) / 2;
+            if (Math.abs(X(za) - X(zb)) < 26) continue;
+            g.fillStyle = col('--testo'); g.fillText('Ø' + fmt(xa, 3), xm, Y(xa / 2) - 6);
+            g.fillStyle = col('--tenue'); g.fillText(fmt(Math.abs(za - zb), 3), xm, Y(-xa / 2) + 14);
+          }
+        }
         // punti
         S.punti.forEach((p, i) => {
           const x = X(num(p.z)), y = Y(num(p.x) / 2);
           g.fillStyle = i === sel ? col('--avviso') : col('--testo');
           g.beginPath(); g.arc(x, y, i === sel ? 7 : 4.5, 0, Math.PI * 2); g.fill();
-          g.fillStyle = col('--tenue'); g.font = '10px system-ui'; g.textAlign = 'left'; g.fillText('P' + (i + 1), x + 6, y - 6);
+          g.fillStyle = col('--tenue'); g.font = '10px system-ui'; g.textAlign = 'left';
+          const extra = (num(p.raccordo) > 0 ? ' R' + fmt(num(p.raccordo)) : '') + (num(p.smusso) > 0 ? ' C' + fmt(num(p.smusso)) : '');
+          g.fillText('P' + (i + 1) + extra, x + 6, y - 6);
         });
+        // il punto in movimento: croce e quote in un riquadro sopra il dito
+        if (mira) {
+          const x = X(mira.z), y = Y(mira.r);
+          g.strokeStyle = col('--avviso'); g.lineWidth = 1; g.setLineDash([3, 3]);
+          g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.setLineDash([]);
+          const t = 'Ø' + fq(mira.r * 2) + '  Z' + fq(mira.z);
+          g.font = '600 13px system-ui'; const w = g.measureText(t).width + 14;
+          const bx = Math.min(Math.max(4, x - w / 2), W - w - 4), by = Math.max(4, y - 56);
+          g.fillStyle = col('--pannello'); g.strokeStyle = col('--avviso'); g.lineWidth = 1.5;
+          g.beginPath(); g.roundRect ? g.roundRect(bx, by, w, 24, 6) : g.rect(bx, by, w, 24); g.fill(); g.stroke();
+          g.fillStyle = col('--testo'); g.textAlign = 'left'; g.fillText(t, bx + 7, by + 16);
+        }
         if (tratto.length > 1) { g.strokeStyle = col('--avviso'); g.lineWidth = 2; g.beginPath(); tratto.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); g.stroke(); }
       };
 
-      // ----- tocchi -----
-      let tratto = [], premuto = null;
+      // ----- tocchi: un dito disegna, due dita zoom e spostamento -----
+      let tratto = [], premuto = null, pinch = null, dopoPinch = false;
+      const attivi = new Map();
       const posizione = e => { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
       const vicino = (px, py) => { let k = -1, best = 22; S.punti.forEach((p, i) => { const d = Math.hypot(vis.X(num(p.z)) - px, vis.Y(num(p.x) / 2) - py); if (d < best) { best = d; k = i; } }); return k; };
+      /** Il tratto (tra due punti) vicino al tocco: per inserire un punto in mezzo. */
+      const suTratto = (px, py) => {
+        let best = 14, k = -1, pr = null;
+        for (let i = 1; i < S.punti.length; i++) {
+          const ax = vis.X(num(S.punti[i - 1].z)), ay = vis.Y(num(S.punti[i - 1].x) / 2), bx = vis.X(num(S.punti[i].z)), by = vis.Y(num(S.punti[i].x) / 2);
+          const L2 = (bx - ax) ** 2 + (by - ay) ** 2; if (L2 < 1) continue;
+          const t = Math.max(0.05, Math.min(0.95, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / L2));
+          const d = Math.hypot(ax + t * (bx - ax) - px, ay + t * (by - ay) - py);
+          if (d < best) { best = d; k = i; pr = t; }
+        }
+        return k < 0 ? null : { i: k, t: pr };
+      };
+      const mostraLettura = (z, r) => { lettura.textContent = 'Ø' + fq(r * 2) + '  Z' + fq(z); };
       cv.addEventListener('pointerdown', e => {
-        if (S.vista === '3D') { premuto = { x: e.clientX, y: e.clientY, yaw: v3.yaw, pitch: v3.pitch }; cv.setPointerCapture(e.pointerId); return; }
+        attivi.set(e.pointerId, posizione(e));
+        try { cv.setPointerCapture(e.pointerId); } catch (x) { /* niente */ }
+        if (attivi.size === 2) {
+          // comincia lo zoom: il disegno o il tratto in corso si lasciano
+          if (premuto && premuto.k >= 0 && premuto.mosso && storia.length) { S.punti = JSON.parse(storia[storia.length - 1]); }
+          premuto = null; tratto = []; mira = null;
+          const [a, b] = Array.from(attivi.values());
+          prepara();
+          const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+          pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z0: vista.zoom, v30: v3.zoom, z: vis.zDa(mx), r: vis.rDa(my) };
+          dopoPinch = true;
+          return;
+        }
+        if (attivi.size > 2) return;
+        dopoPinch = false;
+        if (S.vista === '3D') { premuto = { x: e.clientX, y: e.clientY, yaw: v3.yaw, pitch: v3.pitch }; return; }
         prepara();
         const [px, py] = posizione(e);
-        cv.setPointerCapture(e.pointerId);
         const k = vicino(px, py);
         if (S.modo === 'mano' && k < 0) { tratto = [[px, py]]; premuto = { mano: true }; return; }
         premuto = { k, px, py, mosso: false };
         if (k >= 0) { sel = k; ricorda(); }
       });
       cv.addEventListener('pointermove', e => {
+        if (attivi.has(e.pointerId)) attivi.set(e.pointerId, posizione(e));
+        if (pinch && attivi.size === 2) {
+          const [a, b] = Array.from(attivi.values());
+          const d = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+          if (S.vista === '3D') { v3.zoom = Math.max(0.3, Math.min(6, pinch.v30 * d / pinch.d0)); disegna(); return; }
+          vista.zoom = Math.max(0.5, Math.min(60, pinch.z0 * d / pinch.d0));
+          prepara();
+          vista.dx += mx - vis.X(pinch.z); vista.dy += my - vis.Y(pinch.r);
+          disegna2D();
+          return;
+        }
+        if (S.vista !== '3D' && vis) { const [px, py] = posizione(e); if (!premuto) mostraLettura(...Object.values(aggancia(vis.zDa(px), Math.abs(vis.rDa(py)), null))); }
         if (!premuto) return;
         if (S.vista === '3D') { v3.yaw = premuto.yaw + (e.clientX - premuto.x) * 0.01; v3.pitch = Math.max(-1.2, Math.min(1.2, premuto.pitch + (e.clientY - premuto.y) * 0.01)); tutto(true); return; }
         const [px, py] = posizione(e);
@@ -184,36 +276,86 @@
         if (premuto.k >= 0 && premuto.mosso) {
           const a = aggancia(vis.zDa(px), Math.abs(vis.rDa(py)), premuto.k > 0 ? { z: num(S.punti[premuto.k - 1].z), r: num(S.punti[premuto.k - 1].x) / 2 } : null);
           S.punti[premuto.k].z = String(a.z); S.punti[premuto.k].x = String(a.r * 2);
+          mira = a; mostraLettura(a.z, a.r);
           disegna2D();
         }
       });
-      cv.addEventListener('pointerup', e => {
-        const p = premuto; premuto = null;
-        if (!p || S.vista === '3D') return;
+      const fine = e => {
+        attivi.delete(e.pointerId);
+        if (pinch) { if (attivi.size < 2) pinch = null; premuto = null; return; }
+        const p = premuto; premuto = null; mira = null;
+        if (!p || S.vista === '3D' || dopoPinch) { if (attivi.size === 0) dopoPinch = false; return; }
         const [px, py] = posizione(e);
         if (p.mano) {
           // tratto a mano: si semplifica in poche rette agganciate alla griglia
           const pts = tratto.map(([x, y]) => ({ z: vis.zDa(x), r: Math.abs(vis.rDa(y)) }));
           tratto = [];
           if (pts.length < 2) { disegna2D(); return; }
-          const semp = A.semplifica(pts, Math.max(0.6, (num(S.passo) || 1)));
+          const semp = A.semplifica(pts, Math.max(0.6, (num(S.passo) || 1)) / Math.max(1, vista.zoom));
           ricorda();
-          // dalla testa verso il mandrino
-          if (semp[0].z < semp[semp.length - 1].z) semp.reverse();
+          if (semp[0].z < semp[semp.length - 1].z) semp.reverse();   // dalla testa verso il mandrino
           const out = [];
           semp.forEach(q => { const a = aggancia(q.z, q.r, out.length ? out[out.length - 1] : null); const u = out[out.length - 1]; if (!u || Math.hypot(u.z - a.z, u.r - a.r) > 1e-6) out.push(a); });
           S.punti = out.map(q => ({ x: String(q.r * 2), z: String(q.z) }));
           sel = null; A.salva(); tutto(); return;
         }
         if (p.k >= 0) { if (!p.mosso) storia.pop(); A.salva(); tutto(); return; }
-        // un tocco: punto nuovo alla fine
-        const ult = S.punti[S.punti.length - 1];
-        const a = aggancia(vis.zDa(px), Math.abs(vis.rDa(py)), ult ? { z: num(ult.z), r: num(ult.x) / 2 } : null);
+        // un tocco su un tratto: punto in mezzo; altrove: punto nuovo alla fine
+        const tr = suTratto(px, py);
         ricorda();
-        S.punti.push({ x: String(a.r * 2), z: String(a.z) });
-        sel = S.punti.length - 1;
+        if (tr) {
+          const a = aggancia(vis.zDa(px), Math.abs(vis.rDa(py)), null);
+          S.punti.splice(tr.i, 0, { x: String(a.r * 2), z: String(a.z) });
+          sel = tr.i;
+        } else {
+          const ult = S.punti[S.punti.length - 1];
+          const a = aggancia(vis.zDa(px), Math.abs(vis.rDa(py)), ult ? { z: num(ult.z), r: num(ult.x) / 2 } : null);
+          S.punti.push({ x: String(a.r * 2), z: String(a.z) });
+          sel = S.punti.length - 1;
+        }
         A.salva(); tutto();
-      });
+      };
+      cv.addEventListener('pointerup', fine);
+      cv.addEventListener('pointercancel', e => { attivi.delete(e.pointerId); if (attivi.size < 2) pinch = null; premuto = null; mira = null; tratto = []; disegna(); });
+      cv.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = posizione(e); zoomA(e.deltaY < 0 ? 1.25 : 1 / 1.25, px, py); }, { passive: false });
+
+      // ----- punto con le quote: esatte o relative al punto scelto (o all'ultimo) -----
+      S.qv = S.qv || { tipo: 'lungo', a: '20', b: '', ang: '15' };
+      const panQuote = el('div', { class: 'pannello' });
+      const fQ = A.modulo(panQuote, [{ id: 'qtipo', et: 'Nuovo punto', tipo: 'scelta', scelte: [['lungo', 'Avanti verso il mandrino di'], ['spalla', 'Spallamento fino a Ø'], ['cono', 'Cono: lunghezza e semiangolo'], ['esatto', 'Quote esatte Ø e Z']] },
+        { id: 'qa', et: 'Lunghezza', u: 'mm', se: q => q.qtipo === 'lungo' || q.qtipo === 'cono' || !q.qtipo },
+        { id: 'qd', et: 'Diametro Ø', u: 'mm', se: q => q.qtipo === 'spalla' || q.qtipo === 'esatto' },
+        { id: 'qz', et: 'Z', u: 'mm', se: q => q.qtipo === 'esatto' },
+        { id: 'qang', et: 'Semiangolo', sub: 'positivo: il diametro cresce', u: '°', se: q => q.qtipo === 'cono' }], S.qv, () => { fQ.aggiorna(); });
+      const aggiungiQuote = () => {
+        const q = S.qv, base = sel !== null && S.punti[sel] ? S.punti[sel] : S.punti[S.punti.length - 1];
+        const bx = base ? num(base.x) : 0, bz = base ? num(base.z) : 0;
+        let x, z;
+        const t = q.qtipo || 'lungo';
+        if (t === 'lungo') { const L = num(q.qa); if (!(L > 0)) { A.avviso('Scrivi la lunghezza'); return; } x = bx; z = bz - L; }
+        else if (t === 'spalla') { const D = num(q.qd); if (!(D >= 0)) { A.avviso('Scrivi il diametro'); return; } x = D; z = bz; }
+        else if (t === 'cono') { const L = num(q.qa), an = num(q.qang); if (!(L > 0) || !isFinite(an) || Math.abs(an) >= 89) { A.avviso('Scrivi lunghezza e semiangolo'); return; } z = bz - L; x = bx + 2 * L * Math.tan(an * Math.PI / 180); }
+        else { const D = num(q.qd), Z = num(q.qz); if (!(D >= 0) || !isFinite(Z)) { A.avviso('Scrivi Ø e Z'); return; } x = D; z = Z; }
+        if (x < 0) { A.avviso('Il diametro verrebbe negativo'); return; }
+        ricorda();
+        const idx = sel !== null && S.punti[sel] ? sel + 1 : S.punti.length;
+        S.punti.splice(idx, 0, { x: String(Math.round(x * 1000) / 1000), z: String(Math.round(z * 1000) / 1000) });
+        sel = idx; A.salva(); tutto();
+      };
+      panQuote.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', html: A.icona('piu') + 'Aggiungi il punto', onclick: aggiungiQuote })]));
+      const tuttiSpigoli = el('div', { class: 'chips' }, [el('span', { class: 'leggenda', style: 'margin:0 4px 0 2px;align-self:center', testo: 'Tutti gli spigoli:' })].concat(
+        [['C0.5', 'smusso', '0.5'], ['C1', 'smusso', '1'], ['R1', 'raccordo', '1'], ['vivi', null, null]].map(([t, k, v]) => el('button', { class: 'chip', testo: t, onclick: () => {
+          ricorda();
+          for (let i = 1; i < S.punti.length - 1; i++) {
+            const p = S.punti[i];
+            if (num(S.punti[i - 1].x) === 0 && num(p.x) === 0) continue;
+            if ((p.tratto || 'retta') !== 'retta' || (S.punti[i + 1].tratto || 'retta') !== 'retta') continue;
+            delete p.smusso; delete p.raccordo;
+            if (k) p[k] = v;
+          }
+          A.salva(); tutto();
+        } }))));
+      panGrezzo.previousSibling.before(el('div', { class: 'sez', testo: 'Punto con le quote' }), panQuote, tuttiSpigoli);
 
       // ----- riquadro del punto scelto -----
       const mostraEditor = () => {
@@ -221,7 +363,10 @@
         if (sel === null || !S.punti[sel]) { editor.appendChild(A.info(S.modo === 'mano' ? 'Disegna il profilo con il dito dalla testa (a destra) verso il mandrino: il tratto diventa rette sulla griglia. Tocca un punto per correggerlo.' : 'Tocca per mettere i punti, dalla testa (a destra) verso il mandrino. Trascina un punto per spostarlo, toccalo per scrivere le quote, il raccordo o lo smusso.')); return; }
         const p = S.punti[sel];
         const pan = el('div', { class: 'pannello' });
-        editor.append(el('div', { class: 'sez', testo: 'Punto P' + (sel + 1) }), pan);
+        const metti = (k, v) => { ricorda(); delete p.smusso; delete p.raccordo; if (k) p[k] = v; A.salva(); tutto(); };
+        const rapidi = el('div', { class: 'chips' }, [['C0.5', 'smusso', '0.5'], ['C1', 'smusso', '1'], ['C2', 'smusso', '2'], ['R1', 'raccordo', '1'], ['R2', 'raccordo', '2'], ['R5', 'raccordo', '5'], ['Vivo', null, null]]
+          .map(([t, k, v]) => el('button', { class: 'chip' + ((k && String(p[k]) === v) || (!k && !(num(p.smusso) > 0) && !(num(p.raccordo) > 0)) ? ' attiva' : ''), testo: t, onclick: () => metti(k, v) })));
+        editor.append(el('div', { class: 'sez', testo: 'Punto P' + (sel + 1) + ': spigolo' }), rapidi, pan);
         A.modulo(pan, [{ id: 'x', et: 'X (diametro)', u: 'mm' }, { id: 'z', et: 'Z', u: 'mm' },
           { id: 'tratto', et: 'Ci si arriva con', tipo: 'scelta', scelte: [['retta', 'una retta'], ['cw', 'un arco G2'], ['ccw', 'un arco G3']] },
           { id: 'r', et: 'Raggio dell\'arco', u: 'mm', se: q => q.tratto === 'cw' || q.tratto === 'ccw' },

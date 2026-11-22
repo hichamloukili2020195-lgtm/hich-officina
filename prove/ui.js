@@ -406,6 +406,61 @@ const server = http.createServer((q, r) => {
   await largo('pannello tablet');
   await pg.setViewportSize({ width: 390, height: 844 }); await pg.waitForTimeout(100);
 
+  // ===== 2.11.0: disegno piu comodo =====
+  await vai('disegno'); await pg.waitForTimeout(80);
+  await pg.click('.schede button[data-id="2D"]');
+  await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '20', z: '0' }, { x: '20', z: '-20' }, { x: '30', z: '-20' }, { x: '30', z: '-40' }]; App.salva(); });
+  await vai('home'); await vai('disegno'); await pg.waitForTimeout(80);
+  // punti con le quote, relativi all'ultimo
+  await pg.selectOption('#f-qtipo', 'lungo'); await pg.fill('#f-qa', '10'); await pg.click('text=Aggiungi il punto'); await pg.waitForTimeout(40);
+  let ult = await pg.evaluate(() => App.mem.disegno.punti.slice(-1)[0]);
+  ok(ult.x === '30' && ult.z === '-50', 'avanti di 10: ' + JSON.stringify(ult));
+  await pg.selectOption('#f-qtipo', 'spalla'); await pg.fill('#f-qd', '36'); await pg.click('text=Aggiungi il punto'); await pg.waitForTimeout(40);
+  ult = await pg.evaluate(() => App.mem.disegno.punti.slice(-1)[0]);
+  ok(ult.x === '36' && ult.z === '-50', 'spallamento: ' + JSON.stringify(ult));
+  await pg.selectOption('#f-qtipo', 'cono'); await pg.fill('#f-qa', '10'); await pg.fill('#f-qang', '5,71059'); await pg.click('text=Aggiungi il punto'); await pg.waitForTimeout(40);
+  ult = await pg.evaluate(() => App.mem.disegno.punti.slice(-1)[0]);
+  ok(Math.abs(Number(ult.x) - 38) < 0.01 && ult.z === '-60', 'cono: ' + JSON.stringify(ult));
+  // smusso e raggio con un tocco sul punto scelto (P3 e il punto scelto dopo la modifica? si sceglie toccandolo)
+  await pg.evaluate(() => {});
+  const tela2 = await pg.$('.disegno-tela'); const b2 = await tela2.boundingBox();
+  const posP = await pg.evaluate(i => { const c = document.querySelector('.disegno-tela'); return null; }, 2);
+  // P3 (Ø20 Z-20): lo si cerca toccando vicino al punto con l'aiuto delle coordinate della vista
+  await pg.click('text=Adatta');
+  // tocco su P3 calcolato dalla stessa geometria della vista
+  const xy = await pg.evaluate(() => { const c = document.querySelector('.disegno-tela'); const W = c.clientWidth, H = c.clientHeight; const S = App.mem.disegno; const dg = Number(S.dg) || 40, lg = Number(S.lg) || 50;
+    const rMax = Math.max(dg / 2, ...S.punti.map(p => Number(p.x) / 2)) + 4, zMin = Math.min(-lg, ...S.punti.map(p => Number(p.z))) - 4, zMax = 4; const sc = Math.min((W - 24) / (zMax - zMin), (H - 24) / (2 * rMax));
+    return [W - 12 - (zMax - -20) * sc, H / 2 - 10 * sc]; });
+  await tela2.scrollIntoViewIfNeeded(); const b3 = await tela2.boundingBox();
+  await pg.mouse.click(b3.x + xy[0], b3.y + xy[1]); await pg.waitForTimeout(60);
+  await pg.click('.chips button:text-is("R2")'); await pg.waitForTimeout(40);
+  ok((await pg.evaluate(() => App.mem.disegno.punti[2].raccordo)) === '2', 'raggio con un tocco');
+  await pg.click('.chips button:text-is("C1")'); await pg.waitForTimeout(40);
+  const p3 = await pg.evaluate(() => App.mem.disegno.punti[2]);
+  ok(p3.smusso === '1' && !p3.raccordo, 'smusso con un tocco: ' + JSON.stringify(p3));
+  ok(!(await pg.$('#schermo .errore')), 'disegno con errore dopo lo smusso');
+  // tutti gli spigoli
+  await pg.click('text=Tutti gli spigoli:'); // etichetta, non fa niente
+  await pg.click('.chips button:text-is("C0.5")'); await pg.waitForTimeout(40);
+  // zoom: rotella e due dita
+  const z0 = await pg.evaluate(() => document.querySelector('.lettura') !== null);
+  ok(z0, 'barra della vista');
+  await tela2.scrollIntoViewIfNeeded(); const b4 = await tela2.boundingBox();
+  await pg.mouse.move(b4.x + b4.width / 2, b4.y + b4.height / 2);
+  await pg.mouse.wheel(0, -300); await pg.waitForTimeout(60);
+  const pinch = await pg.evaluate(() => {
+    const c = document.querySelector('.disegno-tela'), r = c.getBoundingClientRect();
+    const ev = (t, id, x, y) => c.dispatchEvent(new PointerEvent(t, { pointerId: id, clientX: r.left + x, clientY: r.top + y, bubbles: true, pointerType: 'touch', isPrimary: id === 1 }));
+    const n0 = App.mem.disegno.punti.length;
+    ev('pointerdown', 1, 150, 150); ev('pointerdown', 2, 200, 150);
+    for (let k = 1; k <= 5; k++) { ev('pointermove', 1, 150 - k * 10, 150); ev('pointermove', 2, 200 + k * 10, 150); }
+    ev('pointerup', 1, 100, 150); ev('pointerup', 2, 250, 150);
+    return App.mem.disegno.punti.length === n0;
+  });
+  ok(pinch, 'lo zoom con due dita non deve aggiungere punti');
+  await foto('29-disegno-zoom');
+  await pg.click('text=Adatta');
+
   // ===== 2.10.0: ciclo proposto e quote dal disegno =====
   await vai('ciclo'); await pg.waitForTimeout(80);
   await pg.click('.schede button[data-id="albero"]'); await pg.waitForTimeout(60);
