@@ -48,6 +48,9 @@ jobs:
           fi
       - name: Costruisci l'APK
         run: gradle -p android assembleRelease --no-daemon
+      - name: Pacchetto per il negozio (AAB), solo con la chiave dei segreti
+        if: env.FIRMA_KEYSTORE != ''
+        run: gradle -p android bundleRelease --no-daemon
       - name: Pubblica l'APK
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,4 +58,8 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk Hich-Officina.apk
           gh release view apk >/dev/null 2>&1 || gh release create apk --title "Hich-Officina per Android" --notes "APK da installare sul telefono. Si aggiorna da solo a ogni nuova versione: scarica e installa sopra quella vecchia."
           gh release upload apk Hich-Officina.apk --clobber
+          if [ -f android/app/build/outputs/bundle/release/app-release.aab ]; then
+            cp android/app/build/outputs/bundle/release/app-release.aab Hich-Officina.aab
+            gh release upload apk Hich-Officina.aab --clobber
+          fi
           gh release edit apk --notes "Versione $VERSIONE_APP (costruzione ${GITHUB_RUN_NUMBER}). Scarica Hich-Officina.apk e installalo sopra quello vecchio: i dati restano."

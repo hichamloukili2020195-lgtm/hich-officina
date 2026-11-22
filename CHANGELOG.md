@@ -2,6 +2,11 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.17.1 - Preparazione per il negozio di app
+- Informativa sulla privacy (`privacy.html`) e testi della scheda (`docs/SCHEDA_STORE.md`), con i campi personali da compilare.
+- Android: livello di API 36 (richiesto dal negozio per le app nuove), strumenti di costruzione aggiornati.
+- Il lavoro automatico costruisce anche il pacchetto per il negozio (AAB), ma solo se c'e la chiave dei segreti.
+
 ## 2.17.0 - Guida, note legali e presentazione
 - "Come si fa": ogni funzione in pochi passi con un esempio, stampabile in PDF.
 - Note legali e privacy: valori indicativi, responsabilita, dati solo sul telefono, marchi e componenti.

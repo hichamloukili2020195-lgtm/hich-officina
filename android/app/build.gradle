@@ -3,11 +3,11 @@ plugins { id 'com.android.application' }
 
 android {
     namespace 'it.hich.officina'
-    compileSdk 35
+    compileSdk 36
     defaultConfig {
         applicationId 'it.hich.officina'
         minSdk 24
-        targetSdk 35
+        targetSdk 36
         versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger())
         versionName(System.getenv('VERSIONE_APP') ?: 'prova')
         // solo i processori dei telefoni: l'APK pesa meno della meta
