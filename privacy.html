@@ -2,64 +2,61 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hich-Officina: informativa sulla privacy</title>
-<meta name="robots" content="index,follow">
-<style>
-:root{--fondo:#0b1220;--pannello:#111a2c;--bordo:#22314f;--testo:#e8eef8;--tenue:#9aa8c0;--accento2:#4c96ff;color-scheme:dark}
-@media (prefers-color-scheme: light){:root{--fondo:#eef2f8;--pannello:#fff;--bordo:#d4dcea;--testo:#132033;--tenue:#516078;--accento2:#1567e0;color-scheme:light}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--fondo);color:var(--testo);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-main{max-width:760px;margin:0 auto;padding-block:32px 56px}
-h1{font-size:clamp(26px,5vw,38px);line-height:1.1;margin:0 0 6px}
-h2{font-size:19px;margin:28px 0 8px}
-p,li{max-width:70ch}
-.agg{color:var(--tenue);font-size:14px}
-.riquadro{background:var(--pannello);border:1px solid var(--bordo);border-radius:12px;padding:14px 16px}
-a{color:var(--accento2)}
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Informativa sulla privacy · Hich-Officina</title>
+<meta name="description" content="Hich-Officina non raccoglie ne invia dati personali: tutto resta sul tuo telefono.">
+<meta name="theme-color" content="#0b1220">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Informativa sulla privacy · Hich-Officina">
+<meta property="og:description" content="Hich-Officina non raccoglie ne invia dati personali: tutto resta sul tuo telefono.">
+<link rel="icon" href="icone/icona.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone/icona-192.png">
+<link rel="stylesheet" href="sito.css">
 </head>
 <body>
-<main>
+<a class="salta" href="#contenuto">Vai al contenuto</a>
+<header class="testata"><div class="largo">
+  <a class="marchio" href="index.html"><img src="icone/icona.svg" alt="" width="32" height="32"><span>Hich-Officina</span></a>
+  <nav aria-label="Principale"><ul><li><a href="index.html">Home</a></li><li><a href="index.html#funzioni">Funzioni</a></li><li><a href="index.html#installa">Installa</a></li><li><a href="guida.html">Guida</a></li><li><a href="novita.html">Novita</a></li><li><a href="privacy.html" aria-current="page">Privacy</a></li></ul></nav>
+  <a class="pul corto" href="app.html">Apri l'app</a>
+</div></header>
+<main id="contenuto">
+<section class="sezione"><div class="largo stretto">
 <h1>Informativa sulla privacy</h1>
-<p class="agg">App: Hich-Officina · Ultimo aggiornamento: <span>[DATA]</span></p>
-
+<p class="piccolo">App: Hich-Officina · Ultimo aggiornamento: <mark>[DATA]</mark></p>
 <p class="riquadro"><b>In breve:</b> Hich-Officina non raccoglie, non invia e non vende dati personali. Tutto quello che scrivi o crei resta sul tuo telefono. Non c'e un account e non c'e pubblicita.</p>
-
 <h2>Chi siamo</h2>
-<p>L'app e pubblicata da <b>[NOME SVILUPPATORE]</b>. Contatto per qualsiasi domanda sulla privacy: <b>[EMAIL DI CONTATTO]</b>.</p>
-
+<p>L'app e pubblicata da <b><mark>[NOME SVILUPPATORE: da compilare in sito.json]</mark></b>. Contatto per qualsiasi domanda sulla privacy: <b><mark>[EMAIL DI CONTATTO: da compilare in sito.json]</mark></b>.</p>
 <h2>Quali dati usa l'app</h2>
 <ul>
 <li><b>Dati che inserisci:</b> misure, programmi, macro, pezzi, utensili, materiali, note e impostazioni. Sono salvati solo sul tuo telefono, nella memoria dell'app.</li>
 <li><b>Foto:</b> le foto di programmi, disegni e pezzi si scattano o si scelgono tu; sono lette e salvate sul telefono. Il riconoscimento del testo dalle foto avviene sul telefono, senza inviare nulla in rete.</li>
 <li><b>Copie di sicurezza e file:</b> li crei tu e scegli tu dove mandarli (per esempio un servizio di archiviazione o la posta). L'app non li invia da sola. La password della macchina non viene inclusa nelle copie.</li>
 </ul>
-
 <h2>Uso della rete</h2>
 <p>L'app non contatta server dell'autore. Usa la rete solo quando lo chiedi tu: per inviare un programma alla macchina all'indirizzo che scrivi nelle impostazioni (invio FTP, non cifrato: usalo solo in una rete di cui ti fidi) e quando condividi un file con un'altra app. Non contiene pubblicita, strumenti di analisi o di tracciamento.</p>
-
 <h2>Autorizzazioni</h2>
 <ul>
 <li><b>Rete:</b> solo per l'invio alla macchina.</li>
 <li><b>Fotocamera e foto:</b> si usano tramite il selettore di sistema, solo quando premi i pulsanti per aggiungere una foto.</li>
 <li><b>Salvataggio file:</b> i programmi esportati vanno nella cartella Download/Hich-Officina o dove scegli tu.</li>
 </ul>
-
 <h2>Condivisione con terzi</h2>
 <p>Nessun dato viene condiviso con terzi dall'app. Il riconoscimento del testo usa un componente software installato con l'app, che lavora sul telefono.</p>
-
 <h2>Conservazione e cancellazione</h2>
 <p>I dati restano sul telefono finche non li cancelli o non disinstalli l'app: in quel caso si perdono. Non abbiamo copie, quindi non possiamo recuperarli: usa la copia di sicurezza dell'app.</p>
-
 <h2>Minori</h2>
 <p>L'app e uno strumento di lavoro e non e rivolta ai bambini.</p>
-
 <h2>Modifiche</h2>
 <p>Se questa informativa cambia, la nuova versione e pubblicata a questo indirizzo con la data di aggiornamento.</p>
-
 <h2>Responsabilita</h2>
 <p>I valori di taglio e i programmi dell'app sono indicativi e vanno sempre controllati prima di lavorare.</p>
+</div></section>
 </main>
+<footer class="piede"><div class="largo">
+  <p><b>Hich-Officina</b> 2.18.0</p>
+  <p class="piccolo">I valori di taglio e i programmi sono di partenza e indicativi: vanno sempre controllati e provati a vuoto prima di lavorare. I nomi dei controlli citati nell'app indicano solo la compatibilita e appartengono ai rispettivi proprietari.</p>
+  <p class="piccolo"><a href="privacy.html">Privacy</a> · <a href="guida.html">Guida</a> · <a href="novita.html">Novita</a></p>
+</div></footer>
 </body>
 </html>

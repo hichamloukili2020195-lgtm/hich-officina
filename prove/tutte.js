@@ -20,8 +20,13 @@ passo('versione coerente', () => {
   const ok = app && sw && log && app[1] === sw[1] && app[1] === log[1] && app[1] === pk;
   return { ok, testo: 'app.js ' + (app && app[1]) + ', sw.js ' + (sw && sw[1]) + ', CHANGELOG.md ' + (log && log[1]) + ', package.json ' + pk };
 });
+passo('pagine del sito aggiornate', () => esegui(['tools/sito.js', '--controlla']));
 passo('calcoli e programmi', () => esegui(['prove/prove.js']));
 passo('prova a tappeto', () => esegui(['prove/tappeto.js']));
+passo('sito nel browser', () => {
+  try { require.resolve('playwright'); } catch (e) { return { ok: true, nota: 'saltata: manca il browser di prova' }; }
+  return esegui(['prove/sito.js'], { timeout: 300000 });
+});
 passo('interfaccia', () => {
   try { require.resolve('playwright'); } catch (e) { return { ok: true, nota: 'saltata: manca il browser di prova' }; }
   return esegui(['prove/ui.js'], { timeout: 900000 });

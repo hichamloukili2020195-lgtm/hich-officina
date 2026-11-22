@@ -3,7 +3,7 @@
 App per telefono Android (e per qualsiasi browser) per fresatori e tornitori. Funziona anche senza rete e non usa
 librerie esterne: sono solo file HTML, CSS e JavaScript.
 
-Il sito si pubblica da solo dal ramo `main` (pagine del repository).
+Il sito si pubblica da solo dal ramo `main` (pagine del repository). La pagina principale presenta l'app; l'app si apre da `app.html`.
 
 ## Cosa fa
 - **Nuovo programma ISO** con anteprima del percorso:
@@ -93,7 +93,7 @@ I dati di taglio sono **di partenza**. Ogni programma va controllato prima di la
 ## Documentazione
 - **Come si fa** nell'app (Home, Come si fa): ogni funzione in pochi passi con un esempio, stampabile in PDF.
 - **Note legali e privacy** nell'app (Impostazioni).
-- `presentazione.html`: pagina di presentazione con le schermate (`docs/schermate`).
+- **Sito** (`index.html`, `guida.html`, `novita.html`, `privacy.html`): pagine generate da `node tools/sito.js` (guida, novita e privacy vengono dall'app e da `CHANGELOG.md`). Nome, email e data della privacy, indirizzo dell'APK e dominio si scrivono in `sito.json`. L'app sta in `app.html`.
 - `docs/PUBBLICAZIONE.md`: i passi, da decidere, per pubblicare l'app su uno store.
 - `CHANGELOG.md`: cronologia delle versioni. `CLAUDE.md`: regole di lavoro.
 

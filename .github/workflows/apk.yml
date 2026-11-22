@@ -24,7 +24,8 @@ jobs:
       - name: Copia le pagine dell'app negli asset
         run: |
           mkdir -p android/app/src/main/assets/www/icone
-          cp index.html stile.css *.js manifest.webmanifest android/app/src/main/assets/www/
+          cp stile.css *.js manifest.webmanifest android/app/src/main/assets/www/
+          cp app.html android/app/src/main/assets/www/index.html
           rm -f android/app/src/main/assets/www/sw.js
           cp icone/* android/app/src/main/assets/www/icone/
           echo "VERSIONE_APP=$(grep -o "VERSIONE: '[0-9.]*'" app.js | grep -o '[0-9.]\+')" >> "$GITHUB_ENV"

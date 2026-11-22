@@ -3,7 +3,7 @@
   "short_name": "Officina",
   "description": "Calcoli di taglio, programmi ISO per fresa e tornio, macro e tabelle per l'officina meccanica.",
   "lang": "it",
-  "start_url": "./index.html",
+  "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

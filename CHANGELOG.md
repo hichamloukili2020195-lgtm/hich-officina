@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.18.0 - Il sito di Hich-Officina
+- Un sito vero: pagina principale con funzioni, schermate, installazione e domande frequenti; guida, novita e informativa sulla privacy; pagina "non trovata".
+- L'app si apre da `app.html`. Chi l'ha gia installata viene portato all'app da solo.
+- Le pagine si generano da una sola fonte (`node tools/sito.js`): guida e novita seguono l'app e il CHANGELOG, e le prove controllano che siano aggiornate.
+- Nome, email e data della privacy si scrivono in `sito.json`.
+- Corretto: nella home compariva la scritta "null" sotto la ricerca quando non c'era il promemoria della copia. Ora una prova cerca "null", "undefined" e "NaN" scritti sullo schermo in tutte le schermate.
+
 ## 2.17.1 - Preparazione per il negozio di app
 - Informativa sulla privacy (`privacy.html`) e testi della scheda (`docs/SCHEDA_STORE.md`), con i campi personali da compilare.
 - Android: livello di API 36 (richiesto dal negozio per le app nuove), strumenti di costruzione aggiornati.

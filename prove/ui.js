@@ -11,7 +11,7 @@ const server = http.createServer((q, r) => {
 });
 (async () => {
   await new Promise(ok => server.listen(0, ok));
-  const url = 'http://127.0.0.1:' + server.address().port + '/';
+  const url = 'http://127.0.0.1:' + server.address().port + '/app.html';
   const dirFoto = process.argv[2];
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
@@ -42,8 +42,11 @@ const server = http.createServer((q, r) => {
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
+  for (const s of ['home', 'programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
     await vai(s); await erroreSchermo(s); await largo(s);
+    // nessun "null", "undefined" o "NaN" scritto sullo schermo
+    const sporco = await pg.evaluate(() => { const t = document.getElementById('schermo').innerText; const m = t.match(/\b(null|undefined|NaN)\b/); return m ? m[0] + ' in: ' + t.slice(Math.max(0, m.index - 30), m.index + 30).replace(/\n/g, ' ') : ''; });
+    ok(!sporco, 'testo sbagliato in ' + s + ': ' + sporco);
     // accessibilita: ogni pulsante, campo e tela ha un nome per i lettori di schermo
     const senzaNome = await pg.evaluate(() => {
       const out = [];

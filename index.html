@@ -3,44 +3,67 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Hich-Officina</title>
-<meta name="description" content="Calcoli di taglio, programmi ISO per fresa e tornio, macro e tabelle per l'officina meccanica.">
+<title>Hich-Officina: calcoli e programmi CNC per fresa e tornio</title>
+<meta name="description" content="Calcoli di taglio, programmi ISO, macro, simulazione e controllo degli errori per fresatori e tornitori. Sul telefono, anche senza rete.">
 <meta name="theme-color" content="#0b1220">
-<link rel="manifest" href="manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Hich-Officina: calcoli e programmi CNC per fresa e tornio">
+<meta property="og:description" content="Calcoli di taglio, programmi ISO, macro, simulazione e controllo degli errori per fresatori e tornitori. Sul telefono, anche senza rete.">
 <link rel="icon" href="icone/icona.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icone/icona-192.png">
-<link rel="stylesheet" href="stile.css">
+<link rel="stylesheet" href="sito.css">
 </head>
 <body>
-<header id="testata">
-  <button id="b-indietro" class="icona-pul" aria-label="Indietro" hidden></button>
-  <h1 id="titolo">Hich-Officina</h1>
-  <div id="azioni"></div>
-</header>
-<main id="schermo"></main>
-<nav id="barra">
-  <button data-vai="home"><span data-ic="home"></span>Home</button>
-  <button data-vai="preferiti"><span data-ic="stella"></span>Preferiti</button>
-  <button data-vai="impostazioni"><span data-ic="ingranaggio"></span>Impostazioni</button>
-</nav>
-<div class="toast" id="toast" role="status"></div>
-<script src="calcoli.js"></script>
-<script src="programmi.js"></script>
-<script src="profilo.js"></script>
-<script src="iso.js"></script>
-<script src="post.js"></script>
-<script src="ciclo.js"></script>
-<script src="app.js"></script>
-<script src="schermi_calcoli.js"></script>
-<script src="schermi_programma.js"></script>
-<script src="schermi_macro.js"></script>
-<script src="schermi_altro.js"></script>
-<script src="schermi_iso.js"></script>
-<script src="schermi_officina.js"></script>
-<script src="schermi_disegno.js"></script>
-<script src="schermi_ciclo.js"></script>
-<script src="schermi_angolo.js"></script>
-<script src="schermi_dati.js"></script>
-<script src="schermi_guida.js"></script>
+<a class="salta" href="#contenuto">Vai al contenuto</a>
+<header class="testata"><div class="largo">
+  <a class="marchio" href="index.html"><img src="icone/icona.svg" alt="" width="32" height="32"><span>Hich-Officina</span></a>
+  <nav aria-label="Principale"><ul><li><a href="index.html" aria-current="page">Home</a></li><li><a href="index.html#funzioni">Funzioni</a></li><li><a href="index.html#installa">Installa</a></li><li><a href="guida.html">Guida</a></li><li><a href="novita.html">Novita</a></li><li><a href="privacy.html">Privacy</a></li></ul></nav>
+  <a class="pul corto" href="app.html">Apri l'app</a>
+</div></header>
+<main id="contenuto">
+<script>if (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone) location.replace('app.html' + location.hash);</script>
+<section class="eroe"><div class="largo eroe-griglia">
+  <div>
+    <p class="sopra">Per fresatori e tornitori</p>
+    <h1>Calcoli e programmi CNC, in tasca.</h1>
+    <p class="sotto">Calcoli di taglio, programmi ISO di fresa e tornio, macro, simulazione e controllo degli errori. Sul telefono, anche senza rete.</p>
+    <p class="azioni"><a class="pul" href="app.html">Apri l'app</a> <a class="pul sec" id="apk" href="#installa" data-apk="">Scarica l'APK Android</a></p>
+    <p class="piccolo">Nessun account, nessuna pubblicita, i dati restano sul telefono.</p>
+  </div>
+  <img class="eroe-img" src="docs/schermate/home.png" alt="La home dell'app con il menu delle funzioni" width="390" height="844">
+</div></section>
+<section id="funzioni" class="sezione"><div class="largo">
+  <h2>Cosa fa</h2>
+  <div class="griglia"><div class="scheda"><h3>Programmi di fresa, foratura e tornio</h3><p>Spianatura, tasche, profili con G41/G42, fori con tutti i cicli, filetti, troncatura e cicli fissi. Piu lavorazioni in un programma, nell'ordine di officina.</p></div><div class="scheda"><h3>Controllo e simulazione</h3><p>Trova gli errori riga per riga, anche da una foto dello schermo. Simulazione animata con quote, giri, centro fresa e urti con le staffe.</p></div><div class="scheda"><h3>Disegna il profilo col dito</h3><p>Linee, archi, smussi, raggi, filetti e gole di scarico, con la vista 3D del pezzo tornito.</p></div><div class="scheda"><h3>Ciclo di lavoro proposto</h3><p>Dal pezzo, o dalle quote di un disegno, alla lavorazione completa con utensili e dati di taglio.</p></div><div class="scheda"><h3>Dati di taglio e tabelle</h3><p>Giri e avanzamenti per utensile e materiale, tolleranze ISO, filetti, rugosita, codici G e M.</p></div><div class="scheda"><h3>Macro, pezzi, attrezzaggio</h3><p>Modelli di macro con simulazione, fogli di attrezzaggio da stampare, foto e controllo delle misure.</p></div></div>
+</div></section>
+<section class="sezione"><div class="largo">
+  <h2>Le schermate</h2>
+  <div class="schermate" role="list"><figure role="listitem"><img src="docs/schermate/home.png" alt="Home con il menu delle funzioni" loading="lazy" height="520"><figcaption>Home</figcaption></figure><figure role="listitem"><img src="docs/schermate/listato.png" alt="Programma ISO generato" loading="lazy" height="520"><figcaption>Programma</figcaption></figure><figure role="listitem"><img src="docs/schermate/simulazione.png" alt="Simulazione a pannello con quote e giri" loading="lazy" height="520"><figcaption>Simulazione</figcaption></figure><figure role="listitem"><img src="docs/schermate/disegno.png" alt="Disegno del profilo del tornio" loading="lazy" height="520"><figcaption>Disegno del profilo</figcaption></figure><figure role="listitem"><img src="docs/schermate/angolo.png" alt="Angolo misurato su una foto" loading="lazy" height="520"><figcaption>Angolo da una foto</figcaption></figure><figure role="listitem"><img src="docs/schermate/ciclo.png" alt="Ciclo di lavoro proposto per una piastra" loading="lazy" height="520"><figcaption>Ciclo proposto</figcaption></figure></div>
+</div></section>
+<section id="installa" class="sezione"><div class="largo">
+  <h2>Come si installa</h2>
+  <div class="griglia due">
+    <div class="scheda"><h3>Dal browser</h3><ol><li>Apri <a href="app.html">l'app</a> dal browser del telefono.</li><li>Dal menu scegli "Installa app" (o "Aggiungi a schermata Home").</li><li>Dopo la prima apertura funziona anche senza rete.</li></ol></div>
+    <div class="scheda"><h3>App Android (APK)</h3><ol><li>Scarica il file con il pulsante qui sopra.</li><li>Aprilo e consenti l'installazione da quella fonte.</li><li>Aggiunge la lettura delle foto, l'invio alla macchina e il salvataggio dei file.</li></ol></div>
+  </div>
+  <p class="piccolo">Gli aggiornamenti si installano sopra la versione vecchia e i dati restano. Prima di aggiornare fai la copia di sicurezza dall'app (Impostazioni).</p>
+</div></section>
+<section class="sezione"><div class="largo">
+  <h2>Domande frequenti</h2>
+  <details class="dom"><summary>Funziona senza internet?</summary><p>Si. Dopo la prima apertura l'app funziona senza rete. La rete serve solo per mandare un programma alla macchina o condividere un file.</p></details>
+  <details class="dom"><summary>Dove vanno i miei dati?</summary><p>Restano sul tuo telefono. Non c'e un account, non c'e pubblicita e non c'e nessun tracciamento. Per non perderli, fai ogni tanto la copia di sicurezza dall'app.</p></details>
+  <details class="dom"><summary>Quanto sono affidabili i valori di taglio?</summary><p>Sono valori di partenza per utensili in metallo duro. Vanno adattati a macchina, fissaggio e utensile, e ogni programma va provato a vuoto. Puoi sostituirli con i tuoi.</p></details>
+  <details class="dom"><summary>Posso mandare il programma alla macchina?</summary><p>Con l'app Android si invia via FTP alla macchina, nella stessa rete. In alternativa copi il programma, lo salvi come file o lo condividi.</p></details>
+  <details class="dom"><summary>Per quali macchine fa i programmi?</summary><p>Per fresa a tre assi e tornio, in ISO, con due altri linguaggi di controllo. Nessun linguaggio e stato provato su una macchina vera: prova sempre a vuoto la prima volta.</p></details>
+  <details class="dom"><summary>Serve installare qualcosa?</summary><p>No: si apre dal browser e si puo aggiungere alla schermata Home. Per la lettura delle foto e l'invio alla macchina serve l'app Android (APK).</p></details>
+</div></section>
+<section class="sezione"><div class="largo"><p class="avviso"><b>Da sapere:</b> i valori di taglio e i programmi sono di partenza e indicativi. La responsabilita di quello che si lavora e di chi usa il programma. Leggi anche la <a href="guida.html">guida</a> e l'<a href="privacy.html">informativa sulla privacy</a>.</p></div></section>
+<script>(function () { var a = document.getElementById('apk'); if (!a) return; var u = a.getAttribute('data-apk'); if (!u) { var h = location.hostname.split('.'), r = location.pathname.split('/')[1]; if (h.length >= 3 && r && h[1] === 'github') u = 'https://github.com/' + h[0] + '/' + r + '/releases/download/apk/Hich-Officina.apk'; } if (u) a.href = u; else a.hidden = true; })();</script>
+</main>
+<footer class="piede"><div class="largo">
+  <p><b>Hich-Officina</b> 2.18.0</p>
+  <p class="piccolo">I valori di taglio e i programmi sono di partenza e indicativi: vanno sempre controllati e provati a vuoto prima di lavorare. I nomi dei controlli citati nell'app indicano solo la compatibilita e appartengono ai rispettivi proprietari.</p>
+  <p class="piccolo"><a href="privacy.html">Privacy</a> · <a href="guida.html">Guida</a> · <a href="novita.html">Novita</a></p>
+</div></footer>
 </body>
 </html>

@@ -12,7 +12,7 @@ Oggi l'app si distribuisce come sito installabile e come APK. Per un negozio di 
 - Pacchetto in formato **app bundle** (AAB) firmato, non l'APK. Il lavoro automatico oggi costruisce solo l'APK: va aggiunto il passo AAB.
 - **Livello di API** richiesto dallo store (ora target 35): gia a posto, da riverificare a ogni scadenza dello store.
 - **Icona** 512x512, **immagine di presentazione** 1024x500 e almeno 2 **schermate** (ci sono in `docs/schermate`).
-- **Descrizione breve e lunga** in italiano (partire da `presentazione.html`).
+- **Descrizione breve e lunga** in italiano (partire dalla pagina principale del sito).
 - **Informativa sulla privacy** pubblicata a un indirizzo web (partire da "Note legali e privacy" nell'app): dati solo sul telefono, rete solo per l'invio alla macchina e la condivisione.
 - **Dichiarazioni dei dati** del negozio: nessun dato raccolto, permessi usati: fotocamera/foto (pezzi e programmi), rete (invio FTP).
 - **Classificazione dei contenuti** (questionario) e **categoria** (Strumenti o Produttivita).

@@ -348,7 +348,7 @@
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto,
-    schermi: {}, param: {}, VERSIONE: '2.17.1'
+    schermi: {}, param: {}, VERSIONE: '2.18.0'
   };
   window.App = App;
 
@@ -463,7 +463,7 @@
         el('div', { class: 'pulsanti', style: 'margin:8px 0 0' }, [el('button', { class: 'pul', style: 'padding:9px', testo: 'Fai la copia', onclick: () => App.copiaSicurezza && App.copiaSicurezza() }),
           el('button', { class: 'pul sec', style: 'padding:9px', testo: 'Tra 3 giorni', onclick: () => { mem.promemoriaFino = new Date(Date.now() + 3 * 86400000).toISOString(); salva(); promemoria.remove(); } })])])]) : null;
       const recBox = rec.length ? el('div', { class: 'recenti' }, [el('div', { class: 'sez', style: 'margin:0 2px 6px', testo: 'Usati di recente' }), el('div', { class: 'chips' }, rec.map(v => el('button', { class: 'chip', testo: v[2], onclick: () => App.vai(v[0]) })))]) : null;
-      m.append(el('div', { class: 'ctrl cerca-home' }, [el('span', { html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>' }), cerca]), promemoria, recBox, risultati, menu);
+      m.append(...[el('div', { class: 'ctrl cerca-home' }, [el('span', { html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>' }), cerca]), promemoria, recBox, risultati, menu].filter(Boolean));   // senza i null: append(null) scrive la parola "null"
       cerca.addEventListener('input', () => {
         const q = cerca.value.trim();
         const L = App.cerca ? App.cerca(q) : [];

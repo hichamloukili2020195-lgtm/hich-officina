@@ -48,9 +48,9 @@ Prima versione sul negozio: calcoli di taglio, programmi ISO di fresa e tornio, 
 ## Categoria e etichette
 - Categoria: Strumenti (oppure Produttivita).
 - Lingua predefinita: italiano.
-- Indirizzo web: [indirizzo della pagina di presentazione]
+- Indirizzo web: [indirizzo della pagina principale del sito]
 - Email di contatto pubblica: [email dedicata]
-- Informativa sulla privacy: [indirizzo della pagina privacy.html, con nome e email compilati]
+- Informativa sulla privacy: [indirizzo di privacy.html del sito: compila prima sito.json con nome, email e data, poi node tools/sito.js]
 
 ## Sezione "Sicurezza dei dati" (risposte)
 - L'app raccoglie o condivide dati utente? **No.**
