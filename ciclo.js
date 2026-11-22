@@ -278,7 +278,61 @@
     return { righe, percorso: P, avvisi };
   }
 
-  const Ciclo = { estraiQuote, pianificaAlbero, pianificaPiastra, gcodeSequenzaTornio, passoGrosso };
+  /**
+   * Programma dal profilo disegnato: profilo (sgrossatura e finitura) piu le lavorazioni messe sulle linee
+   * (gola di scarico alla fine, filetto, tolleranza). punti = [{x, z, tratto, r, raccordo, smusso, fil (passo), gola (larghezza), toll}]
+   */
+  function pianificaProfilo(punti, ctx) {
+    const note = { testi: [], daControllare: new Set() };
+    const mt = ctx.mat, tab = ctx.tab || [], nmax = ctx.nmax || 3000, dg = Number(ctx.dg);
+    if (!mt || !(mt.lvc > 0)) return { errore: 'Il materiale non ha i dati di tornitura.' };
+    if (!(dg > 0)) return { errore: 'Scrivi il diametro del grezzo.' };
+    const P = punti.map(p => Object.assign({}, p, { x: Number(p.x), z: Number(p.z) }));
+    const misure = [];
+    // diametri dei cilindri con tolleranza o filetto: si spostano tutti e due i punti della linea
+    for (let i = 1; i < P.length; i++) {
+      const a = P[i - 1], b = P[i];
+      if (Math.abs(a.x - b.x) > 1e-9 || Math.abs(a.z - b.z) < 1e-9) continue;
+      const d = Number(punti[i].x);
+      let nuovo = d;
+      if (Number(b.fil) > 0) nuovo = d - 0.1;
+      else if (b.toll) {
+        const t = leggiTol(d, b.toll);
+        if (t.errore) note.testi.push('Tolleranza "' + b.toll + '" su Ø' + d + ' non capita: al nominale.');
+        else { nuovo = r3(d + (t.sup + t.inf) / 2); misure.push({ nome: 'Ø' + d + ' ' + b.toll, nominale: String(d), toll: b.toll }); }
+      }
+      a.x = nuovo; b.x = nuovo;
+    }
+    const base = { nmax, codLimite: ctx.codLimite, codFiletto: ctx.codFiletto, refrig: ctx.refrig };
+    const tSgr = trovaT(tab, ['inserto'], 0, 1, note);
+    const mezzo = mt.lvc >= 300 ? 3 : mt.lvc <= 100 ? 1 : 2;
+    const fasi = [{ op: 'profilo', titolo: 'Sgrossatura e finitura del profilo T' + tSgr, c: Object.assign({}, base, { t: tSgr, dg, punti: P.map(p => ({ x: p.x, z: p.z, tratto: p.tratto, r: Number(p.r) || 0, raccordo: Number(p.raccordo) || 0, smusso: Number(p.smusso) || 0 })),
+      ap: mezzo, sx: 0.4, sz: 0.1, ff: r3(Math.max(0.05, mt.lf * 0.4)), finitura: true, metodo: ctx.metodo || 'passate', vc: mt.lvc, f: mt.lf }) }];
+    if (P.some((p, i) => Number(punti[i].toll) || punti[i].toll)) note.testi.push('I cilindri con tolleranza si finiscono al centro della tolleranza.');
+    // gole alla fine delle linee, poi i filetti
+    for (let i = 1; i < punti.length; i++) {
+      const b = punti[i], d = Number(b.x), zA = Number(punti[i - 1].z), zB = Number(b.z);
+      if (Number(b.gola) > 0) {
+        const w = Number(b.gola), pf = Number(b.fil) > 0 ? 0.613343 * Number(b.fil) + 0.1 : Math.max(0.5, Number(b.golaProf) || 0.5);
+        const tG = trovaT(tab, ['inserto'], 0, 4, note);
+        fasi.push({ op: 'gola', titolo: 'Gola di scarico su Ø' + d + ' larga ' + w + ' T' + tG, c: Object.assign({}, base, { t: tG, dg: d, dfondo: r3(d - 2 * pf), zg: r3(zB + w), b: w, w: Math.min(3, w), vc: r3(mt.lvc * 0.6), f: r3(Math.max(0.03, mt.lf * 0.3)) }) });
+      }
+    }
+    for (let i = 1; i < punti.length; i++) {
+      const b = punti[i], p = Number(b.fil);
+      if (!(p > 0)) continue;
+      const d = Number(b.x), zA = Number(punti[i - 1].z), zB = Number(b.z);
+      const w = Number(b.gola) > 0 ? Number(b.gola) : 0;
+      const tF = trovaT(tab, ['inserto'], 0, 3, note);
+      const np = p <= 1 ? 5 : p <= 1.5 ? 6 : p <= 2 ? 8 : p <= 3 ? 10 : 12;
+      fasi.push({ op: 'filetto', titolo: 'Filetto M' + d + 'x' + p + ' T' + tF, c: Object.assign({}, base, { t: tF, dg: d, d, p, l: r3(-zB - w / 2), n: np, giri: giriDa(mt.lvc * 0.5, d, nmax), metodo: ctx.metodo || 'passate', vc: Math.round(mt.lvc * 0.5) }) });
+      if (zA < 0) note.testi.push('Il filetto M' + d + ' non parte dalla testa: le prime passate vanno in aria.');
+      if (!w && i < punti.length - 1 && Number(punti[i + 1].x) > d) note.testi.push('Il filetto M' + d + ' finisce contro uno spallamento senza gola di scarico.');
+    }
+    return { fasi, misure, note: finisci(note), modo: 'tornio' };
+  }
+
+  const Ciclo = { pianificaProfilo, estraiQuote, pianificaAlbero, pianificaPiastra, gcodeSequenzaTornio, passoGrosso };
   Object.assign(O, Ciclo);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

@@ -38,11 +38,11 @@ const server = http.createServer((q, r) => {
   await vai('home');
   await foto('01-home');
   const voci = await pg.$$eval('.menu .voce', x => x.length);
-  ok(voci === 13, 'voci del menu: ' + voci);
+  ok(voci === 14, 'voci del menu: ' + voci);
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo']) {
+  for (const s of ['programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'ciclo', 'angolo']) {
     await vai(s); await erroreSchermo(s); await largo(s);
   }
 
@@ -499,6 +499,37 @@ const server = http.createServer((q, r) => {
   ok(pinch, 'lo zoom con due dita non deve aggiungere punti');
   await foto('29-disegno-zoom');
   await pg.click('text=Adatta');
+
+  // ===== 2.13.0: lavorazioni sulle linee, angolo da una foto =====
+  await vai('disegno'); await pg.waitForTimeout(80);
+  await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '20', z: '0', smusso: '1' }, { x: '20', z: '-25' }, { x: '30', z: '-25' }, { x: '30', z: '-45' }, { x: '40', z: '-45' }]; App.salva(); });
+  await vai('home'); await vai('disegno'); await pg.waitForTimeout(80);
+  await pg.click('.linea-testo:has-text("Cilindro Ø20 lungo 25")'); await pg.waitForTimeout(40);
+  await pg.selectOption('#f-fil', '2.5'); await pg.waitForTimeout(60);
+  let pl = await pg.evaluate(() => App.mem.disegno.punti[2]);
+  ok(pl.fil === '2.5' && Number(pl.gola) >= 3, 'filetto e gola sulla linea: ' + JSON.stringify(pl));
+  await pg.click('.linea-testo:has-text("Cilindro Ø30 lungo 20")'); await pg.waitForTimeout(40);
+  await pg.fill('#f-toll', 'h6'); await pg.waitForTimeout(40);
+  ok((await pg.textContent('.elenco-linee')).includes('filetto M20x2,5') && (await pg.textContent('.elenco-linee')).includes('h6'), 'lavorazioni nell\'elenco');
+  await foto('31-disegno-filetto');
+  await pg.click('text=Crea il programma'); await pg.waitForTimeout(120);
+  const lst = await pg.textContent('.listato');
+  ok(lst.includes('(FASE 3: FILETTO M20X2.5') && lst.includes('G75') === false && lst.includes('X29.994'), 'programma con profilo, gola e filetto');
+  // angolo da una foto: immagine fatta qui con un fianco a 60 gradi
+  await vai('angolo'); await pg.waitForTimeout(80);
+  const png64 = await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 800; c.height = 600; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 800, 600);
+    g.fillStyle = '#333'; g.beginPath(); g.moveTo(100, 550); g.lineTo(100, 450); g.lineTo(450, 450); g.lineTo(450 + 150, 450 - 150 * Math.tan(Math.PI / 3)); g.lineTo(700, 450 - 150 * Math.tan(Math.PI / 3)); g.lineTo(700, 550); g.closePath(); g.fill();
+    return c.toDataURL('image/png').split(',')[1]; });
+  await pg.setInputFiles('#f-fotoAngolo', { name: 'pezzo.png', mimeType: 'image/png', buffer: Buffer.from(png64, 'base64') });
+  await pg.waitForTimeout(300);
+  const ang = await pg.evaluate(() => { const st = App.angoloStato; st.pti = [{ x: 150, y: 456 }, { x: 400, y: 445 }, { x: 476, y: 404 }, { x: 566, y: 247 }]; App.angoloCalcola(); const prima = st.alfa; App.angoloAggancia(); App.angoloDisegna(); return [prima, st.alfa]; });
+  ok(Math.abs(ang[0] - 60) > 1 && Math.abs(ang[1] - 60) < 1, 'aggancio ai bordi: ' + ang.map(a => a.toFixed(2)).join(' -> '));
+  const tes = await pg.textContent('#schermo');
+  ok(tes.includes('Smussatore (angolo di punta): 60') && tes.includes('di serie 60°') && tes.includes('coda di rondine'), 'utensili per 60 gradi');
+  await pg.selectOption('#f-cosa', 'cava'); await pg.waitForTimeout(40);
+  ok((await pg.textContent('#schermo')).includes('Fresa a V'), 'cava a V');
+  await foto('32-angolo');
+  await largo('fine 2.13.0');
 
   // ===== 2.10.0: ciclo proposto e quote dal disegno =====
   await vai('ciclo'); await pg.waitForTimeout(80);

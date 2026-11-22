@@ -39,8 +39,14 @@ Il sito si pubblica da solo dal ramo `main` (pagine del repository).
   tolto fa accostare il resto), le cambi Ø e lunghezza (il resto si sposta), la dividi, la fai diventare arco; l'elenco
   delle linee in parole ("Cilindro Ø20 lungo 25", "Cono da Ø30 a Ø38") con la ✕; le linee nuove con i bottoni
   Cilindro, Spallamento, Cono, Arco (bombato o incavato), Punto a quote; Annulla e Ripeti.
+  Su un cilindro scelto si mettono le **lavorazioni**: filetto (passi della tabella), gola di scarico alla fine,
+  tolleranza; "Crea il programma" fa profilo, gole e filetti in un programma solo.
 - **Simulazione a pannello**: quote X Y Z grandi, giri con l'indicatore, avanzamento, utensile, righe del programma che
   scorrono con la riga in lavoro; su tablet in orizzontale grafico e pannello affiancati.
+- **Angolo da una foto**: sulla foto del pezzo si mettono due punti sul lato di riferimento e due sul lato inclinato
+  (lente per la precisione, zoom con due dita), "Aggancia ai bordi" li porta sui bordi veri; l'app dà l'angolo e
+  l'utensile: smussatore (angolo di punta), fresa a coda di rondine, fresa a V, inclinazione del pezzo, con l'angolo
+  di serie piu vicino.
 - **Ricerca veloce dalla home**: M10 (filetto e preforo), H7 25 (tolleranza), 316 (materiale), G83 (codice), T5
   (utensile), nomi di pezzi, programmi e macro.
 - **Calcolatrice di taglio**: fresatura, tornitura, foratura, maschiatura, filettatura al tornio, cono, fori su
@@ -108,6 +114,7 @@ Dopo ogni modifica cambia `VERSIONE` in `sw.js`, cosi i telefoni scaricano i fil
 - `calcoli.js`: formule, materiali, dati di taglio, tolleranze, programmi del tornio.
 - `programmi.js`: programmi della fresatrice, sequenza, schemi dei fori, macro.
 - `ciclo.js`: ciclo di lavoro proposto (albero e piastra), quote lette da un disegno, programma del tornio a piu fasi.
+- `schermi_angolo.js`: angolo misurato su una foto e utensile.
 - `schermi_disegno.js`: disegno del profilo col dito e vista 3D del pezzo tornito.
 - `profilo.js`: profili liberi (raccordi, smussi, archi), percorso con G41/G42, sgrossatura dei profili da tornio.
 - `post.js`: post-processor verso gli altri linguaggi delle macchine.

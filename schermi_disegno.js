@@ -99,7 +99,8 @@
       const editor = el('div'), msg = el('div'), panGrezzo = el('div', { class: 'pannello' });
       const crea = el('button', { class: 'pul', html: A.icona('codice') + 'Crea il programma' });
       m.append(schede, cv, chips, msg, editor, el('div', { class: 'sez', testo: 'Grezzo e griglia' }), panGrezzo, el('div', { class: 'pulsanti' }, [crea]));
-      A.modulo(panGrezzo, [{ id: 'dg', et: 'Diametro del grezzo', u: 'mm' }, { id: 'lg', et: 'Lunghezza da disegnare', u: 'mm' },
+      if (S.mat === undefined) S.mat = '4';
+      A.modulo(panGrezzo, [{ id: 'mat', et: 'Materiale', tipo: 'scelta', scelte: () => A.sceltaMateriali() }, { id: 'dg', et: 'Diametro del grezzo', u: 'mm' }, { id: 'lg', et: 'Lunghezza da disegnare', u: 'mm' },
         { id: 'passo', et: 'Passo della griglia', tipo: 'scelta', scelte: [['0.5', '0,5 mm'], ['1', '1 mm'], ['2', '2 mm'], ['5', '5 mm']] }], S, () => tutto());
 
       // ----- vista: zoom e spostamento (due dita, rotella, pulsanti) -----
@@ -187,6 +188,23 @@
           const pl = g2.errore ? [{ a: num(a.z), b: num(a.x) / 2 }, { a: num(b.z), b: num(b.x) / 2 }] : O.polilineaProfilo(g2.tratti, 0.25);
           g.strokeStyle = col('--avviso'); g.lineWidth = 6; g.globalAlpha = 0.85; g.lineCap = 'round';
           g.beginPath(); pl.forEach((q, k) => (k ? g.lineTo(X(q.a), Y(q.b)) : g.moveTo(X(q.a), Y(q.b)))); g.stroke(); g.globalAlpha = 1; g.lineCap = 'butt';
+        }
+        // lavorazioni sulle linee: filetto (denti) e gola di scarico
+        for (let i = 1; i < S.punti.length; i++) {
+          const a = S.punti[i - 1], b = S.punti[i], r = num(b.x) / 2, za = num(a.z), zb = num(b.z);
+          if (Math.abs(num(a.x) - num(b.x)) > 1e-9) continue;
+          if (num(b.fil) > 0) {
+            const pz = Math.max(num(b.fil), 4 / sc), h = Math.min(0.6134 * num(b.fil), r * 0.3);
+            g.strokeStyle = col('--ok'); g.lineWidth = 1.3;
+            g.beginPath();
+            for (let z = za, k = 0; z > zb + (num(b.gola) || 0) - 1e-9; z -= pz / 2, k++) { const y = k % 2 ? Y(r - h) : Y(r); k ? g.lineTo(X(z), y) : g.moveTo(X(z), y); }
+            g.stroke();
+          }
+          if (num(b.gola) > 0) {
+            const w = num(b.gola), pf = num(b.fil) > 0 ? 0.6134 * num(b.fil) + 0.1 : 0.5;
+            g.fillStyle = col('--avviso'); g.globalAlpha = 0.5;
+            g.fillRect(X(zb + w), Y(r), X(zb) - X(zb + w), Math.max(2, pf * sc)); g.globalAlpha = 1;
+          }
         }
         // quote: Ø sopra i tratti cilindrici, lunghezza sotto lo specchio
         g.font = '600 11px system-ui'; g.textAlign = 'center';
@@ -406,7 +424,7 @@
       const descrivi = i => {
         const a = S.punti[i - 1], b = S.punti[i], t = tipoLinea(i);
         const xa = num(a.x), xb = num(b.x), L = Math.abs(num(a.z) - num(b.z));
-        if (t === 'cil') return 'Cilindro Ø' + fmt(xa, 3) + ' lungo ' + fmt(L, 3);
+        if (t === 'cil') return 'Cilindro Ø' + fmt(xa, 3) + ' lungo ' + fmt(L, 3) + (num(b.fil) > 0 ? ' · filetto M' + fmt(xa, 3) + 'x' + fmt(num(b.fil), 3) : '') + (num(b.gola) > 0 ? ' · gola ' + fmt(num(b.gola), 2) : '') + (b.toll ? ' · ' + b.toll : '');
         if (t === 'faccia') return 'Faccia fino a Ø' + fmt(xb, 3);
         if (t === 'spalla') return 'Spallamento da Ø' + fmt(xa, 3) + ' a Ø' + fmt(xb, 3);
         if (t === 'cono') return 'Cono da Ø' + fmt(xa, 3) + ' a Ø' + fmt(xb, 3) + ', lungo ' + fmt(L, 3) + ' (' + fmt(Math.atan(Math.abs(xb - xa) / 2 / L) * 180 / Math.PI, 2) + '°)';
@@ -465,6 +483,22 @@
           if (id === 'forma') b.tratto = v.forma === 'incavato' ? 'cw' : 'ccw';
           A.salva(); disegna(); disegnaElenco();
         });
+        if (t === 'cil') {
+          const d = num(b.x);
+          const passi = O.FILETTI_GROSSI.filter(f => f[0] === d).concat(O.FILETTI_FINI.filter(f => f[0] === d)).map(f => f[1]);
+          const lv = { fil: b.fil || '', gola: b.gola || '', toll: b.toll || '' };
+          editor.appendChild(el('div', { class: 'sez', testo: 'Lavorazioni su questa linea' }));
+          const panL = el('div', { class: 'pannello' });
+          editor.appendChild(panL);
+          A.modulo(panL, [{ id: 'fil', et: 'Filetto', tipo: 'scelta', scelte: [['', 'nessuno']].concat(passi.map(p => [String(p), 'M' + fmt(d) + ' x ' + fmt(p) + (p === O.passoGrosso(d) ? ' (grosso)' : ' (fine)')])).concat(passi.length ? [] : [['1', 'passo 1'], ['1.5', 'passo 1,5'], ['2', 'passo 2']]) },
+            { id: 'gola', et: 'Gola di scarico alla fine', sub: 'larghezza; vuoto = niente', u: 'mm' },
+            { id: 'toll', et: 'Tolleranza', sub: 'es. h6, ±0,02', tipo: 'testo' }], lv, id => {
+            if (id === 'fil') { if (lv.fil) b.fil = lv.fil; else delete b.fil; if (lv.fil && !b.gola && i < S.punti.length - 1 && num(S.punti[i + 1].x) > d) { b.gola = String(Math.max(3, Math.round(2 * num(lv.fil) * 10) / 10)); A.avviso('Aggiunta la gola di scarico larga ' + b.gola); } A.salva(); tutto(); return; }
+            if (id === 'gola') { if (num(lv.gola) > 0) b.gola = lv.gola; else delete b.gola; }
+            if (id === 'toll') { if (String(lv.toll).trim()) b.toll = lv.toll.trim(); else delete b.toll; }
+            A.salva(); disegna(); disegnaElenco();
+          });
+        }
         const ultimo = i === S.punti.length - 1;
         if (!ultimo) {
           const metti = (k, val) => { ricorda(); delete b.smusso; delete b.raccordo; if (k) b[k] = val; A.salva(); tutto(); };
@@ -536,9 +570,20 @@
         const { errore, poli } = poliDi(S.punti);
         if (errore) { A.avviso(errore); return; }
         if (poli.length < 2) { A.avviso('Servono almeno due punti'); return; }
+        const conLav = S.punti.some(p => num(p.fil) > 0 || num(p.gola) > 0 || (p.toll && String(p.toll).trim()));
+        if (conLav) {
+          const I = A.imp();
+          const pr = O.pianificaProfilo(S.punti, { mat: A.materiale(S.mat || 0), tab: A.tabellaUt ? A.tabellaUt() : [], dg: num(S.dg), nmax: I.nmaxTornio, codLimite: I.codLimite, codFiletto: I.codFiletto, refrig: I.refrig });
+          if (pr.errore) { A.avviso(pr.errore); return; }
+          const r = O.gcodeSequenzaTornio(pr.fasi, { num: I.numProg, nome: 'PROFILO' });
+          if (r.errore) { A.avviso(r.errore); return; }
+          A.param.listato = { righe: r.righe, iso: r.righe.slice(), nome: (r.righe[1] || 'O0001').split(' ')[0], tipo: 'tornio', avvisi: pr.note.concat(pr.fasi.map((f, k) => (k + 1) + '. ' + f.titolo)) };
+          A.vai('listato');
+          return;
+        }
         const P = A.sezione('programma');
         P.tab = 'tornio';
-        P.tornio = Object.assign(P.tornio || {}, { op: 'profilo', punti: JSON.parse(JSON.stringify(S.punti)), dg: S.dg });
+        P.tornio = Object.assign(P.tornio || {}, { op: 'profilo', punti: JSON.parse(JSON.stringify(S.punti)), dg: S.dg, mat: S.mat });
         A.salva(); A.vai('programma');
       });
       tutto();

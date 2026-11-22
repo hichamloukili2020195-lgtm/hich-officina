@@ -1,7 +1,7 @@
 // Cache per usare l'app senza rete. Cambia VERSIONE a ogni aggiornamento dei file.
-const VERSIONE = 'hich-officina-2.12.0';
+const VERSIONE = 'hich-officina-2.13.0';
 const FILE = ['./', './index.html', './stile.css', './calcoli.js', './programmi.js', './profilo.js', './iso.js', './post.js', './ciclo.js', './app.js', './schermi_calcoli.js',
-  './schermi_programma.js', './schermi_macro.js', './schermi_altro.js', './schermi_iso.js', './schermi_officina.js', './schermi_disegno.js', './schermi_ciclo.js', './manifest.webmanifest',
+  './schermi_programma.js', './schermi_macro.js', './schermi_altro.js', './schermi_iso.js', './schermi_officina.js', './schermi_disegno.js', './schermi_ciclo.js', './schermi_angolo.js', './manifest.webmanifest',
   './icone/icona.svg', './icone/icona-192.png', './icone/icona-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSIONE).then(c => c.addAll(FILE)).then(() => self.skipWaiting()));
