@@ -2,6 +2,11 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.27.0 - Velocita di taglio e avanzamento in primo piano
+- **In cima alla home** c'e il calcolo rapido: materiale, utensile e diametro (con il tastierino grande e i taglienti a un tocco) danno subito **giri al minuto, avanzamento e velocita di taglio**, piu fz o fn, passata e passo laterale.
+- Vale per tutti gli utensili (fresa, punta, alesatore, bareno, maschio, lamatore, inserto da tornio) e usa gli stessi dati della calcolatrice completa: i valori restano gli stessi tra le due. Il tasto "Completa" apre la calcolatrice con tutti gli utensili.
+- I giri restano limitati al massimo delle Impostazioni, e la nota ricorda che i valori sono di partenza.
+
 ## 2.26.0 - Segnala un problema
 - **Impostazioni, "Segnala un problema"**: apre l'email gia scritta con versione, schermata, telefono e misura dello schermo, per i tester e per chi usa l'app.
 - L'indirizzo di contatto viene da `sito.json` (copiato in `contatto.js` da `node tools/sito.js`): non e scritto nel codice.

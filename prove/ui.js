@@ -722,6 +722,39 @@ const server = http.createServer((q, r) => {
     await vai('home');
   }
 
+  // ===== 2.27.0: velocita di taglio e avanzamento in primo piano =====
+  {
+    await pg.evaluate(() => { Object.keys(App.sezione('utensili')).forEach(k => delete App.sezione('utensili')[k]); App.salva(); App.ridisegna(); });
+    await vai('home'); await pg.waitForTimeout(120);
+    ok(await pg.isVisible('#rapido'), 'calcolo rapido nella home');
+    const sopra = await pg.evaluate(() => { const r = document.querySelector('#rapido').getBoundingClientRect(), i = document.querySelector('.ingressi').getBoundingClientRect(); return r.top < i.top; });
+    ok(sopra, 'il calcolo rapido sta sopra i quattro ingressi');
+    const attesi = await pg.evaluate(() => { const S = App.sezione('utensili'), r = App.O.datiTaglio(App.materiale(S.mat), { tipo: S.tipo, d: Number(S.d), z: 3, nmax: App.imp().nmaxFresa }); return [App.fmt(r.n, 0), App.fmt(r.f, 0), App.fmt(r.vc, 0), S.tipo, S.d]; });
+    ok((await pg.textContent('#rapido-n')) === attesi[0] && (await pg.textContent('#rapido-f')) === attesi[1] && (await pg.textContent('#rapido-vc')) === attesi[2], 'giri, avanzamento e Vc come nella calcolatrice: ' + attesi.join(','));
+    // cambio materiale: i valori cambiano
+    const nC40 = await pg.textContent('#rapido-n');
+    await pg.selectOption('#rapido-mat', { label: 'Alluminio' }); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#rapido-n')) !== nC40 && Number((await pg.textContent('#rapido-vc')).replace('.', '')) > 200, 'alluminio: giri e Vc diversi dal C40');
+    // diametro scritto col tastierino
+    await pg.locator('#rapido .cn', { hasText: 'Diametro' }).locator('input').click();
+    await pg.click('.tast-k[aria-label="Cancella tutto"]'); await pg.click('.tast-k[aria-label="2"]'); await pg.click('.tast-k[aria-label="0"]'); await pg.click('.tast-k[aria-label="Conferma"]'); await pg.waitForTimeout(60);
+    const n20 = await pg.evaluate(() => { const S = App.sezione('utensili'); return [S.d, App.fmt(App.O.datiTaglio(App.materiale(S.mat), { tipo: S.tipo, d: 20, z: 3, nmax: App.imp().nmaxFresa }).n, 0)]; });
+    ok(n20[0] === '20' && (await pg.textContent('#rapido-n')) === n20[1], 'diametro 20 col tastierino: ' + n20.join());
+    // taglienti e utensile
+    await pg.click('#rapido [data-z="4"]'); await pg.waitForTimeout(40);
+    ok((await pg.evaluate(() => App.sezione('utensili').z)) === '4', 'taglienti');
+    await pg.selectOption('#rapido-tipo', 'maschio'); await pg.waitForTimeout(60);
+    ok((await pg.$$eval('#rapido [data-z]', x => x.length)) === 0 && (await pg.textContent('#rapido')).includes('Passo del filetto'), 'maschio: niente taglienti, c\'e il passo');
+    ok((await pg.textContent('#rapido')).includes('fn') || (await pg.textContent('#rapido')).includes('mm/giro'), 'maschio: avanzamento per giro');
+    await pg.selectOption('#rapido-tipo', 'fresa'); await pg.waitForTimeout(40);
+    // la calcolatrice completa ha gli stessi valori
+    await pg.click('#rapido-completo'); await pg.waitForTimeout(150);
+    ok((await pg.evaluate(() => location.hash)) === '#calcoli', 'apre la calcolatrice completa');
+    ok((await pg.inputValue('#f-d')) === '20' && (await pg.inputValue('#f-tipo')) === 'fresa', 'stessi valori nella calcolatrice completa');
+    await largo('home con il calcolo rapido');
+    await vai('home'); await foto('48-home-rapido');
+  }
+
   // ===== 2.26.0: segnala un problema =====
   {
     await vai('impostazioni'); await pg.waitForTimeout(60);

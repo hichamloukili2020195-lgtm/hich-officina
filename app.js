@@ -447,7 +447,7 @@
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.26.0'
+    schermi: {}, param: {}, VERSIONE: '2.27.0'
   };
   window.App = App;
 
@@ -570,6 +570,7 @@
       const cerca = el('input', { id: 'f-cerca-home', type: 'search', placeholder: 'Cerca: M10, H7 25, 316, G83, T5...', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search' });
       const risultati = el('div', { class: 'menu', hidden: true });
       const menu = el('div', { class: 'menu-sezioni' });
+      if (App.calcoloRapido) menu.appendChild(App.calcoloRapido());
       const L = mem.lavoro;
       const haLavoro = L && L.usato && ((L.fresa && (L.fresa.forme || []).length) || (L.tornio && (L.tornio.tratti || []).length));
       // primo avvio: una scheda (non blocca niente) con la macchina e i giri massimi

@@ -334,6 +334,56 @@
       aggiorna();
     }
   }
+  /**
+   * Calcolo rapido di velocita di taglio, giri e avanzamento: sta in cima alla home. Usa gli stessi valori della
+   * calcolatrice completa (sezione "utensili"), cosi i due si trovano sempre uguali.
+   */
+  A.calcoloRapido = function () {
+    const S = A.sezione('utensili');
+    if (!A.materiale(S.mat || 0)) S.mat = '0';
+    if (S.mat === undefined || S.mat === '') S.mat = String(Math.min(4, Math.max(0, A.materiali().length - 1)));
+    if (!O.UTENSILI.some(u => u[0] === S.tipo)) S.tipo = 'fresa';
+    if (S.d === undefined || S.d === '') S.d = '10';
+    const scheda = el('section', { class: 'rapido', id: 'rapido', 'aria-label': 'Calcolo rapido di velocita di taglio e avanzamento' });
+    const corpo = el('div', { class: 'rapido-corpo' });
+    const ris = el('div', { class: 'rapido-ris', 'aria-live': 'polite' });
+    const dopo = () => { A.salva(); aggiorna(); };
+    const sel = (id, et, scelte, valore, cambia) => {
+      const s2 = el('select', { id, 'aria-label': et }, scelte.map(([v, t]) => el('option', { value: v, testo: t })));
+      s2.value = String(valore);
+      s2.addEventListener('change', () => cambia(s2.value));
+      return el('label', { class: 'cn' }, [el('span', { class: 'cn-et', testo: et }), el('span', { class: 'cn-box sel' }, [s2])]);
+    };
+    const campi = el('div', { class: 'rapido-campi' });
+    const aggiorna = () => {
+      const tipo = S.tipo, mt = A.materiale(S.mat || 0), nmax = tipo === 'inserto' ? A.imp().nmaxTornio : A.imp().nmaxFresa;
+      const fresa = /^(fresa|fresaFin|filettaFresa)$/.test(tipo);
+      const d = O.num(S.d), z = O.num(S.z) > 0 ? O.num(S.z) : 3, passo = O.num(S.passo) > 0 ? O.num(S.passo) : 1.5;
+      campi.innerHTML = '';
+      campi.append(sel('rapido-mat', 'Materiale', A.sceltaMateriali(), S.mat, v => { S.mat = v; dopo(); }),
+        sel('rapido-tipo', 'Utensile', O.UTENSILI, tipo, v => { S.tipo = v; dopo(); }),
+        A.campoNum(S, 'd', tipo === 'inserto' ? 'Diametro del pezzo' : 'Diametro', 'mm', () => { A.salva(); risultato(); }));
+      if (fresa) campi.appendChild(el('div', { class: 'cn' }, [el('span', { class: 'cn-et', testo: 'Taglienti' }), el('div', { class: 'chips', role: 'group', 'aria-label': 'Numero di taglienti' }, [1, 2, 3, 4, 5, 6].map(n => el('button', { class: 'chip' + (z === n ? ' attiva' : ''), 'data-z': String(n), testo: String(n), onclick: () => { S.z = String(n); dopo(); } })))]));
+      if (tipo === 'maschio') campi.appendChild(A.campoNum(S, 'passo', 'Passo del filetto', 'mm', () => { A.salva(); risultato(); }));
+      risultato();
+      function risultato() {
+        const r = O.datiTaglio(mt, { tipo, d: O.num(S.d), z, passo, nmax });
+        ris.innerHTML = '';
+        if (!r) { ris.appendChild(el('p', { class: 'rapido-vuoto', testo: d > 0 ? 'Per questo materiale non ci sono dati per questo utensile.' : 'Scrivi il diametro.' })); return; }
+        ris.appendChild(el('div', { class: 'rapido-kpi' }, [
+          el('div', { class: 'k grande' }, [el('b', { id: 'rapido-n', testo: fmt(r.n, 0) }), el('small', { testo: 'giri/min' })]),
+          el('div', { class: 'k grande' }, [el('b', { id: 'rapido-f', testo: fmt(r.f, 0) }), el('small', { testo: 'avanzamento mm/min' })]),
+          el('div', { class: 'k' }, [el('b', { id: 'rapido-vc', testo: fmt(r.vc, 0) }), el('small', { testo: 'Vc m/min' })])]));
+        const riga = [r.fz !== undefined ? 'fz ' + fmt(r.fz, 3) + ' mm/dente' : 'fn ' + fmt(r.fn, 3) + ' mm/giro', r.ap !== undefined ? 'ap ' + fmt(r.ap, 1) + ' mm' : '', r.ae !== undefined ? 'ae ' + fmt(r.ae, 1) + ' mm' : ''].filter(Boolean).join(' · ');
+        ris.appendChild(el('p', { class: 'rapido-riga', testo: riga + (r.n >= nmax ? ' · giri limitati al massimo (' + nmax + ')' : '') }));
+      }
+    };
+    corpo.append(campi, ris);
+    scheda.append(el('div', { class: 'rapido-testa' }, [el('b', { testo: 'Velocita di taglio e avanzamento' }), el('button', { class: 'rapido-apri', id: 'rapido-completo', 'aria-label': 'Apri la calcolatrice completa', testo: 'Completa', onclick: () => A.vai('utensili') })]), corpo,
+      el('p', { class: 'leggenda rapido-nota', testo: 'Valori di partenza: adattali a macchina e fissaggio.' }));
+    aggiorna();
+    return scheda;
+  };
   A.schermi.utensili = { titolo: 'Calcolatrice di taglio', preferibile: false, render() { A.mem.calc = 'utensile'; A.salva(); location.replace('#calcoli'); } };
 
   // ----- tolleranze e accoppiamenti -----

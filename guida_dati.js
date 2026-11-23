@@ -3,7 +3,7 @@
   'use strict';
   const GUIDA = [
     { id: 'giri', t: 'Calcolare giri e avanzamenti', vai: 'calcoli',
-      passi: ['Home, Calcolatrice di taglio, scheda "Per utensile".', 'Scegli il materiale, il tipo di utensile e il diametro.', 'Leggi giri al minuto, velocita di taglio, avanzamento e tutti gli utensili del materiale in tabella.'],
+      passi: ['Subito in cima alla home: scegli materiale e utensile, scrivi il diametro (e i taglienti): leggi giri, avanzamento e Vc. "Completa" apre la calcolatrice con tutti gli utensili.', 'Calcolatrice di taglio, scheda "Per utensile".', 'Scegli il materiale, il tipo di utensile e il diametro.', 'Leggi giri al minuto, velocita di taglio, avanzamento e tutti gli utensili del materiale in tabella.'],
       esempio: 'Fresa D10 a 3 taglienti in C40: Vc 180 m/min, circa 5.730 giri/min, avanzamento 0,055 mm/dente.', attenzione: 'I valori sono di partenza: adattali a macchina, fissaggio e utensile.' },
     { id: 'programma', t: 'Fare un programma di fresa, foratura o tornio', vai: 'programma',
       passi: ['Home, Nuovo programma ISO. Scegli Fresatura, Foratura o Tornitura.', 'Scegli materiale e lavorazione, poi scrivi le misure.', 'Vc e avanzamento si riempiono dal materiale: li puoi correggere.', '"Genera programma ISO": copia, condividi, salva o simula.'],
