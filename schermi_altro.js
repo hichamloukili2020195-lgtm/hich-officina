@@ -74,12 +74,25 @@
   const TAB = {
     filetti() { return ''; },
     tolleranze(S) {
-      const campi = ['H7', 'H8', 'G7', 'F7', 'JS7', 'h6', 'h7', 'g6', 'f7', 'js6', 'k6', 'm6', 'n6', 'p6'], sc = S.toll || 'H7';
-      let h = '<div class="chips">' + campi.map(c => '<button class="chip' + (c === sc ? ' attiva' : '') + '" data-toll="' + c + '">' + c + '</button>').join('') + '</div>';
-      h += '<div class="pannello" style="padding:4px 8px"><div class="scorri"><table><tr><th>Diametro mm</th><th>Sup. µm</th><th>Inf. µm</th><th>IT</th></tr>';
+      const LETT = ['D', 'E', 'F', 'G', 'H', 'JS', 'd', 'e', 'f', 'g', 'h', 'js', 'k', 'm', 'n', 'p'];
+      const mt = /^(js|JS|[a-zA-Z])(\d{1,2})$/.exec(S.toll || 'H7') || ['', 'H', '7'];
+      S.tollL = LETT.includes(S.tollL) ? S.tollL : mt[1]; S.tollG = O.GRADI_IT.includes(S.tollG) ? S.tollG : (O.GRADI_IT.includes(mt[2]) ? mt[2] : '7');
+      const sc = S.tollL + S.tollG;
+      let h = '<div class="sez">Lettera: fori in maiuscolo, alberi in minuscolo</div><div class="chips fam">' + LETT.map(c => '<button class="chip' + (c === S.tollL ? ' attiva' : '') + '" data-toll-l="' + c + '">' + c + '</button>').join('') + '</div>';
+      h += '<div class="sez">Grado di tolleranza (IT)</div><div class="chips fam">' + O.GRADI_IT.map(g => '<button class="chip' + (g === S.tollG ? ' attiva' : '') + '" data-toll-g="' + g + '">IT' + g + '</button>').join('') + '</div>';
+      h += '<div class="fil-testa"><b>' + sc + '</b></div>';
+      h += '<div class="pannello" style="padding:4px 8px"><div class="scorri"><table><tr><th>Diametro mm</th><th>Sup. µm</th><th>Inf. µm</th><th>IT µm</th></tr>';
       let da = 0;
-      for (const lim of O.LIMITI) { const t = O.tolleranza(lim, sc); h += '<tr><td>oltre ' + da + ' fino a ' + lim + '</td><td>' + (t.sup > 0 ? '+' : '') + fmt(t.sup, 1) + '</td><td>' + (t.inf > 0 ? '+' : '') + fmt(t.inf, 1) + '</td><td>' + t.it + '</td></tr>'; da = lim; }
-      return h + '</table></div></div>';
+      for (const lim of O.LIMITI) {
+        const t = O.tolleranza(lim, sc);
+        h += t.errore ? '<tr><td>oltre ' + da + ' fino a ' + lim + '</td><td colspan="3">' + A.esc(t.errore) + '</td></tr>' : '<tr><td>oltre ' + da + ' fino a ' + lim + '</td><td>' + (t.sup > 0 ? '+' : '') + fmt(t.sup, 1) + '</td><td>' + (t.inf > 0 ? '+' : '') + fmt(t.inf, 1) + '</td><td>' + fmt(t.it, 1) + '</td></tr>';
+        da = lim;
+      }
+      h += '</table></div></div>';
+      h += '<div class="sez">Tutti i gradi IT (µm)</div><div class="pannello" style="padding:4px 8px"><div class="scorri"><table class="tab-fil"><tr><th>Oltre / fino a</th>' + O.GRADI_IT.map(g => '<th>IT' + g + '</th>').join('') + '</tr>';
+      da = 0;
+      O.LIMITI.forEach((lim, i) => { h += '<tr><td><b>' + da + ' / ' + lim + '</b></td>' + O.GRADI_IT.map(g => '<td>' + fmt(O.IT[g][i], 1) + '</td>').join('') + '</tr>'; da = lim; });
+      return h + '</table></div></div><p class="leggenda">ISO 286, fino a 500 mm. Lettere disponibili: fori D E F G H JS, alberi d e f g h js k m n p. Le altre lettere (a, b, c, r, s, t, u...) servono le tabelle complete della norma.</p>';
     },
     rugosita() {
       const c = [['N12', 50], ['N11', 25], ['N10', 12.5], ['N9', 6.3], ['N8', 3.2], ['N7', 1.6], ['N6', 0.8], ['N5', 0.4], ['N4', 0.2], ['N3', 0.1], ['N2', 0.05], ['N1', 0.025]];
@@ -159,7 +172,8 @@
         chips.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.tab));
         corpo.innerHTML = '';
         if (S.tab === 'filetti') filettiDom(S, corpo); else corpo.innerHTML = TAB[S.tab](S);
-        corpo.querySelectorAll('[data-toll]').forEach(b => b.addEventListener('click', () => { S.toll = b.dataset.toll; mostra('tolleranze'); }));
+        corpo.querySelectorAll('[data-toll-l]').forEach(b => b.addEventListener('click', () => { S.tollL = b.dataset.tollL; S.toll = S.tollL + (S.tollG || '7'); mostra('tolleranze'); }));
+        corpo.querySelectorAll('[data-toll-g]').forEach(b => b.addEventListener('click', () => { S.tollG = b.dataset.tollG; S.toll = (S.tollL || 'H') + S.tollG; mostra('tolleranze'); }));
       };
       Object.keys(TAB).forEach(k => chips.appendChild(el('button', { class: 'chip', 'data-id': k, testo: nomi[k], onclick: () => mostra(k) })));
       mostra(S.tab || 'filetti');

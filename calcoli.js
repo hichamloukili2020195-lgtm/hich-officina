@@ -232,15 +232,30 @@
 
   // ----- tolleranze ISO 286 (fino a 500 mm) -----
   const LIMITI = [3, 6, 10, 18, 30, 50, 80, 120, 180, 250, 315, 400, 500];
+  // gradi di tolleranza normalizzati IT01..IT18 (ISO 286-1), in micrometri, per i 13 campi di diametro
   const IT = {
-    5: [4, 5, 6, 8, 9, 11, 13, 15, 18, 20, 23, 25, 27],
-    6: [6, 8, 9, 11, 13, 16, 19, 22, 25, 29, 32, 36, 40],
-    7: [10, 12, 15, 18, 21, 25, 30, 35, 40, 46, 52, 57, 63],
-    8: [14, 18, 22, 27, 33, 39, 46, 54, 63, 72, 81, 89, 97],
-    9: [25, 30, 36, 43, 52, 62, 74, 87, 100, 115, 130, 140, 155],
-    10: [40, 48, 58, 70, 84, 100, 120, 140, 160, 185, 210, 230, 250],
-    11: [60, 75, 90, 110, 130, 160, 190, 220, 250, 290, 320, 360, 400]
+    '01': [0.3, 0.4, 0.4, 0.5, 0.6, 0.6, 0.8, 1, 1.2, 2, 2.5, 3, 4],
+    '0': [0.5, 0.6, 0.6, 0.8, 1, 1, 1.2, 1.5, 2, 3, 4, 5, 6],
+    '1': [0.8, 1, 1, 1.2, 1.5, 1.5, 2, 2.5, 3.5, 4.5, 6, 7, 8],
+    '2': [1.2, 1.5, 1.5, 2, 2.5, 2.5, 3, 4, 5, 7, 8, 9, 10],
+    '3': [2, 2.5, 2.5, 3, 4, 4, 5, 6, 8, 10, 12, 13, 15],
+    '4': [3, 4, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 20],
+    '5': [4, 5, 6, 8, 9, 11, 13, 15, 18, 20, 23, 25, 27],
+    '6': [6, 8, 9, 11, 13, 16, 19, 22, 25, 29, 32, 36, 40],
+    '7': [10, 12, 15, 18, 21, 25, 30, 35, 40, 46, 52, 57, 63],
+    '8': [14, 18, 22, 27, 33, 39, 46, 54, 63, 72, 81, 89, 97],
+    '9': [25, 30, 36, 43, 52, 62, 74, 87, 100, 115, 130, 140, 155],
+    '10': [40, 48, 58, 70, 84, 100, 120, 140, 160, 185, 210, 230, 250],
+    '11': [60, 75, 90, 110, 130, 160, 190, 220, 250, 290, 320, 360, 400],
+    '12': [100, 120, 150, 180, 210, 250, 300, 350, 400, 460, 520, 570, 630],
+    '13': [140, 180, 220, 270, 330, 390, 460, 540, 630, 720, 810, 890, 970],
+    '14': [250, 300, 360, 430, 520, 620, 740, 870, 1000, 1150, 1300, 1400, 1550],
+    '15': [400, 480, 580, 700, 840, 1000, 1200, 1400, 1600, 1850, 2100, 2300, 2500],
+    '16': [600, 750, 900, 1100, 1300, 1600, 1900, 2200, 2500, 2900, 3200, 3600, 4000],
+    '17': [1000, 1200, 1500, 1800, 2100, 2500, 3000, 3500, 4000, 4600, 5200, 5700, 6300],
+    '18': [1400, 1800, 2200, 2700, 3300, 3900, 4600, 5400, 6300, 7200, 8100, 8900, 9700]
   };
+  const GRADI_IT = Object.keys(IT);
   // scostamento superiore degli alberi d..h (micrometri)
   const ES_ALBERO = {
     d: [-20, -30, -40, -50, -65, -80, -100, -120, -145, -170, -190, -210, -230],
@@ -267,11 +282,11 @@
   function tolleranza(d, campo) {
     const m = /^(js|JS|[a-zA-Z])(\d{1,2})$/.exec(String(campo || '').trim());
     if (!m) return { errore: 'Scrivi il campo come H7, g6, js6...' };
-    const lettera = m[1], grado = Number(m[2]);
+    const lettera = m[1], grado = Number(m[2]), chiave = m[2];
     if (!(d > 0) || d > 500) return { errore: 'Diametro da 0 a 500 mm.' };
-    if (!IT[grado]) return { errore: 'Gradi disponibili: da IT5 a IT11.' };
+    if (!IT[chiave]) return { errore: 'Gradi disponibili: da IT01 a IT18.' };
     const i = LIMITI.findIndex(l => d <= l);
-    const it = IT[grado][i];
+    const it = IT[chiave][i];
     const foro = lettera === lettera.toUpperCase() && lettera !== lettera.toLowerCase();
     const l = lettera.toLowerCase();
     let sup, inf;
@@ -716,7 +731,7 @@
   const Officina = {
     leggiTolleranza, campoNonValido, num, MATERIALI, UTENSILI, datiTaglio, leggiMateriali, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
     FILETTI_GROSSI, FILETTI_FINI, filetto, passateFiletto,
-    tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT,
+    tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT, GRADI_IT,
     cono, foriSuCerchio, rugositaN, gc, gcodeTornio
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Officina;

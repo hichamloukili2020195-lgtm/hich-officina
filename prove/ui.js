@@ -703,6 +703,25 @@ const server = http.createServer((q, r) => {
     await vai('home');
   }
 
+  // ===== 2.22.0: tutte le tolleranze IT01-IT18 =====
+  {
+    await vai('tabelle'); await pg.click('#schermo .chips:not(.fam) .chip:text-is("Tolleranze")'); await pg.waitForTimeout(60);
+    ok((await pg.$$eval('[data-toll-g]', x => x.length)) === 20 && (await pg.$$eval('[data-toll-l]', x => x.length)) === 16, 'chip di lettere e gradi');
+    await pg.click('[data-toll-l="h"]'); await pg.click('[data-toll-g="13"]'); await pg.waitForTimeout(40);
+    let tx = await pg.textContent('#schermo');
+    ok(tx.includes('h13') && /-330/.test(tx), 'classe h13 in tabella');
+    ok(tx.includes('IT18') && tx.includes('3900') && tx.includes('IT01'), 'tabella di tutti i gradi IT');
+    await pg.click('[data-toll-l="F"]'); await pg.click('[data-toll-g="9"]'); await pg.waitForTimeout(40);
+    ok((await pg.textContent('#schermo')).includes('F9'), 'classe F9');
+    await vai('tolleranze'); await pg.fill('#f-libero', 'H12'); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#schermo')).includes('210'), 'H12 nella calcolatrice');
+    ok((await pg.$$eval('#f-foro option', x => x.map(o => o.value))).includes('H13') && (await pg.$$eval('#f-alb option', x => x.map(o => o.value))).includes('h14'), 'classi in piu nelle liste');
+    await pg.fill('#f-libero', 'H19'); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#schermo')).includes('IT18'), 'grado non valido: messaggio');
+    await pg.fill('#f-libero', '');
+    await vai('home');
+  }
+
   // ===== 2.19.0: mini CAD/CAM per la fresa =====
   {
   await vai('cad'); await pg.waitForTimeout(150);

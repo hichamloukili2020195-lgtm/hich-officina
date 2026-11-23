@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.22.0 - Tolleranze: tutti i gradi IT01-IT18
+- Tutti i **gradi di tolleranza normalizzati da IT01 a IT18** (prima da IT5 a IT11), per ogni classe: H12, h13, D10, js14, f9, k4...
+- **Tabelle, Tolleranze**: scegli la lettera (16) e il grado (20) con i tasti; in fondo la tabella di tutti i gradi IT per ogni campo di diametro.
+- La calcolatrice delle tolleranze ha piu classi nelle liste (H5-H14, h5-h14, D10, E9, js7...) e accetta qualsiasi classe nel campo "Altra classe".
+- Disegno del lavoro: lista di tutte le classi d-p dai gradi 5 a 14 per i cilindri.
+- Le altre lettere della norma (a, b, c, r, s, t, u, v, x, y, z) non ci sono ancora: servono le tabelle complete di ISO 286-2, che l'app non puo ricavare con formule senza arrotondamenti diversi dal libro.
+
 ## 2.21.0 - Modelli, lavori salvati, barenatura, costo e rampa
 - **Modelli pronti** per partire: perno con filetto, albero a gradini, boccola, disco con foro (tornio); piastra con 4 fori M8, piastra con tasca, staffa con asole, flangia a 6 fori (fresa).
 - **Lavori salvati con un nome**: salva, apri, duplica ed elimina, dal primo passo.

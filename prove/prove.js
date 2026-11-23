@@ -658,4 +658,26 @@ prova('lavoro: barenatura interna, modelli, costo del pezzo, rampa della tasca',
   rampe.forEach(s => { const m = Math.atan2(s.z0 - s.z, Math.hypot(s.x - s.x0, s.y - s.y0)) * 180 / Math.PI; assert.ok(m <= 3.01, 'pendenza ' + m); });
   assert.ok(!O.eseguiISO(r.righe.join('\n')).errore);
 });
+prova('tolleranze: tutti i gradi IT01-IT18 e le classi con ogni grado', () => {
+  assert.strictEqual(O.GRADI_IT.length, 20);
+  // ogni grado cresce con il grado e con il diametro
+  const ord = ['01', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18'];
+  ord.forEach((g, k) => { O.IT[g].forEach((v, i) => { if (i) assert.ok(v >= O.IT[g][i - 1], 'IT' + g + ' cresce col diametro'); if (k) assert.ok(v > O.IT[ord[k - 1]][i], 'IT' + g + ' maggiore del precedente a ' + i); }); });
+  // valori di riferimento della norma
+  const IT = (d, g) => O.tolleranza(d, 'H' + g).it;
+  vicino(IT(25, 7), 21); vicino(IT(25, 6), 13); vicino(IT(40, 8), 39); vicino(IT(100, 9), 87); vicino(IT(10, 11), 90);
+  vicino(IT(25, 12), 210); vicino(IT(25, 13), 330); vicino(IT(40, 14), 620); vicino(IT(40, 18), 3900); vicino(IT(200, 16), 2900);
+  vicino(IT(25, '01'), 0.6); vicino(IT(25, '0'), 1); vicino(IT(25, 1), 1.5); vicino(IT(25, 4), 6); vicino(IT(2, 1), 0.8);
+  // lo stesso grado a fori e alberi, con i sensi giusti
+  const h13 = O.tolleranza(25, 'h13'), H13 = O.tolleranza(25, 'H13');
+  vicino(h13.sup, 0); vicino(h13.inf, -330); vicino(H13.inf, 0); vicino(H13.sup, 330);
+  const js14 = O.tolleranza(40, 'js14'); vicino(js14.sup, 310); vicino(js14.inf, -310);
+  const d10 = O.tolleranza(25, 'D10'); vicino(d10.inf, 65); vicino(d10.sup, 65 + 84);
+  vicino(O.tolleranza(25, 'f9').sup, -20); vicino(O.tolleranza(25, 'f9').inf, -72);
+  vicino(O.tolleranza(25, 'h5').inf, -9); vicino(O.tolleranza(25, 'k4').inf, 2);
+  assert.ok(O.tolleranza(25, 'H19').errore.includes('IT18'));
+  assert.ok(O.tolleranza(25, 'H7').sup === 21 && O.tolleranza(25, 'g6').sup === -7);
+  // la tolleranza scritta a mano usa gli stessi gradi
+  const t = O.leggiTolleranza(25, 'h12'); vicino(t.sup, 0); vicino(t.inf, -0.21);
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

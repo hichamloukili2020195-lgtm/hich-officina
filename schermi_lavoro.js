@@ -257,6 +257,12 @@
               ed.append(el('div', { class: 'lav-et', testo: 'Filetto' }), chips([['', 'No']].concat(passi.map(p => [p, 'M' + fmt(d) + 'x' + fmt(p)])), t.fil || '', v => { if (v) { t.fil = v; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * v * 10) / 10); } else delete t.fil; ri(); }, 'Filetto'));
               ed.append(el('div', { class: 'lav-et', testo: 'Gola di scarico alla fine' }), chips([['', 'No'], [3, '3 mm'], [4, '4 mm'], [5, '5 mm'], [6, '6 mm']], t.gola || '', v => { if (v) t.gola = v; else delete t.gola; ri(); }, 'Gola'));
               ed.append(el('div', { class: 'lav-et', testo: 'Tolleranza' }), chips([['', 'No'], ['h6', 'h6'], ['h7', 'h7'], ['g6', 'g6'], ['f7', 'f7'], ['k6', 'k6'], ['js6', 'js6']], t.toll || '', v => { if (v) t.toll = v; else delete t.toll; ri(); }, 'Tolleranza'));
+              const tutte = [];
+              ['d', 'e', 'f', 'g', 'h', 'js', 'k', 'm', 'n', 'p'].forEach(l => ['5', '6', '7', '8', '9', '10', '11', '12', '13', '14'].forEach(g => tutte.push(l + g)));
+              const altre = el('select', { class: 'lav-altra-toll', 'aria-label': 'Altra tolleranza', id: 'lav-altra-toll-' + i }, [el('option', { value: '', testo: 'Altra tolleranza…' })].concat(tutte.map(c => el('option', { value: c, testo: c }))));
+              altre.value = tutte.includes(t.toll) ? t.toll : '';
+              altre.addEventListener('change', () => { if (altre.value) t.toll = altre.value; else delete t.toll; ri(); });
+              ed.appendChild(el('div', { class: 'ctrl' }, [altre]));
             }
             ed.append(el('div', { class: 'lav-et', testo: 'Spigolo alla fine' }), chips([['', 'Vivo'], ['C0.5', 'C0,5'], ['C1', 'C1'], ['C2', 'C2'], ['R0.5', 'R0,5'], ['R1', 'R1'], ['R2', 'R2']], t.spigolo || '', v => { t.spigolo = v; ri(); }, 'Spigolo'));
             card.appendChild(ed);
