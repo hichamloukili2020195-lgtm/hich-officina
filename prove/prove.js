@@ -817,4 +817,22 @@ prova('disegno: richiami di fori su piu righe, tolleranze geometriche, cartiglio
   assert.strictEqual(lam.c.punti.length, 3); assert.strictEqual(lam.c.prof, 9); assert.strictEqual(lam.c.d, 15);
   assert.ok(!O.eseguiISO(O.programmaLavoro(p, {}, { num: 1, nome: 'F' }).righe.join('\n')).errore);
 });
+prova('grafica: contrasto dei colori (WCAG AA) nel tema scuro e in quello chiaro', () => {
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', 'stile.css'), 'utf8');
+  const blocco = re => { const m = re.exec(css); const v = {}; (m ? m[1] : '').replace(/--([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})/g, (x, k, c) => { v[k] = c; }); return v; };
+  const scuro = blocco(/^:root\{([^}]*)\}/m), chiaro = Object.assign({}, scuro, blocco(/:root\[data-theme="light"\]\{([^}]*)\}/));
+  const lum = c => { const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255).map(x => (x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4))); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const rapp = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  [['scuro', scuro], ['chiaro', chiaro]].forEach(([nome, t]) => {
+    ['fondo', 'pannello', 'riga', 'campo', 'testo', 'tenue', 'accento', 'accento2', 'su-accento', 'ok', 'avviso', 'errore', 'g-calcola', 'g-controlla', 'g-officina'].forEach(k => assert.ok(t[k], nome + ': manca --' + k));
+    const ctrl = (a, b, min, perche) => assert.ok(rapp(t[a], t[b]) >= min, nome + ': ' + perche + ' ' + rapp(t[a], t[b]).toFixed(2) + ' (serve ' + min + ')');
+    ['fondo', 'pannello', 'riga', 'campo'].forEach(s => { ctrl('testo', s, 7, 'testo su ' + s); ctrl('tenue', s, 4.5, 'testo tenue su ' + s); });
+    ['pannello', 'riga'].forEach(s => ['accento2', 'ok', 'avviso', 'errore', 'g-calcola', 'g-controlla', 'g-officina'].forEach(k => ctrl(k, s, 4.5, k + ' come testo su ' + s)));
+    ctrl('su-accento', 'accento', 4.5, 'testo sui pulsanti');
+    ctrl('accento', 'fondo', 3, 'accento come bordo o icona sul fondo');
+  });
+  // le due palette sono diverse e l'accento e blu
+  assert.notStrictEqual(scuro.fondo, chiaro.fondo);
+  assert.ok(parseInt(scuro.accento.slice(5, 7), 16) > parseInt(scuro.accento.slice(1, 3), 16), 'accento blu: piu blu che rosso');
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

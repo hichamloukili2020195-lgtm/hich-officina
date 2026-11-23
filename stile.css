@@ -1,7 +1,8 @@
 /* Hich-Officina: blu acciaio su fondo notte, schermate a pila con testata e barra in basso. */
 :root{
-  --fondo:#0b1220; --pannello:#111a2c; --riga:#16213a; --campo:#0e1728; --bordo:#22314f;
-  --testo:#e8eef8; --tenue:#8d9cb6; --accento:#1f7aff; --accento2:#4c96ff; --su-accento:#ffffff;
+  --fondo:#070d1a; --pannello:#0f1b33; --riga:#13223f; --campo:#0a1429; --bordo:#1f3359;
+  --testo:#e8eef8; --tenue:#9aaac6; --accento:#1f66f0; --accento2:#6aa8ff; --su-accento:#ffffff;
+  --g-calcola:#ffb020; --g-controlla:#2fd48a; --g-officina:#b58cff;
   --ok:#3fcf8e; --avviso:#f2b54a; --errore:#ff6b6b;
   --cod-g:#79b8ff; --cod-m:#f2cc60; --cod-com:#7ee0a1; --cod-num:#5d6c88; --cod-t:#d2a8ff;
   --ombra:0 6px 24px rgba(0,0,0,.35);
@@ -11,7 +12,8 @@
 }
 :root[data-theme="light"]{
   --fondo:#eef2f8; --pannello:#ffffff; --riga:#f3f6fb; --campo:#f7f9fc; --bordo:#d4dcea;
-  --testo:#132033; --tenue:#5b6a82; --accento:#1567e0; --accento2:#1f7aff; --su-accento:#ffffff;
+  --testo:#132033; --tenue:#5b6a82; --accento:#1567e0; --accento2:#1558c4; --su-accento:#ffffff;
+  --g-calcola:#8a5a00; --g-controlla:#0b6e44; --g-officina:#6d3fc2;
   --ok:#14804f; --avviso:#9a5b00; --errore:#c62828;
   --cod-g:#0a58ca; --cod-m:#9a6700; --cod-com:#1a7f37; --cod-num:#8b97ab; --cod-t:#8250df;
   --ombra:0 4px 16px rgba(20,40,80,.12);
@@ -20,7 +22,8 @@
 @media (prefers-color-scheme: light){
   :root:not([data-theme="dark"]):not([data-tema="scuro"]){
     --fondo:#eef2f8; --pannello:#ffffff; --riga:#f3f6fb; --campo:#f7f9fc; --bordo:#d4dcea;
-    --testo:#132033; --tenue:#5b6a82; --accento:#1567e0; --accento2:#1f7aff; --su-accento:#ffffff;
+    --testo:#132033; --tenue:#5b6a82; --accento:#1567e0; --accento2:#1558c4; --su-accento:#ffffff;
+  --g-calcola:#8a5a00; --g-controlla:#0b6e44; --g-officina:#6d3fc2;
     --ok:#14804f; --avviso:#9a5b00; --errore:#c62828;
     --cod-g:#0a58ca; --cod-m:#9a6700; --cod-com:#1a7f37; --cod-num:#8b97ab; --cod-t:#8250df;
     --ombra:0 4px 16px rgba(20,40,80,.12);
@@ -578,3 +581,12 @@ body.con-tastierino .lav-barra{display:none}
 @media (min-width:760px){.rapido-campi{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .rapido-campi .cn:has(.chips){grid-column:1/-1}
 .rapido-campi .chips{flex-wrap:wrap}
+
+/* ===== 2.28: un colore per gruppo ===== */
+.ingresso[data-gruppo=calcola]{border-left:4px solid var(--g-calcola)}
+.ingresso[data-gruppo=controlla]{border-left:4px solid var(--g-controlla)}
+.ingresso[data-gruppo=officina]{border-left:4px solid var(--g-officina)}
+.ingresso[data-gruppo=calcola] .ic{background:color-mix(in srgb,var(--g-calcola) 20%,transparent);color:var(--g-calcola)}
+.ingresso[data-gruppo=controlla] .ic{background:color-mix(in srgb,var(--g-controlla) 20%,transparent);color:var(--g-controlla)}
+.ingresso[data-gruppo=officina] .ic{background:color-mix(in srgb,var(--g-officina) 20%,transparent);color:var(--g-officina)}
+.ingresso.primo{background:linear-gradient(135deg,#2f7bff,#1747c9)}

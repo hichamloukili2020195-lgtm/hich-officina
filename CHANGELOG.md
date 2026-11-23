@@ -2,6 +2,12 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.28.0 - Grafica: un colore per gruppo
+- La home ha **un colore per ogni gruppo**: Calcola giallo, Controlla verde, Officina viola, con il bordo colorato e l'icona nello stesso colore. Il blu resta il colore principale dell'app.
+- **Blu piu profondo** nel tema scuro (fondo, pannelli e bordi) e testi secondari piu leggibili.
+- **Tema chiaro** con i colori dei gruppi scuriti per leggersi bene sul bianco.
+- Una **prova automatica controlla il contrasto** (livello AA) di testi, pulsanti e colori dei gruppi in entrambi i temi.
+
 ## 2.27.0 - Velocita di taglio e avanzamento in primo piano
 - **In cima alla home** c'e il calcolo rapido: materiale, utensile e diametro (con il tastierino grande e i taglienti a un tocco) danno subito **giri al minuto, avanzamento e velocita di taglio**, piu fz o fn, passata e passo laterale.
 - Vale per tutti gli utensili (fresa, punta, alesatore, bareno, maschio, lamatore, inserto da tornio) e usa gli stessi dati della calcolatrice completa: i valori restano gli stessi tra le due. Il tasto "Completa" apre la calcolatrice con tutti gli utensili.
