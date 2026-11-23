@@ -32,7 +32,11 @@ jobs:
       # se le prove falliscono non si costruisce l'APK
       - name: Prove (sintassi, calcoli, prova a tappeto)
         run: node prove/tutte.js
-      - name: Chiave di firma dai segreti (se ci sono)
+      # l'APK resta firmato con la chiave di serie: chi l'ha gia installato continua ad aggiornarlo senza perdere i dati
+      - name: Costruisci l'APK
+        run: gradle -p android assembleRelease --no-daemon
+      # il pacchetto per il negozio (AAB) usa invece la chiave di caricamento dai segreti, se ci sono
+      - name: Chiave di caricamento dai segreti (se ci sono)
         env:
           FIRMA_KEYSTORE_B64: ${{ secrets.FIRMA_KEYSTORE_B64 }}
           FIRMA_PASSWORD: ${{ secrets.FIRMA_PASSWORD }}
@@ -43,12 +47,10 @@ jobs:
             echo "FIRMA_KEYSTORE=$RUNNER_TEMP/firma.jks" >> "$GITHUB_ENV"
             echo "FIRMA_PASSWORD=$FIRMA_PASSWORD" >> "$GITHUB_ENV"
             echo "FIRMA_ALIAS=${FIRMA_ALIAS:-hich}" >> "$GITHUB_ENV"
-            echo "Firma con la chiave dei segreti"
+            echo "AAB firmato con la chiave di caricamento dei segreti"
           else
-            echo "Firma con la chiave di serie del repository"
+            echo "Nessun segreto: niente pacchetto per il negozio"
           fi
-      - name: Costruisci l'APK
-        run: gradle -p android assembleRelease --no-daemon
       - name: Pacchetto per il negozio (AAB), solo con la chiave dei segreti
         if: env.FIRMA_KEYSTORE != ''
         run: gradle -p android bundleRelease --no-daemon

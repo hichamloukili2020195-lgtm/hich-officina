@@ -32,4 +32,4 @@ Oggi l'app si distribuisce come sito installabile e come APK. Per un negozio di 
 6. **Produzione**: dopo l'approvazione si pubblica; la prima revisione puo durare qualche giorno.
 
 ### Attenzione alle due chiavi
-La chiave con cui sono firmati gli APK di oggi sta nel repository, che e pubblico: chiunque potrebbe firmare con quella. Per il negozio si usa una chiave nuova e segreta. Chi ha installato l'APK a mano dovra **disinstallare e reinstallare** quando passa alla versione del negozio (le firme sono diverse): prima fa la copia di sicurezza dei dati dall'app.
+La chiave con cui sono firmati gli APK di oggi sta nel repository, che e pubblico: chiunque potrebbe firmare con quella. Per questo il lavoro automatico firma l'APK con la chiave di serie (cosi chi l'ha installato a mano continua ad aggiornarlo senza perdere i dati) e firma **solo il pacchetto del negozio** con la chiave nuova e segreta dei segreti di GitHub. Chi passa dall'APK a mano all'app del negozio dovra **disinstallare e reinstallare** (le firme sono diverse): prima fa la copia di sicurezza dei dati dall'app.
