@@ -2,6 +2,11 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.26.0 - Segnala un problema
+- **Impostazioni, "Segnala un problema"**: apre l'email gia scritta con versione, schermata, telefono e misura dello schermo, per i tester e per chi usa l'app.
+- L'indirizzo di contatto viene da `sito.json` (copiato in `contatto.js` da `node tools/sito.js`): non e scritto nel codice.
+- `docs/TEST_CHIUSO.md`: come iscrivere i tester, il messaggio da mandare, le cinque prove e cosa chiedere nel resoconto.
+
 ## 2.25.0 - Dal disegno: richiami dei fori, flange, tolleranze geometriche
 - **Richiami su piu righe** letti come una quota sola: "N°4 Fori Ø13 / Passanti / Equidistanti", "N°3 Fori Lamati Ø13 / Lamatura Ø18.5 / Prof.lamatura 13", "N°2 Fori spina Ø10 H7 / Prof.foro 10 / A 180°". Prima "N°" e "Fori" con la maiuscola non si capivano e le righe sotto si perdevano.
 - **Riquadri di tolleranza geometrica** (posizione, concentricita) ignorati: prima "Ø 0.1 A B" diventava un foro.

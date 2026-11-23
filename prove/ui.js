@@ -722,6 +722,19 @@ const server = http.createServer((q, r) => {
     await vai('home');
   }
 
+  // ===== 2.26.0: segnala un problema =====
+  {
+    await vai('impostazioni'); await pg.waitForTimeout(60);
+    ok(await pg.isVisible('#segnala'), 'tasto Segnala un problema nelle Impostazioni');
+    const mail = await pg.evaluate(() => App.mailSegnalazione('lavoro'));
+    const sito = JSON.parse(require('fs').readFileSync(path.join(radice, 'sito.json'), 'utf8'));
+    const ver = await pg.evaluate(() => App.VERSIONE);
+    ok(mail.startsWith('mailto:' + (sito.email || '') + '?subject='), 'la segnalazione va al contatto di sito.json');
+    ok(decodeURIComponent(mail).includes('Hich-Officina ' + ver) && decodeURIComponent(mail).includes('Schermata: lavoro') && decodeURIComponent(mail).includes('Versione: ' + ver) && decodeURIComponent(mail).includes('Schermo: '), 'versione, schermata e schermo nell\'email');
+    ok(!/[\w.+-]+@[\w-]+\.[a-z]{2,}/i.test(require('fs').readFileSync(path.join(radice, 'app.js'), 'utf8') + require('fs').readFileSync(path.join(radice, 'schermi_altro.js'), 'utf8')), 'nessun indirizzo email scritto nel codice dell\'app');
+    await vai('home');
+  }
+
   // ===== 2.24.0: dal disegno al pezzo, con la conferma di ogni quota =====
   {
     const pngD = await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 1000; c.height = 500; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 1000, 500);

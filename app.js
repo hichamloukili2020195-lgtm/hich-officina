@@ -434,12 +434,20 @@
       chiudi => [el('button', { class: 'pul sec', testo: 'Annulla', onclick: () => chiudi(false) }), el('button', { class: 'pul' + (pericolo ? ' peric' : ''), testo: etichetta || 'Conferma', onclick: () => chiudi(true) })]);
   }
 
+  /** Indirizzo mailto per segnalare un problema: versione, schermata e telefono gia scritti. Il contatto viene da contatto.js (da sito.json). */
+  function mailSegnalazione(schermata) {
+    const a = window.CONTATTO || '';
+    const sch = schermata || (typeof attuale !== 'undefined' && attuale) || 'home';
+    const corpo = 'Cosa non va (scrivi qui sotto):\n\n\n\n--- non cancellare ---\nVersione: ' + App.VERSIONE + '\nSchermata: ' + sch + '\nTelefono: ' + (navigator.userAgent || '').replace(/\s+/g, ' ').slice(0, 160) + '\nSchermo: ' + window.innerWidth + 'x' + window.innerHeight;
+    return 'mailto:' + a + '?subject=' + encodeURIComponent('Hich-Officina ' + App.VERSIONE + ': segnalazione') + '&body=' + encodeURIComponent(corpo);
+  }
+
   // ----- schermate -----
   const App = {
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
-    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino,
-    schermi: {}, param: {}, VERSIONE: '2.25.0'
+    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
+    schermi: {}, param: {}, VERSIONE: '2.26.0'
   };
   window.App = App;
 

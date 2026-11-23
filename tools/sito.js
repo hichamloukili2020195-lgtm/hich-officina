@@ -180,7 +180,9 @@ function nonTrovata() {
 }
 
 const robots = 'User-agent: *\nAllow: /\n' + (base ? 'Sitemap: ' + base + 'sitemap.xml\n' : '');
-const PAGINE = { 'index.html': indexHtml(), 'guida.html': guidaHtml(), 'novita.html': novitaHtml(), 'privacy.html': privacyHtml(), '404.html': nonTrovata(), 'robots.txt': robots };
+// l'indirizzo di contatto per "Segnala un problema" nell'app: copiato da sito.json, mai scritto a mano nel codice
+const contatto = '// Generato da tools/sito.js da sito.json: non modificare.\nwindow.CONTATTO = ' + JSON.stringify(cfg.email || '') + ';\n';
+const PAGINE = { 'contatto.js': contatto, 'index.html': indexHtml(), 'guida.html': guidaHtml(), 'novita.html': novitaHtml(), 'privacy.html': privacyHtml(), '404.html': nonTrovata(), 'robots.txt': robots };
 if (base) PAGINE['sitemap.xml'] = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ['', 'guida.html', 'novita.html', 'privacy.html'].map(p => '  <url><loc>' + base + p + '</loc></url>').join('\n') + '\n</urlset>\n';
 
 const controlla = process.argv.includes('--controlla');

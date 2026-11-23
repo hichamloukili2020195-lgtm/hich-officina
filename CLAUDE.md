@@ -21,6 +21,7 @@ manuale. Rispondi in modo breve.
   dei fori, macro. `profilo.js` profili liberi. `iso.js` lettura, simulazione e controllo dei programmi ISO e delle macro.
   `post.js` linguaggi delle macchine. `ciclo.js` ciclo di lavoro proposto e quote da un disegno.
 - `app.js` base dell'interfaccia (schermate a pila con `#nome`, memoria, moduli). `schermi_*.js` le schermate. `stile.css`.
+- `contatto.js` si GENERA con `node tools/sito.js` da `sito.json` (l'indirizzo di contatto non va scritto a mano nel codice).
 - Sito: `index.html`, `guida.html`, `novita.html`, `privacy.html`, `404.html`, `sito.css` si GENERANO con `node tools/sito.js` (dati personali in `sito.json`): non si modificano a mano. L'app e `app.html`.
 - `sw.js` funzionamento senza rete (cambia VERSIONE a ogni rilascio). `manifest.webmanifest`. `android/` progetto Android.
 - Le schermate si registrano in `App.schermi`; i campi si costruiscono con `App.modulo`; i dati sono in `App.mem`
