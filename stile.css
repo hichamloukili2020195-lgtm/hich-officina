@@ -531,3 +531,26 @@ body.con-tastierino .lav-barra{display:none}
 .pulsanti .pul{min-height:50px;border-radius:var(--r1)}
 .sez{margin-top:20px}
 .vuoto{border:2px dashed var(--bordo);border-radius:var(--r2);padding:24px 16px;text-align:center;color:var(--tenue)}
+
+/* ----- dal disegno al pezzo ----- */
+.dd-foto{margin:8px 0;border-radius:var(--r2);overflow:hidden;border:1px solid var(--bordo);background:var(--campo)}
+.dd-tela{display:block;width:100%;height:160px;cursor:crosshair;touch-action:manipulation}
+.dd-stato{color:var(--tenue);font-size:13.5px;min-height:1em;margin-top:6px}
+.dd-barra .pul.attiva{background:var(--avviso);color:#2a1a00}
+.dd-testa{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:18px 0 8px}
+.dd-lista{display:flex;flex-direction:column;gap:8px}
+.dd-q{display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;align-items:center;padding:8px 8px 8px 10px;border:1px solid var(--bordo);border-left:4px solid var(--avviso);border-radius:var(--r2);background:var(--riga)}
+.dd-q.ok{border-left-color:var(--ok)}.dd-q.no{border-left-color:var(--errore);opacity:.6}
+.dd-q.scelta{box-shadow:0 0 0 2px var(--avviso)}
+.dd-q .num{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;background:var(--avviso);color:#2a1a00}
+.dd-q.ok .num{background:var(--ok);color:#06291a}.dd-q.no .num{background:var(--errore);color:#fff}
+.dd-q-c{min-width:0}.dd-q-c small{display:block;color:var(--tenue);font-size:12px}
+.dd-q-c input{width:100%;background:var(--campo);border:1px solid var(--bordo);border-radius:8px;color:var(--testo);font:600 16px var(--font);padding:8px 10px}
+.dd-si,.dd-no{width:48px;height:48px;border-radius:12px;border:1px solid var(--bordo);background:var(--pannello);color:var(--tenue);display:grid;place-items:center;cursor:pointer}
+.dd-si svg,.dd-no svg{width:22px;height:22px}
+.dd-si.on{background:var(--ok);border-color:var(--ok);color:#06291a}.dd-no.on{background:var(--errore);border-color:var(--errore);color:#fff}
+.dd-proposta{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.dd-pezzo{margin:0;padding-left:22px;line-height:1.7}
+.lav-foto{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px;border-radius:var(--r2);border:1px solid color-mix(in srgb,var(--accento) 55%,var(--bordo));background:color-mix(in srgb,var(--accento) 12%,var(--riga));color:var(--testo);cursor:pointer}
+.lav-foto .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accento);color:#fff;flex:0 0 auto}
+.lav-foto .t b{display:block}.lav-foto .t small{color:var(--tenue)}

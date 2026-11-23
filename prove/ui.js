@@ -40,7 +40,7 @@ const server = http.createServer((q, r) => {
   ok((await pg.$$eval('.ingressi .ingresso', x => x.length)) === 4, 'quattro ingressi nella home');
   let voci = 0;
   for (const g of ['calcola', 'controlla', 'officina']) { await vai('g-' + g); voci += await pg.$$eval('#schermo .tessera', x => x.length); }
-  ok(voci === 16, 'funzioni dentro i gruppi: ' + voci);
+  ok(voci === 17, 'funzioni dentro i gruppi: ' + voci);
   await vai('home');
   await largo('home');
 
@@ -719,6 +719,58 @@ const server = http.createServer((q, r) => {
     await pg.fill('#f-libero', 'H19'); await pg.waitForTimeout(60);
     ok((await pg.textContent('#schermo')).includes('IT18'), 'grado non valido: messaggio');
     await pg.fill('#f-libero', '');
+    await vai('home');
+  }
+
+  // ===== 2.24.0: dal disegno al pezzo, con la conferma di ogni quota =====
+  {
+    const pngD = await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 1000; c.height = 500; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 1000, 500);
+      g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeRect(100, 200, 250, 100); g.strokeRect(350, 170, 280, 160); g.strokeRect(630, 150, 200, 200); return c.toDataURL('image/png').split(',')[1]; });
+    const righeD = [{ t: 'M20x2.5', x: 150, y: 150, w: 30, h: 110, r: 90 }, { t: 'Ø30 h6', x: 420, y: 140, w: 30, h: 120, r: 90 }, { t: 'Ø36', x: 700, y: 160, w: 30, h: 80, r: 90 },
+      { t: '25', x: 180, y: 400, w: 40, h: 24, r: 0 }, { t: '20', x: 430, y: 400, w: 40, h: 24, r: 0 }, { t: '15', x: 690, y: 400, w: 40, h: 24, r: 0 }, { t: '60', x: 450, y: 460, w: 40, h: 24, r: 0 },
+      { t: '1x45°', x: 80, y: 90, w: 60, h: 22, r: 0 }, { t: 'Materiale: C40', x: 760, y: 470, w: 200, h: 20, r: 0 }, { t: 'Scala 1:1', x: 760, y: 490, w: 120, h: 18, r: 0 }];
+    await pg.evaluate(r => { App._androidVero = App.ANDROID; App.ANDROID = { leggiImmagine: dato => { App._letta = dato.slice(0, 22); setTimeout(() => window.__righeLette({ w: 1000, h: 500, righe: r }, null), 20); } }; }, righeD);
+    await pg.evaluate(() => { delete App.mem.dalDisegno; App.salva(); });
+    await vai('lavoro'); await pg.click('.lav-passi button[data-passo="0"]'); await pg.waitForTimeout(60);
+    await pg.click('#lav-da-foto'); await pg.waitForTimeout(100);
+    ok((await pg.evaluate(() => location.hash)) === '#dalDisegno', 'dal lavoro alla foto del disegno');
+    await pg.setInputFiles('#f-disegno', { name: 'albero.png', mimeType: 'image/png', buffer: Buffer.from(pngD, 'base64') });
+    await pg.waitForTimeout(500);
+    ok((await pg.evaluate(() => App._letta)) === 'data:image/jpeg;base64', 'la foto va alla lettura');
+    ok((await pg.$$eval('.dd-q', x => x.length)) === 8, 'otto quote trovate, il cartiglio no: ' + (await pg.$$eval('.dd-q', x => x.length)));
+    ok(await pg.$eval('#dd-crea', b => b.disabled), 'senza conferma il pezzo non si crea');
+    ok((await pg.textContent('#dd-mancano')).includes('8'), 'mancano 8 quote');
+    ok((await pg.evaluate(() => App.ddStato.S.modo)) === 'tornio', 'riconosciuto il tornio');
+    // correggo il Ø30 in Ø32 h6, scarto il 20, confermo le altre
+    await pg.locator('#schermo .dd-q input').nth(1).fill('Ø32 h6'); await pg.locator('#schermo .dd-q input').nth(1).dispatchEvent('change'); await pg.waitForTimeout(60);
+    await pg.click('button[aria-label="Scarta la quota 5"]'); await pg.waitForTimeout(40);
+    ok(await pg.$eval('#dd-crea', b => b.disabled), 'ancora quote da controllare');
+    await pg.click('#dd-tutte'); await pg.waitForTimeout(60);
+    ok(!(await pg.$eval('#dd-crea', b => b.disabled)), 'tutte controllate: si puo creare');
+    const pz = await pg.textContent('.dd-pezzo');
+    ok(pz.includes('Ø20') && pz.includes('Ø32 h6') && pz.includes('Ø36') && pz.includes('filetto M20x2,5'), 'il pezzo dal disegno: ' + pz);
+    ok((await pg.textContent('.dd-proposta')).includes('ricavata dal totale'), 'la lunghezza scartata si ricava dal totale, con il dubbio');
+    await foto('46-dal-disegno');
+    await pg.click('#dd-crea'); await pg.waitForTimeout(200);
+    ok((await pg.evaluate(() => location.hash)) === '#lavoro' && await pg.isVisible('#lav-dal-disegno'), 'il pezzo va nel lavoro guidato con l\'avviso');
+    const tr = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti.map(t => [t.d, t.l, t.toll || '', t.fil || 0]));
+    ok(JSON.stringify(tr) === JSON.stringify([[20, 25, '', 2.5], [32, 20, 'h6', 0], [36, 15, '', 0]]), 'tratti dal disegno: ' + JSON.stringify(tr));
+    ok((await pg.evaluate(() => App.materiale(App.lavoroStato.S.mat).n)) === 'C40', 'materiale dal cartiglio');
+    await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
+    ok((await pg.$$eval('.lav-fase', x => x.length)) >= 4, 'lavorazioni dal disegno');
+    // nel browser senza lettura: le quote si aggiungono toccando la foto
+    await pg.evaluate(() => { App.ANDROID = null; delete App.mem.dalDisegno; App.salva(); });
+    await vai('dalDisegno');
+    await pg.setInputFiles('#f-disegno', { name: 'albero.png', mimeType: 'image/png', buffer: Buffer.from(pngD, 'base64') });
+    await pg.waitForTimeout(400);
+    ok((await pg.textContent('.dd-stato')).includes('Aggiungi una quota'), 'senza lettura: si spiega come aggiungere');
+    await pg.click('#dd-aggiungi');
+    const bb = await pg.$eval('.dd-tela', c => { const b = c.getBoundingClientRect(); return [b.x, b.y, b.width, b.height]; });
+    await pg.mouse.click(bb[0] + bb[2] * 0.4, bb[1] + bb[3] * 0.3); await pg.waitForTimeout(80);
+    await pg.fill('#f-chiedi', 'Ø40 g6'); await pg.click('.dialogo-box .pul:text-is("OK")'); await pg.waitForTimeout(100);
+    const qa = await pg.evaluate(() => App.ddStato.S.quote);
+    ok(qa.length === 1 && qa[0].tipo === 'diametro' && qa[0].valore === 40 && qa[0].toll === 'g6' && qa[0].stato === 'ok' && Math.abs(qa[0].x - 0.4) < 0.05, 'quota aggiunta a mano sulla foto: ' + JSON.stringify(qa[0]));
+    await pg.evaluate(() => { App.ANDROID = App._androidVero; });
     await vai('home');
   }
 

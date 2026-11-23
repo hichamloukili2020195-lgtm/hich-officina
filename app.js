@@ -71,7 +71,7 @@
     if (m.materiali !== undefined && !Array.isArray(m.materiali)) delete m.materiali;
     if (Array.isArray(m.materiali) && !m.materiali.length) delete m.materiali;
     if (!m.imp || typeof m.imp !== 'object' || Array.isArray(m.imp)) m.imp = {};
-    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo', 'cad', 'lavoro'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
+    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo', 'cad', 'lavoro', 'dalDisegno'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
     // programmi salvati e pezzi: solo voci complete
     m.salvati = m.salvati.filter(x => x && Array.isArray(x.righe)).map(x => Object.assign({ id: Date.now() + Math.random(), nome: 'O0001', data: '' }, x));
     m.pezzi = m.pezzi.filter(x => x && typeof x === 'object').map(x => Object.assign({ id: 'p' + Date.now() + Math.floor(Math.random() * 1e6), nome: 'Pezzo', programmi: [], foto: [], misure: [], controlli: [] }, x));
@@ -439,7 +439,7 @@
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino,
-    schermi: {}, param: {}, VERSIONE: '2.23.0'
+    schermi: {}, param: {}, VERSIONE: '2.24.0'
   };
   window.App = App;
 
@@ -513,6 +513,7 @@
   const MARCHIO = '<svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#63b4ff"/><stop offset="1" stop-color="#1f5fe0"/></linearGradient><linearGradient id="ma" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#c9d4e6"/><stop offset="1" stop-color="#8a98b2"/></linearGradient><linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17305c"/><stop offset="1" stop-color="#091226"/></linearGradient><radialGradient id="ml" cx=".3" cy=".25" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><path d="M415.1,225.6 L454.4,230.9 L454.4,281.1 L415.1,286.4 L402.6,325.0 L431.3,352.4 L401.8,392.9 L366.9,374.1 L334.0,398.0 L341.2,437.0 L293.5,452.5 L276.3,416.7 L235.7,416.7 L218.5,452.5 L170.8,437.0 L178.0,398.0 L145.1,374.1 L110.2,392.9 L80.7,352.4 L109.4,325.0 L96.9,286.4 L57.6,281.1 L57.6,230.9 L96.9,225.6 L109.4,187.0 L80.7,159.6 L110.2,119.1 L145.1,137.9 L178.0,114.0 L170.8,75.0 L218.5,59.5 L235.7,95.3 L276.3,95.3 L293.5,59.5 L341.2,75.0 L334.0,114.0 L366.9,137.9 L401.8,119.1 L431.3,159.6 L402.6,187.0 Z" fill="url(#mg)"/><circle cx="256" cy="256" r="118.0" fill="#0b1830"/><circle cx="256" cy="256" r="118.0" fill="none" stroke="#5db0ff" stroke-width="5.0" opacity=".9"/><circle cx="256.0" cy="256.0" r="92.0" fill="url(#ma)"/><circle cx="319.8" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="319.8" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="256" cy="256" r="41.4" fill="none" stroke="#7d8aa6" stroke-width="3.0"/><circle cx="256" cy="256" r="12.9" fill="#2a3a5c"/></svg>';
 
   const MENU = [
+    ['dalDisegno', 'galleria', 'Dal disegno al pezzo', 'Foto del disegno: le quote lette e confermate diventano il pezzo e il programma'],
     ['lavoro', 'fresa', 'Disegna e lavora', 'Dal pezzo al programma in 4 passi: grezzo, forma, lavorazioni, programma'],
     ['programma', 'nuovo', 'Nuovo programma ISO', 'Fresatura, foratura e tornitura con anteprima'],
     ['calcoli', 'calcolo', 'Calcolatrice di taglio', 'Giri e avanzamenti per utensile e materiale, filetti, peso...'],
@@ -536,7 +537,7 @@
     disegna: { t: 'Disegna e lavora', s: 'Dal pezzo al programma in 4 passi', ic: 'fresa', vai: 'lavoro' },
     calcola: { t: 'Calcola', s: 'Giri, tolleranze, filetti, angoli', ic: 'calcolo', voci: ['calcoli', 'tolleranze', 'tabelle', 'angolo', 'materiali'] },
     controlla: { t: 'Controlla', s: 'Apri, simula, programmi salvati', ic: 'codice', voci: ['apri', 'salvati', 'galleria'] },
-    officina: { t: 'Officina', s: 'Utensili, pezzi, strumenti avanzati', ic: 'utensile', voci: ['tabellaUtensili', 'pezzi', 'programma', 'cad', 'disegno', 'macro', 'ciclo', 'guida'] }
+    officina: { t: 'Officina', s: 'Utensili, pezzi, strumenti avanzati', ic: 'utensile', voci: ['dalDisegno', 'tabellaUtensili', 'pezzi', 'programma', 'cad', 'disegno', 'macro', 'ciclo', 'guida'] }
   };
   const TITOLO_BREVE = { cad: 'CAD fresa libero', disegno: 'CAD tornio libero', programma: 'Programma ISO a mano', macro: 'Macro CNC', ciclo: 'Ciclo di lavoro', calcoli: 'Calcolatrice di taglio', tolleranze: 'Tolleranze',
     angolo: 'Angolo da una foto', tabelle: 'Tabelle e filetti', apri: 'Controlla e simula', galleria: 'Esempi', pezzi: 'Pezzi e attrezzaggio', tabellaUtensili: 'Tabella utensili', salvati: 'Programmi salvati', materiali: 'Materiali', guida: 'Come si fa' };

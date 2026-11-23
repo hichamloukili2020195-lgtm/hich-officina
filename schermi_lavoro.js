@@ -176,6 +176,7 @@
       const passoGrezzo = () => {
         corpo.appendChild(el('div', { class: 'lav-scelta', role: 'radiogroup', 'aria-label': 'Macchina' }, [['fresa', 'Fresa', 'Piastre: tasche, fori, asole'], ['tornio', 'Tornio', 'Alberi: diametri, coni, filetti']].map(([id, t, s]) =>
           el('button', { class: 'lav-macchina' + (S.modo === id ? ' attiva' : ''), role: 'radio', 'aria-checked': S.modo === id ? 'true' : 'false', 'data-modo': id, onclick: () => { S.modo = id; scelta = null; S.aperta = null; A.salva(); tutto(); } }, [el('span', { class: 'ic', html: svg(IC[id]) }), el('b', { testo: t }), el('small', { testo: s })]))));
+        corpo.appendChild(el('button', { class: 'lav-foto', id: 'lav-da-foto', onclick: () => A.vai('dalDisegno') }, [el('span', { class: 'ic', html: A.icona('fotocamera') }), el('span', { class: 't' }, [el('b', { testo: 'Parti da una foto del disegno' }), el('small', { testo: 'Le quote lette, controllate da te, diventano il pezzo' })])]));
         corpo.appendChild(el('div', { class: 'sez', testo: 'Materiale' }));
         const mats = A.sceltaMateriali();
         const usati = mats.slice(0, 6);
@@ -407,7 +408,7 @@
         corpo.innerHTML = '';
         corpo.appendChild(el('h2', { class: 'lav-titolo', testo: ['Grezzo e materiale', S.modo === 'tornio' ? 'Il pezzo, dalla testa al mandrino' : 'Tasche, fori e profili', 'Lavorazioni', 'Programma pronto'][S.passo] }));
         if (S.passo === 0) passoGrezzo();
-        else if (S.passo === 1) { if (S.modo === 'tornio') passoFormaTornio(); else passoFormaFresa(); if (S.ultimoTolto && S.ultimoTolto.modo === S.modo) corpo.appendChild(el('button', { class: 'pul sec', id: 'lav-ripristina', testo: 'Ripristina l\'ultimo eliminato', onclick: () => { lista().splice(Math.min(S.ultimoTolto.i, lista().length), 0, S.ultimoTolto.x); S.ultimoTolto = null; A.salva(); tutto(); } })); }
+        else if (S.passo === 1) { if (S.daDisegno) corpo.appendChild(el('div', { class: 'info avviso', id: 'lav-dal-disegno' }, [el('div', { html: A.icona('avviso') }), el('div', {}, [el('b', { testo: 'Pezzo preso dal disegno. ' }), document.createTextNode('Ricontrolla le quote con il disegno in mano, poi Avanti. '), el('button', { class: 'pul sec', style: 'padding:6px 10px;margin-top:6px', testo: 'Ho controllato', onclick: () => { S.daDisegno = false; A.salva(); tutto(); } })])])); if (S.modo === 'tornio') passoFormaTornio(); else passoFormaFresa(); if (S.ultimoTolto && S.ultimoTolto.modo === S.modo) corpo.appendChild(el('button', { class: 'pul sec', id: 'lav-ripristina', testo: 'Ripristina l\'ultimo eliminato', onclick: () => { lista().splice(Math.min(S.ultimoTolto.i, lista().length), 0, S.ultimoTolto.x); S.ultimoTolto = null; A.salva(); tutto(); } })); }
         else if (S.passo === 2) passoLavorazioni();
         else passoProgramma();
         disegnoBox.hidden = S.passo >= 2;

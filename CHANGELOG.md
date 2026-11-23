@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.24.0 - Dal disegno al pezzo, con la conferma di ogni quota
+- **Foto del disegno**: l'app legge le quote **e dove stanno** sul disegno, anche quelle scritte in verticale (la foto si legge anche girata di 90 gradi). Il cartiglio (scala, revisione, tolleranze generali, note) non da quote; il materiale scritto nel cartiglio si prende.
+- Le quote sono **numerate sulla foto** con il colore dello stato: da controllare, giusta, scartata. Ognuna si conferma, si scarta o si corregge scrivendo; quelle mancanti si aggiungono toccando la foto.
+- **Tornio**: i diametri si mettono in fila lungo l'asse, la testa e dove c'e il filetto (o il diametro piu piccolo), le lunghezze vanno al loro diametro; una lunghezza mancante si ricava dal totale, una somma che non torna si dice. Filetto con gola, tolleranze, smusso di testa, barra commerciale. "Inverti testa e mandrino" se serve.
+- **Fresa**: misure del pezzo, spessore, fori ripetuti, filetti e fori singoli; le posizioni dei fori si propongono e vanno controllate.
+- **Niente senza conferma**: "Crea il pezzo" si accende solo quando tutte le quote sono controllate; il pezzo va nel lavoro guidato con l'avviso di ricontrollarlo.
+- Nel browser (senza la lettura del telefono) le quote si aggiungono a mano sulla foto.
+
 ## 2.23.0 - Funzioni d'officina
 - **Barra seno**: altezza dei blocchetti per un angolo, o l'angolo da un'altezza, con l'errore per 0,01 mm.
 - **Ingranaggi e divisore**: da modulo e denti i diametri (primitivo, esterno, di fondo, di base), il passo, l'altezza e lo spessore del dente, l'interasse con la ruota accoppiata e i giri di manovella del divisore (40:1 e altri).

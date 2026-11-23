@@ -53,6 +53,7 @@ ${corpo}
 const FUNZIONI = [
   ['Programmi di fresa, foratura e tornio', 'Spianatura, tasche, profili con G41/G42, fori con tutti i cicli, filetti, troncatura e cicli fissi. Piu lavorazioni in un programma, nell\'ordine di officina.'],
   ['Controllo e simulazione', 'Trova gli errori riga per riga, anche da una foto dello schermo. Simulazione animata con quote, giri, centro fresa e urti con le staffe.'],
+  ['Dalla foto del disegno al pezzo', 'L\'app legge le quote e dove stanno sul disegno, le numera sulla foto e tu le confermi una per una: diventano il pezzo e il programma.'],
   ['Disegna e lavora in 4 passi', 'Grezzo, forma a quote con il tastierino grande, lavorazioni proposte dalle regole di officina, programma con tempo e utensili. Uguale per fresa e tornio.'],
   ['Mini CAD/CAM per fresa e tornio', 'Disegni col dito, a schermo intero e girando il telefono: profili, fori, tasche, asole, filetti e gole. A ogni disegno dai la lavorazione e l\'app scrive il programma e lo simula.'],
   ['Ciclo di lavoro proposto', 'Dal pezzo, o dalle quote di un disegno, alla lavorazione completa con utensili e dati di taglio.'],

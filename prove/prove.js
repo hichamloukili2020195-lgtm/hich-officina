@@ -6,6 +6,8 @@ require('../profilo.js');
 require('../filetti.js');
 require('../cad.js');
 require('../lavoro.js');
+require('../ciclo.js');
+require('../disegno_foto.js');
 require('../iso.js');
 require('../post.js');
 require('../ciclo.js');
@@ -706,5 +708,55 @@ prova('funzioni d\'officina: barra seno, ingranaggi, divisore, dilatazione, pote
   O.MATERIALI.forEach(m => assert.ok(O.kcMateriale(m) >= 400 && O.kcMateriale(m) <= 3500, m.n));
   // tempo
   vicino(O.tempoTaglio(120, 300, 3).minuti, 1.2, 1e-9); assert.strictEqual(O.tempoTaglio(0, 300), null); assert.strictEqual(O.tempoTaglio(10, 300, 0).passate, 1);
+});
+prova('dal disegno al pezzo: quote con la posizione, tornio e fresa', () => {
+  const mt = O.MATERIALI.find(m => m.n === 'C40');
+  // albero di prova (disegnato qui): asse orizzontale, Ø in verticale, lunghezze sotto, cartiglio in basso
+  const righe = [
+    { t: 'M20x2.5', x: 150, y: 150, w: 30, h: 110, r: 90 }, { t: 'Ø30 h6', x: 420, y: 140, w: 30, h: 120, r: 90 }, { t: 'Ø36', x: 700, y: 160, w: 30, h: 80, r: 90 },
+    { t: '25', x: 180, y: 400, w: 40, h: 24, r: 0 }, { t: '20', x: 430, y: 400, w: 40, h: 24, r: 0 }, { t: '15', x: 690, y: 400, w: 40, h: 24, r: 0 }, { t: '60', x: 450, y: 460, w: 40, h: 24, r: 0 },
+    { t: '1x45°', x: 80, y: 90, w: 60, h: 22, r: 0 }, { t: 'Materiale: C40', x: 760, y: 470, w: 200, h: 20, r: 0 }, { t: 'Scala 1:1', x: 760, y: 490, w: 120, h: 18, r: 0 },
+    { t: 'Tolleranze generali ISO 2768-m', x: 500, y: 490, w: 250, h: 18, r: 0 }, { t: 'Rev. 3 del 12.04', x: 860, y: 450, w: 130, h: 18, r: 0 }];
+  const Q = O.quoteDaRighe(righe, 1000, 500);
+  assert.deepStrictEqual(Q.map(q => q.tipo), ['filetto', 'diametro', 'diametro', 'lunghezza', 'lunghezza', 'lunghezza', 'lunghezza', 'smusso'], 'il cartiglio non da quote: ' + Q.map(q => q.testo).join());
+  assert.ok(Q.every(q => q.stato === 'da' && q.x > 0 && q.x < 1 && q.y > 0 && q.y < 1));
+  assert.ok(Q[0].verticale && !Q[3].verticale);
+  assert.strictEqual(O.modoDalDisegno(Q), 'tornio');
+  assert.strictEqual(O.MATERIALI[O.materialeDa(righe, O.MATERIALI)].n, 'C40');
+  const t = O.proponiTornio(Q);
+  assert.deepStrictEqual(t.tratti.map(x => [x.d, x.l]), [[20, 25], [30, 20], [36, 15]]);
+  assert.strictEqual(t.tratti[0].fil, 2.5); assert.ok(t.tratti[0].gola > 0); assert.strictEqual(t.tratti[1].toll, 'h6');
+  assert.strictEqual(t.smussoTesta, 'C1'); assert.strictEqual(t.grezzo.dg, 38); assert.deepStrictEqual(t.dubbi, []);
+  assert.ok(!O.proponiLavoro({ modo: 'tornio', grezzo: t.grezzo, tratti: t.tratti, smussoTesta: t.smussoTesta, troncatura: true }, { mat: mt, nmax: 3000 }).errore);
+  // la quota scartata non conta: senza il 20 la lunghezza del Ø30 viene dal totale 60, con il dubbio
+  const Q2 = Q.map(q => Object.assign({}, q, { stato: q.testo === '20' ? 'no' : 'ok' }));
+  const t2 = O.proponiTornio(Q2);
+  assert.deepStrictEqual(t2.tratti.map(x => x.l), [25, 20, 15]);
+  assert.ok(t2.dubbi.some(d => /ricavata dal totale/.test(d)));
+  // testa dall'altra parte: lo stesso disegno specchiato
+  const spec = righe.slice(0, 8).map(r => Object.assign({}, r, { x: 1000 - r.x - r.w }));
+  const t3 = O.proponiTornio(O.quoteDaRighe(spec, 1000, 500));
+  assert.deepStrictEqual(t3.tratti.map(x => x.d), [20, 30, 36], 'la testa e dove c\'e il filetto');
+  assert.deepStrictEqual(O.proponiTornio(O.quoteDaRighe(spec, 1000, 500), { invertito: true }).tratti.map(x => x.d), [36, 30, 20]);
+  // somma che non torna col totale: si dice
+  const r4 = righe.slice(0, 7).map(r => (r.t === '60' ? Object.assign({}, r, { t: '70' }) : r));
+  assert.ok(O.proponiTornio(O.quoteDaRighe(r4, 1000, 500)).dubbi.some(d => /non torna con il totale 70/.test(d)));
+  // tolleranza scritta da sola vicino al diametro
+  const r5 = [{ t: 'Ø25', x: 300, y: 150, w: 30, h: 90, r: 90 }, { t: 'g6', x: 300, y: 250, w: 30, h: 30, r: 90 }, { t: 'Ø40', x: 600, y: 150, w: 30, h: 90, r: 90 }, { t: '30', x: 300, y: 400, w: 40, h: 24, r: 0 }, { t: '20', x: 600, y: 400, w: 40, h: 24, r: 0 }];
+  const t5 = O.proponiTornio(O.quoteDaRighe(r5, 1000, 500));
+  assert.strictEqual(t5.tratti[0].toll, 'g6'); assert.deepStrictEqual(t5.tratti.map(x => [x.d, x.l]), [[25, 30], [40, 20]]);
+  assert.ok(O.proponiTornio([]).errore);
+  // piastra di prova
+  const p = [{ t: '100', x: 450, y: 470, w: 50, h: 22, r: 0 }, { t: '60', x: 960, y: 230, w: 22, h: 40, r: 90 }, { t: '4x Ø8.5', x: 150, y: 60, w: 110, h: 24, r: 0 }, { t: 'M10', x: 500, y: 250, w: 50, h: 22, r: 0 }, { t: 'sp. 15', x: 800, y: 60, w: 70, h: 22, r: 0 }];
+  const QP = O.quoteDaRighe(p, 1000, 500);
+  assert.ok(!QP.some(q => q.tipo === 'diametro'), 'il Ø8,5 dei 4 fori non e un diametro in piu');
+  assert.strictEqual(O.modoDalDisegno(QP), 'fresa');
+  const f = O.proponiFresa(QP);
+  assert.deepStrictEqual([f.grezzo.lx, f.grezzo.ly, f.grezzo.lz], [100, 60, 15]);
+  assert.strictEqual(f.forme.length, 2); assert.strictEqual(f.forme[0].tipo, 'foriGriglia'); assert.strictEqual(f.forme[0].d, 8.5); assert.strictEqual(f.forme[1].foro, 'maschio');
+  assert.ok(f.dubbi.length >= 2, 'le posizioni dei fori sono da controllare');
+  const q = O.proponiLavoro({ modo: 'fresa', grezzo: f.grezzo, forme: f.forme }, { mat: mt, nmax: 8000 });
+  assert.ok(!q.errore, q.errore);
+  assert.strictEqual(O.barraPer(36), 38); assert.strictEqual(O.barraPer(40), 42);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

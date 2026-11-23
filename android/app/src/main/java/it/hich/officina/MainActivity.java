@@ -2,6 +2,9 @@ package it.hich.officina;
 
 import android.app.Activity;
 import android.content.ClipData;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.content.ClipboardManager;
 import android.content.ContentValues;
@@ -24,7 +27,11 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
+
+import com.google.android.gms.tasks.Tasks;
+import com.google.mlkit.vision.text.TextRecognizer;
 
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
@@ -227,6 +234,37 @@ public class MainActivity extends Activity {
         return out.toString();
     }
 
+
+    /** Le righe lette con la posizione sulla foto (in pixel della foto). rot = 90 se lette sulla foto girata. */
+    private static void aggiungiRighe(Text t, int rot, int H, JSONArray out, List<float[]> giaBox, List<String> giaTesto) throws Exception {
+        for (Text.TextBlock b : t.getTextBlocks()) for (Text.Line l : b.getLines()) {
+            Rect r = l.getBoundingBox();
+            if (r == null) continue;
+            float x0, y0, x1, y1;
+            if (rot == 90) { x0 = r.top; x1 = r.bottom; y0 = H - r.right; y1 = H - r.left; }   // foto girata di 90 gradi in senso orario
+            else { x0 = r.left; x1 = r.right; y0 = r.top; y1 = r.bottom; }
+            String testo = l.getText().trim();
+            if (testo.isEmpty()) continue;
+            boolean doppia = false;
+            for (int i = 0; i < giaBox.size(); i++) {
+                float[] g = giaBox.get(i);
+                float ix = Math.max(0, Math.min(x1, g[2]) - Math.max(x0, g[0])), iy = Math.max(0, Math.min(y1, g[3]) - Math.max(y0, g[1]));
+                float inter = ix * iy, area = Math.min((x1 - x0) * (y1 - y0), (g[2] - g[0]) * (g[3] - g[1]));
+                if (area > 0 && inter / area > 0.5f) { doppia = true; break; }
+            }
+            if (doppia) continue;
+            giaBox.add(new float[]{x0, y0, x1, y1}); giaTesto.add(testo);
+            JSONObject o = new JSONObject();
+            o.put("t", testo); o.put("x", x0); o.put("y", y0); o.put("w", x1 - x0); o.put("h", y1 - y0); o.put("r", rot);
+            out.put(o);
+        }
+    }
+
+    private void rispostaRighe(String json, String errore) {
+        final String js = "window.__righeLette && window.__righeLette(" + (json == null ? "null" : json) + "," + (errore == null ? "null" : JSONObject.quote(errore)) + ")";
+        runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
     private void rispostaFoto(String testo, String errore) {
         final String js = "window.__fotoLetta && window.__fotoLetta(" + (testo == null ? "null" : JSONObject.quote(testo)) + "," + (errore == null ? "null" : JSONObject.quote(errore)) + ")";
         runOnUiThread(() -> web.evaluateJavascript(js, null));
@@ -238,6 +276,33 @@ public class MainActivity extends Activity {
 
     /** Le funzioni che la pagina chiama con window.Android. */
     private class Ponte {
+        /** Legge il testo di una foto data dalla pagina (data URL), con la posizione di ogni riga; anche le scritte in verticale. */
+        @JavascriptInterface
+        public void leggiImmagine(String dati) {
+            new Thread(() -> {
+                try {
+                    byte[] by = android.util.Base64.decode(dati.substring(dati.indexOf(',') + 1), android.util.Base64.DEFAULT);
+                    Bitmap bmp = BitmapFactory.decodeByteArray(by, 0, by.length);
+                    if (bmp == null) { rispostaRighe(null, "Foto non leggibile"); return; }
+                    int W = bmp.getWidth(), H = bmp.getHeight();
+                    TextRecognizer tr = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+                    JSONArray righe = new JSONArray();
+                    List<float[]> box = new ArrayList<>();
+                    List<String> testi = new ArrayList<>();
+                    aggiungiRighe(Tasks.await(tr.process(InputImage.fromBitmap(bmp, 0))), 0, H, righe, box, testi);
+                    Matrix m = new Matrix();
+                    m.postRotate(90);
+                    Bitmap girata = Bitmap.createBitmap(bmp, 0, 0, W, H, m, true);
+                    aggiungiRighe(Tasks.await(tr.process(InputImage.fromBitmap(girata, 0))), 90, H, righe, box, testi);
+                    JSONObject o = new JSONObject();
+                    o.put("w", W); o.put("h", H); o.put("righe", righe);
+                    rispostaRighe(o.toString(), null);
+                } catch (Exception e) {
+                    rispostaRighe(null, "Lettura non riuscita: " + e.getMessage());
+                }
+            }).start();
+        }
+
         /** Schermo intero del disegno: "orizzontale" o "verticale" blocca lo schermo, "libero" segue il sensore. */
         @JavascriptInterface
         public void orientamento(String modo) {
