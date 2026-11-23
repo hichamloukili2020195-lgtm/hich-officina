@@ -63,6 +63,7 @@
       const l = { op: tipo, d: num(f.d), passante: f.passante !== false, prof: num(f.prof) };
       if (tipo === 'maschio') l.passo = pos(num(f.passo)) ? num(f.passo) : O.passoGrosso(num(f.d));
       if (tipo === 'alesato') l.toll = f.toll || 'H7';
+      if (pos(num(f.lamD))) { l.lamD = num(f.lamD); l.lamProf = pos(num(f.lamProf)) ? num(f.lamProf) : r3(num(f.d) * 0.6); }
       return l;
     };
     const punto = (x, y, f) => E.push({ id: id++, tipo: 'punto', x: r3(x), y: r3(y), lav: [lavForo(f)] });

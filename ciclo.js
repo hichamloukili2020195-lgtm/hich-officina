@@ -23,34 +23,56 @@
   function estraiQuote(testo) {
     const out = [], visti = new Set();
     const metti = q => { const k = q.tipo + '|' + q.testo; if (!visti.has(k)) { visti.add(k); out.push(q); } };
-    const t = String(testo || '').replace(/\r/g, '').replace(/[⌀Ø∅ø]/g, 'Ø').replace(/(\d),(\d)/g, '$1.$2');
+    let t = String(testo || '').replace(/\r/g, '').replace(/[⌀Ø∅ø]/g, 'Ø').replace(/(\d),(\d)/g, '$1.$2');
+    // tolleranze geometriche (riquadri con il simbolo e i riferimenti): non sono quote del pezzo
+    if (/[⌖⊕◎⌯⏥⌭]/.test(t) || (/Ø\s*0\.\d+/.test(t) && /(?:^|\s)[A-F](?:\s+[A-F])*\s*$/.test(t.trim()))) return out;
+    // quote di riferimento tra parentesi e scostamenti tra parentesi: si tolgono
+    t = t.replace(/\(\s*\d+(?:\.\d+)?\s*\)/g, ' ').replace(/\(\s*[+\-±][^)]*\)?/g, ' ');
     let m;
-    // fori ripetuti: 4xØ8.5, 6 x M8, 4 fori Ø9, n.4 fori M10
-    const reFori = /(\d{1,2})\s*(?:x|X|×|fori|FORI|n\.?)\s*(?:fori\s*)?(Ø\s*\d+(?:\.\d+)?|M\s*\d+(?:\.\d+)?(?:\s*[xX×]\s*\d+(?:\.\d+)?)?)(?:\s*(H\d{1,2}))?/g;
+    // fori ripetuti: 4xØ8.5, 6 x M8, 4 fori Ø9, N°4 Fori Ø13, N°2 Fori spina Ø 10 H7, n.4 fori M10
+    const reFori = /(?:[Nn]\s*°\s*|[Nn]\.\s*|[Nn]r\.?\s*)?(\d{1,3})\s*(?:x|X|×|[Ff]ori|FORI|pz)[^Ø\d\n]{0,30}?(Ø\s*\d+(?:\.\d+)?|M\s*\d+(?:\.\d+)?(?:\s*[xX×]\s*\d+(?:\.\d+)?)?)(?:\s*((?:js|JS|[A-Za-z])\d{1,2})(?![\d.]))?/g;
     while ((m = reFori.exec(t))) {
       const n = Number(m[1]), q = m[2].replace(/\s+/g, '');
-      if (n < 1 || n > 99) continue;
+      if (n < 1 || n > 999) continue;
       if (q[0] === 'M') { const [d, p] = q.slice(1).split(/[xX×]/).map(Number); metti({ tipo: 'fori', testo: n + ' x ' + q, n, filetto: { d, p: p || passoGrosso(d) } }); }
       else metti({ tipo: 'fori', testo: n + ' x ' + q + (m[3] ? ' ' + m[3] : ''), n, d: Number(q.slice(1)), toll: m[3] || '' });
     }
+    const t2 = t.replace(reFori, ' ');
+    // fresature (cave): Fresatura 3 Profondita 2
+    const reCava = /fresatura\s*(\d+(?:\.\d+)?)\s*(?:mm\s*)?profondit[aà]\s*(\d+(?:\.\d+)?)/gi;
+    while ((m = reCava.exec(t2))) metti({ tipo: 'cava', testo: m[1] + 'x' + m[2], larghezza: Number(m[1]), prof: Number(m[2]) });
+    // lamatura e profondita (nei richiami dei fori)
+    const reLam = /lamatur[ae]\s*Ø\s*(\d+(?:\.\d+)?)/gi;
+    while ((m = reLam.exec(t2))) metti({ tipo: 'lamatura', testo: 'lamatura Ø' + m[1], d: Number(m[1]) });
+    const reProf = /(?:prof\.?\s*(lamatura|foro)?\s*|profondit[aà]\s*)(\d+(?:\.\d+)?)/gi;
+    while ((m = reProf.exec(t2.replace(reCava, ' ')))) metti({ tipo: 'profondita', testo: 'prof. ' + (m[1] ? m[1].toLowerCase() + ' ' : '') + m[2], valore: Number(m[2]), di: m[1] ? m[1].toLowerCase() : '' });
+    const t3 = t2.replace(reCava, ' ').replace(reLam, ' ').replace(reProf, ' ');
     // filetti: M20x1.5, M8
     const reM = /(?:^|[^A-Z\d])M\s*(\d+(?:\.\d+)?)(?:\s*[xX×]\s*(\d+(?:\.\d+)?))?/g;
-    while ((m = reM.exec(t))) { const d = Number(m[1]); if (d >= 1 && d <= 200) metti({ tipo: 'filetto', testo: 'M' + m[1] + (m[2] ? 'x' + m[2] : ''), d, p: m[2] ? Number(m[2]) : passoGrosso(d) }); }
+    while ((m = reM.exec(t3))) { const d = Number(m[1]); if (d >= 1 && d <= 200) metti({ tipo: 'filetto', testo: 'M' + m[1] + (m[2] ? 'x' + m[2] : ''), d, p: m[2] ? Number(m[2]) : passoGrosso(d) }); }
     // diametri: Ø20, Ø20h6, Ø20 H7, Ø 20 ±0.02
-    const reD = /Ø\s*(\d+(?:\.\d+)?)\s*((?:js|JS|[a-zA-Z])\d{1,2})?(?:\s*(±\s*\d*\.?\d+|[+-]\s*\d*\.?\d+\s*\/?\s*[+-]?\s*\d*\.?\d+))?/g;
-    while ((m = reD.exec(t))) metti({ tipo: 'diametro', testo: 'Ø' + m[1] + (m[2] ? ' ' + m[2] : '') + (m[3] ? ' ' + m[3].replace(/\s+/g, '') : ''), valore: Number(m[1]), toll: m[2] || (m[3] ? m[3].replace(/\s+/g, '') : '') });
+    const reD = /Ø\s*(\d+(?:\.\d+)?)\s*((?:js|JS|[a-zA-Z])\d{1,2}(?![\d.]))?(?:\s*(±\s*\d*\.?\d+|[+-]\s*\d*\.?\d+\s*\/?\s*[+-]?\s*\d*\.?\d+))?/g;
+    while ((m = reD.exec(t3))) { if (Number(m[1]) <= 0) continue; metti({ tipo: 'diametro', testo: 'Ø' + m[1] + (m[2] ? ' ' + m[2] : '') + (m[3] ? ' ' + m[3].replace(/\s+/g, '') : ''), valore: Number(m[1]), toll: m[2] || (m[3] ? m[3].replace(/\s+/g, '') : '') }); }
     // smussi: 1x45°, 0.5 x 45
     const reC = /(\d+(?:\.\d+)?)\s*[xX×]\s*45\s*°?/g;
-    while ((m = reC.exec(t))) metti({ tipo: 'smusso', testo: m[1] + 'x45°', valore: Number(m[1]) });
+    while ((m = reC.exec(t3))) metti({ tipo: 'smusso', testo: m[1] + 'x45°', valore: Number(m[1]) });
     // raggi: R2, R0.5
     const reR = /(?:^|[^A-Z])R\s*(\d+(?:\.\d+)?)/g;
-    while ((m = reR.exec(t))) metti({ tipo: 'raggio', testo: 'R' + m[1], valore: Number(m[1]) });
-    // tolleranze isolate: H7, g6 (senza diametro davanti)
+    while ((m = reR.exec(t3))) metti({ tipo: 'raggio', testo: 'R' + m[1], valore: Number(m[1]) });
+    // angoli: 30°, 22.5°, A 180° (non gli smussi a 45 gradi)
+    const t4 = t3.replace(reC, ' ');
+    const reA = /(?:^|[^\d.])(\d{1,3}(?:\.\d+)?)\s*°/g;
+    while ((m = reA.exec(t4))) { const v = Number(m[1]); if (v > 0 && v <= 360) metti({ tipo: 'angolo', testo: m[1] + '°', valore: v }); }
+    // tolleranze isolate: H7, g6 (senza diametro davanti; non le sigle delle flange come ISO F12)
     const reT = /(?:^|\s)((?:JS|js|[A-HJ-NP-Za-hj-np-z])\d{1,2})(?=\s|$)/g;
-    while ((m = reT.exec(t))) if (!O.tolleranza(10, m[1]).errore) metti({ tipo: 'tolleranza', testo: m[1], valore: m[1] });
-    // lunghezze: numeri rimasti (quote lineari)
-    const resto = t.replace(reFori, ' ').replace(reM, ' ').replace(reD, ' ').replace(reC, ' ').replace(reR, ' ');
-    const reL = /(?:^|[^\w.])(\d{1,4}(?:\.\d+)?)(?![\w.°])/g;
+    while ((m = reT.exec(t3))) {
+      if (/ISO\s*$/i.test(t3.slice(0, m.index + m[0].indexOf(m[1])).replace(/[\s-]+$/, ' ').trimEnd() + ' ')) continue;
+      if (/ISO\s*-?\s*$/i.test(t3.slice(0, m.index + m[0].indexOf(m[1])))) continue;
+      if (!O.tolleranza(10, m[1]).errore) metti({ tipo: 'tolleranza', testo: m[1], valore: m[1] });
+    }
+    // lunghezze: numeri rimasti (quote lineari), non gli scostamenti (+0.2, -0.1) ne gli angoli
+    const resto = t4.replace(reM, ' ').replace(reD, ' ').replace(reR, ' ').replace(reA, ' ').replace(/ISO\s*[A-Z]\d+/gi, ' ');
+    const reL = /(?:^|[^\w.+\-±])(\d{1,4}(?:\.\d+)?)(?![\w.°])/g;
     while ((m = reL.exec(resto))) { const v = Number(m[1]); if (v > 0 && v < 5000) metti({ tipo: 'lunghezza', testo: m[1], valore: v }); }
     return out;
   }

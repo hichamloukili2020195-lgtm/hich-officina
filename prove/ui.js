@@ -770,6 +770,24 @@ const server = http.createServer((q, r) => {
     await pg.fill('#f-chiedi', 'Ø40 g6'); await pg.click('.dialogo-box .pul:text-is("OK")'); await pg.waitForTimeout(100);
     const qa = await pg.evaluate(() => App.ddStato.S.quote);
     ok(qa.length === 1 && qa[0].tipo === 'diametro' && qa[0].valore === 40 && qa[0].toll === 'g6' && qa[0].stato === 'ok' && Math.abs(qa[0].x - 0.4) < 0.05, 'quota aggiunta a mano sulla foto: ' + JSON.stringify(qa[0]));
+    // flangia di prova (rifatta qui): richiami su piu righe, riquadri di tolleranza, cartiglio
+    const righeF = [
+      { t: 'N°6 Fori Ø11', x: 650, y: 80, w: 150, h: 20 }, { t: 'Passanti', x: 650, y: 102, w: 90, h: 20 }, { t: 'Equidistanti', x: 650, y: 124, w: 120, h: 20 }, { t: '⌖ Ø 0.1 A B', x: 640, y: 150, w: 140, h: 22 },
+      { t: 'N°3 Fori Lamati Ø9', x: 80, y: 300, w: 170, h: 20 }, { t: 'Passanti', x: 80, y: 322, w: 90, h: 20 }, { t: 'Lamatura Ø15', x: 80, y: 344, w: 130, h: 20 }, { t: 'Prof.lamatura 9', x: 80, y: 366, w: 140, h: 20 },
+      { t: 'N°2 Fori spina Ø 8 H7 (+0.015', x: 60, y: 560, w: 260, h: 20 }, { t: 'Prof.foro 12', x: 60, y: 582, w: 120, h: 20 }, { t: 'A 180°', x: 60, y: 604, w: 60, h: 20 },
+      { t: 'Ø 160', x: 900, y: 450, w: 24, h: 70, r: 90 }, { t: 'Ø 110 - ISO F11', x: 860, y: 430, w: 24, h: 140, r: 90 }, { t: 'Ø 90 - Fori spina', x: 820, y: 430, w: 24, h: 150, r: 90 }, { t: 'Ø 70', x: 780, y: 460, w: 24, h: 60, r: 90 },
+      { t: 'Tolleranze (dove non specificato)', x: 500, y: 900, w: 250, h: 18 }, { t: 'Smussi 0.5 x 45°', x: 500, y: 920, w: 150, h: 18 }].map(x => Object.assign({ r: 0 }, x));
+    await pg.evaluate(r => { App.ANDROID = { leggiImmagine: () => setTimeout(() => window.__righeLette({ w: 1000, h: 1000, righe: r }, null), 20) }; delete App.mem.dalDisegno; App.salva(); }, righeF);
+    await vai('dalDisegno');
+    await pg.setInputFiles('#f-disegno', { name: 'flangia.png', mimeType: 'image/png', buffer: Buffer.from(pngD, 'base64') });
+    await pg.waitForTimeout(500);
+    const tipiF = await pg.$$eval('.dd-q .dd-q-c small', x => x.map(e => e.textContent));
+    ok(tipiF.filter(t => t === 'Fori (richiamo)').length === 3 && !(await pg.textContent('.dd-lista')).includes('0.1'), 'tre richiami, niente riquadri: ' + tipiF.join(', '));
+    ok((await pg.evaluate(() => App.ddStato.S.modo)) === 'fresa', 'flangia: fresa');
+    await pg.click('#dd-tutte'); await pg.waitForTimeout(60);
+    const fz = await pg.textContent('.dd-proposta');
+    ok(fz.includes('Pezzo tondo Ø160') && fz.includes('6 fori Ø11') && fz.includes('su Ø110') && fz.includes('lamatura Ø15') && fz.includes('Ø8 H7 prof. 12') && fz.includes('su Ø90'), 'flangia proposta: ' + fz.slice(0, 300));
+    await foto('47-dal-disegno-flangia');
     await pg.evaluate(() => { App.ANDROID = App._androidVero; });
     await vai('home');
   }

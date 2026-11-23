@@ -2,6 +2,15 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.25.0 - Dal disegno: richiami dei fori, flange, tolleranze geometriche
+- **Richiami su piu righe** letti come una quota sola: "N°4 Fori Ø13 / Passanti / Equidistanti", "N°3 Fori Lamati Ø13 / Lamatura Ø18.5 / Prof.lamatura 13", "N°2 Fori spina Ø10 H7 / Prof.foro 10 / A 180°". Prima "N°" e "Fori" con la maiuscola non si capivano e le righe sotto si perdevano.
+- **Riquadri di tolleranza geometrica** (posizione, concentricita) ignorati: prima "Ø 0.1 A B" diventava un foro.
+- Ignorati anche il **cartiglio** con le tolleranze generali (smussi, raggi, angoli, rugosita), le **date**, le **quote di riferimento tra parentesi** e gli **scostamenti** (+0.2); le sigle delle flange (ISO F12) non sono tolleranze.
+- Nuove quote: **angoli** (30°, 22,5°, A 180°), **fresature** (Fresatura 3 Profondita 2), lamature e profondita.
+- **Pezzi tondi** (flange, dischi): il diametro piu grande e il pezzo, il centro e nel mezzo; ogni gruppo di fori va sul **suo cerchio** (la scritta "Fori spina" lega il cerchio ai fori spina), il primo foro all'angolo di mezzo passo se e quotato.
+- **Lamatura** nei fori: nel passo Forma (interruttore Lamatura) e nel programma, con il lamatore dopo la punta e la sosta sul fondo.
+- Ogni dubbio si dice: spessore che non c'e nella pianta, cerchio e angolo dei fori da controllare, diametri del tornio, fresature da mettere dove vanno.
+
 ## 2.24.0 - Dal disegno al pezzo, con la conferma di ogni quota
 - **Foto del disegno**: l'app legge le quote **e dove stanno** sul disegno, anche quelle scritte in verticale (la foto si legge anche girata di 90 gradi). Il cartiglio (scala, revisione, tolleranze generali, note) non da quote; il materiale scritto nel cartiglio si prende.
 - Le quote sono **numerate sulla foto** con il colore dello stato: da controllare, giusta, scartata. Ognuna si conferma, si scarta o si corregge scrivendo; quelle mancanti si aggiungono toccando la foto.

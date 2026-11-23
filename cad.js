@@ -88,8 +88,8 @@
           const c = centroTondo(e, lav);
           if (!isFinite(c.x) || !isFinite(c.y) || !(c.d > 0)) { nErrore = 'Elemento ' + (k + 1) + ': scrivi il diametro del foro.'; return; }
           const passo = num(lav.passo) || O.passoGrosso(c.d);
-          const chiave = [op, r3(c.d), op === 'maschio' ? r3(passo) : '', lav.passante ? 'P' : r3(prof), lav.toll || '', lav.smusso || ''].join('|');
-          if (!gruppiFori.has(chiave)) gruppiFori.set(chiave, { tipo: op, d: c.d, passo, passante: !!lav.passante, prof: prof > 0 ? prof : c.d * 2, toll: lav.toll, smusso: num(lav.smusso), punti: [] });
+          const chiave = [op, r3(c.d), op === 'maschio' ? r3(passo) : '', lav.passante ? 'P' : r3(prof), lav.toll || '', lav.smusso || '', num(lav.lamD) > 0 ? 'L' + r3(num(lav.lamD)) + 'x' + r3(num(lav.lamProf)) : ''].join('|');
+          if (!gruppiFori.has(chiave)) gruppiFori.set(chiave, { tipo: op, d: c.d, passo, passante: !!lav.passante, prof: prof > 0 ? prof : c.d * 2, toll: lav.toll, smusso: num(lav.smusso), lamD: num(lav.lamD), lamProf: num(lav.lamProf), punti: [] });
           gruppiFori.get(chiave).punti.push([r3(c.x), r3(c.y)]);
           return;
         }
@@ -138,6 +138,14 @@
       const p = O.pianificaPiastra(pezzo, ctx);
       if (p.errore) return { errore: p.errore };
       fasi.push(...p.fasi.filter(f => f.op !== 'spianatura' && f.op !== 'contorno'));
+      // lamature: lamatore sul foro gia fatto, con sosta sul fondo
+      gruppi.filter(g => g.lamD > 0).forEach(g => {
+        const dt = O.datiTaglio(mt, { tipo: 'lamatore', d: g.lamD, nmax }) || {};
+        const t = O.trovaT(tab, ['lamatore'], g.lamD, 11, note);
+        const pr = g.lamProf > 0 ? g.lamProf : r3(g.d * 0.6);
+        fasi.push({ op: 'fori', tipoUt: 'lamatore', titolo: 'Lamatura Ø' + r3(g.lamD) + ' prof. ' + r3(pr) + ' (' + g.punti.length + ' fori) T' + t,
+          c: Object.assign({}, base, { t, n: dt.n || 500, f: dt.f || 60, punti: g.punti.map(q => q.slice()), prof: pr, d: g.lamD, ciclo: 'G82', sosta: 500 }) });
+      });
       note.testi.push(...(p.note || []).filter(t => !/^(Spianatura|Contornatura|Utensili non trovati)/.test(t)));
     }
     // tasche libere: sgrossatura a righe + finitura col profilo interno

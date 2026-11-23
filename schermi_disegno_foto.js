@@ -6,7 +6,7 @@
   'use strict';
   const A = window.App, O = A.O, el = A.el, fmt = A.fmt;
   const col = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
-  const NOMI = { diametro: 'Diametro', lunghezza: 'Lunghezza', filetto: 'Filetto', fori: 'Fori ripetuti', smusso: 'Smusso', raggio: 'Raggio', tolleranza: 'Tolleranza' };
+  const NOMI = { diametro: 'Diametro', lunghezza: 'Lunghezza', filetto: 'Filetto', fori: 'Fori ripetuti', gruppoFori: 'Fori (richiamo)', smusso: 'Smusso', raggio: 'Raggio', tolleranza: 'Tolleranza', angolo: 'Angolo', cava: 'Fresatura (larghezza x profondita)', lamatura: 'Lamatura', profondita: 'Profondita' };
   const svg = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
 
   /** Rimpicciolisce una foto (data URL) per la lettura: al massimo 2000 pixel sul lato lungo. */
@@ -129,10 +129,10 @@
       const scheda = (q, i) => {
         const inp = el('input', { type: 'text', value: q.testo, 'aria-label': 'Quota ' + (i + 1), id: 'dd-q-' + q.id, autocomplete: 'off', spellcheck: 'false' });
         inp.addEventListener('change', () => {
-          const Q = O.estraiQuote(inp.value);
+          const Q = O.quoteDaTesto(inp.value);
           if (!Q.length) { A.avviso('Non e una quota che conosco: ' + inp.value); inp.value = q.testo; return; }
-          const nuova = Q.find(z => z.tipo === 'fori') || Q.find(z => z.tipo === 'diametro') || Q.find(z => z.tipo === 'filetto') || Q[0];
-          ['valore', 'd', 'p', 'n', 'toll', 'filetto'].forEach(k => delete q[k]);
+          const nuova = Q.find(z => z.tipo === 'gruppoFori') || Q.find(z => z.tipo === 'fori') || Q.find(z => z.tipo === 'diametro') || Q.find(z => z.tipo === 'filetto') || Q[0];
+          ['valore', 'd', 'p', 'n', 'toll', 'filetto', 'passo', 'foro', 'lamD', 'lamProf', 'prof', 'passante', 'equidistanti', 'a180', 'spina', 'larghezza'].forEach(k => delete q[k]);
           Object.assign(q, nuova, { stato: 'ok' });
           A.salva(); tutto();
         });
@@ -158,7 +158,10 @@
           proposta.appendChild(el('ol', { class: 'dd-pezzo' }, p.tratti.map(t => el('li', { testo: 'Ø' + fmt(t.d, 3) + (t.toll ? ' ' + t.toll : '') + ' · L ' + (t.l === '' ? '?' : fmt(t.l, 3)) + (t.fil ? ' · filetto M' + fmt(t.d) + 'x' + fmt(t.fil) : '') + (t.gola ? ' · gola ' + fmt(t.gola) : '') }))));
           proposta.appendChild(el('p', { class: 'leggenda', testo: 'Barra Ø' + fmt(p.grezzo.dg) + (p.smussoTesta ? ' · smusso di testa ' + p.smussoTesta : '') + ' · dalla testa verso il mandrino' }));
         } else {
-          proposta.appendChild(el('p', { testo: 'Pezzo ' + (p.grezzo.lx || '?') + ' x ' + (p.grezzo.ly || '?') + ' x ' + (p.grezzo.lz || '?') + ' · ' + p.forme.length + (p.forme.length === 1 ? ' forma' : ' forme') }));
+          proposta.appendChild(el('p', { testo: (p.tondo ? 'Pezzo tondo Ø' + p.grezzo.lx : 'Pezzo ' + (p.grezzo.lx || '?') + ' x ' + (p.grezzo.ly || '?')) + ' · spessore ' + (p.grezzo.lz || '?') }));
+          const descr = f => (f.tipo === 'foriCerchio' ? f.n + ' fori ' : f.tipo === 'foriGriglia' ? (f.nx * f.ny) + ' fori ' : f.tipo === 'foro' ? '1 foro ' : '') + (f.foro === 'maschio' ? 'M' + fmt(f.d) : f.tipo === 'tascaTonda' ? 'tasca Ø' + fmt(f.dt) : 'Ø' + fmt(f.d)) + (f.toll ? ' ' + f.toll : '') +
+            (f.passante === false && f.prof ? ' prof. ' + fmt(f.prof) : f.tipo !== 'tascaTonda' ? ' passanti' : '') + (f.lamD ? ', lamatura Ø' + fmt(f.lamD) + ' prof. ' + fmt(f.lamProf) : '') + (f.tipo === 'foriCerchio' ? ' su Ø' + fmt(f.dc) + ', primo a ' + fmt(f.a0) + '°' : '');
+          proposta.appendChild(el('ol', { class: 'dd-pezzo' }, p.forme.map(f => el('li', { testo: descr(f) }))));
         }
         if (p.dubbi.length) proposta.appendChild(A.info('<b>Da controllare:</b><br>' + p.dubbi.map(A.esc).join('<br>'), 'avviso'));
         const daFare = S.quote.filter(q => q.stato === 'da').length;

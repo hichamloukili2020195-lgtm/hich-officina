@@ -759,4 +759,62 @@ prova('dal disegno al pezzo: quote con la posizione, tornio e fresa', () => {
   assert.ok(!q.errore, q.errore);
   assert.strictEqual(O.barraPer(36), 38); assert.strictEqual(O.barraPer(40), 42);
 });
+prova('disegno: richiami di fori su piu righe, tolleranze geometriche, cartiglio, flangia', () => {
+  const Q1 = t => O.estraiQuote(t).map(q => q.tipo + ':' + q.testo);
+  // le quote singole come si scrivono in officina
+  assert.deepStrictEqual(Q1('⌖ Ø 0.1 A B'), [], 'tolleranza di posizione: non e un foro');
+  assert.deepStrictEqual(Q1('◎ Ø 0.05 A'), []);
+  assert.deepStrictEqual(Q1('(11.5)'), [], 'quota tra parentesi: di riferimento');
+  assert.deepStrictEqual(Q1('17 +0.2'), ['lunghezza:17'], 'lo scostamento non e una lunghezza');
+  assert.ok(!Q1('Ø 110 - ISO F11').includes('tolleranza:F11'), 'ISO F11 e la flangia, non una tolleranza');
+  assert.deepStrictEqual(Q1('Fresatura 4 Profondità 2'), ['cava:4x2']);
+  assert.deepStrictEqual(Q1('30°'), ['angolo:30°']); assert.deepStrictEqual(Q1('A 180°'), ['angolo:180°']);
+  assert.deepStrictEqual(Q1('Smussi 0.5 x 45°'), ['smusso:0.5x45°']);
+  assert.deepStrictEqual(Q1('N°6 Fori Ø11'), ['fori:6 x Ø11']);
+  assert.deepStrictEqual(Q1('N°2 Fori spina Ø 8 H7'), ['fori:2 x Ø8 H7']);
+  assert.deepStrictEqual(Q1('4 FORI M8'), ['fori:4 x M8']);
+  // flangia di prova rifatta qui (numeri inventati): pianta con richiami e cartiglio
+  const W = 1000, H = 1000;
+  const r = [
+    { t: 'N°6 Fori Ø11', x: 650, y: 80, w: 150, h: 20 }, { t: 'Passanti', x: 650, y: 102, w: 90, h: 20 }, { t: 'Equidistanti', x: 650, y: 124, w: 120, h: 20 },
+    { t: '⌖ Ø 0.1 A B', x: 640, y: 150, w: 140, h: 22 },
+    { t: 'N°3 Fori Lamati Ø9', x: 80, y: 300, w: 170, h: 20 }, { t: 'Passanti', x: 80, y: 322, w: 90, h: 20 }, { t: 'Lamatura Ø15', x: 80, y: 344, w: 130, h: 20 }, { t: 'Prof.lamatura 9', x: 80, y: 366, w: 140, h: 20 }, { t: 'Equidistanti', x: 80, y: 388, w: 120, h: 20 },
+    { t: 'N°2 Fori spina Ø 8 H7 (+0.015', x: 60, y: 560, w: 260, h: 20 }, { t: 'Prof.foro 12', x: 60, y: 582, w: 120, h: 20 }, { t: 'A 180°', x: 60, y: 604, w: 60, h: 20 },
+    { t: 'Ø 160', x: 900, y: 450, w: 24, h: 70, r: 90 }, { t: 'Ø 110 - ISO F11', x: 860, y: 430, w: 24, h: 140, r: 90 }, { t: 'Ø 90 - Fori spina', x: 820, y: 430, w: 24, h: 150, r: 90 }, { t: 'Ø 70', x: 780, y: 460, w: 24, h: 60, r: 90 },
+    { t: '30°', x: 300, y: 200, w: 40, h: 20 }, { t: 'Fresatura 4 Profondità 2', x: 600, y: 480, w: 180, h: 20 },
+    { t: 'Tolleranze (dove non specificato)', x: 500, y: 900, w: 250, h: 18 }, { t: 'Smussi 0.5 x 45°', x: 500, y: 920, w: 150, h: 18 }, { t: 'Raggi 0.4', x: 500, y: 940, w: 100, h: 18 },
+    { t: 'Angoli ±0.5°', x: 500, y: 960, w: 100, h: 18 }, { t: '12-03-21', x: 900, y: 30, w: 80, h: 20 }, { t: 'Materiale C40', x: 760, y: 960, w: 150, h: 18 }].map(x => Object.assign({ r: 0 }, x));
+  const Q = O.quoteDaRighe(r, W, H);
+  const g = Q.filter(q => q.tipo === 'gruppoFori');
+  assert.strictEqual(g.length, 3, 'tre richiami di fori: ' + Q.map(q => q.tipo + ':' + q.testo).join(' | '));
+  const g6 = g.find(q => q.n === 6), g3 = g.find(q => q.n === 3), g2 = g.find(q => q.n === 2);
+  assert.ok(g6.d === 11 && g6.passante && g6.equidistanti, 'N°6 fori passanti equidistanti');
+  assert.ok(g3.d === 9 && g3.lamD === 15 && g3.lamProf === 9 && g3.passante, 'lamatura e profondita della lamatura');
+  assert.ok(g2.d === 8 && g2.toll === 'H7' && g2.foro === 'alesato' && !g2.passante && g2.prof === 12 && g2.a180, 'fori spina H7 non passanti a 180 gradi');
+  assert.ok(!Q.some(q => q.tipo === 'diametro' && q.valore < 1), 'niente Ø0,1 dai riquadri');
+  assert.ok(!Q.some(q => /dove non|Raggi|Angoli|12-03/.test(q.riga || '')), 'il cartiglio e la data non danno quote');
+  assert.ok(Q.some(q => q.tipo === 'cava' && q.larghezza === 4 && q.prof === 2));
+  assert.strictEqual(O.modoDalDisegno(Q), 'fresa');
+  const f = O.proponiFresa(Q.map(q => Object.assign(q, { stato: 'ok' })));
+  assert.deepStrictEqual([f.grezzo.lx, f.grezzo.ly], [160, 160], 'pezzo tondo Ø160');
+  const fc = f.forme.filter(x => x.tipo === 'foriCerchio');
+  assert.strictEqual(fc.length, 3);
+  const c6 = fc.find(x => x.n === 6), c3 = fc.find(x => x.n === 3), c2 = fc.find(x => x.n === 2);
+  assert.ok(c6.dc === 110 && c2.dc === 90 && c3.dc === 70, 'cerchi dei fori: ' + [c6.dc, c3.dc, c2.dc].join());
+  assert.ok(c6.cx === 80 && c6.cy === 80, 'centro del pezzo tondo');
+  assert.ok(c3.lamD === 15 && c3.lamProf === 9 && c2.foro === 'alesato' && c2.toll === 'H7' && c2.passante === false && c2.prof === 12);
+  assert.ok(f.dubbi.some(d => /tondo/.test(d)) && f.dubbi.some(d => /Fresatura 4/.test(d)));
+  // dal pezzo al programma: centrino, punte, lamatura, alesatura, nell'ordine di officina
+  const mt = O.MATERIALI.find(m => m.n === 'C40');
+  assert.ok(f.dubbi.some(d => /Spessore/.test(d)), 'lo spessore non c\'e nella pianta: si chiede');
+  const p = O.proponiLavoro({ modo: 'fresa', grezzo: Object.assign({}, f.grezzo, { lz: 20 }), forme: f.forme }, { mat: mt, nmax: 8000 });
+  assert.ok(!p.errore, p.errore);
+  const t = p.fasi.map(x => x.titolo);
+  const i = s => t.findIndex(x => x.startsWith(s));
+  assert.ok(i('Lamatura') > i('Punta') && i('Lamatura') >= 0, 'lamatura dopo la punta: ' + t.join(' / '));
+  assert.ok(i('Alesatore') > i('Lamatura'));
+  const lam = p.fasi.find(x => x.titolo.startsWith('Lamatura'));
+  assert.strictEqual(lam.c.punti.length, 3); assert.strictEqual(lam.c.prof, 9); assert.strictEqual(lam.c.d, 15);
+  assert.ok(!O.eseguiISO(O.programmaLavoro(p, {}, { num: 1, nome: 'F' }).righe.join('\n')).errore);
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

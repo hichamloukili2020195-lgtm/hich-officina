@@ -324,6 +324,7 @@
           if (f.foro === 'maschio') ed.append(campi([['passo', 'Passo']]));
           if (f.foro === 'alesato') ed.append(chips([['H7', 'H7'], ['H8', 'H8'], ['G7', 'G7']], f.toll || 'H7', v => { f.toll = v; ri(); }, 'Tolleranza'));
           ed.append(interruttore('Passante', f.passante !== false, v => { f.passante = v; ri(); }));
+          if (f.foro !== 'maschio') ed.append(interruttore('Lamatura', num(f.lamD) > 0, v => { if (v) { f.lamD = Math.round(num(f.d) * 1.6 * 2) / 2; f.lamProf = Math.round(num(f.d) * 0.6 * 2) / 2; } else { delete f.lamD; delete f.lamProf; } ri(); }), num(f.lamD) > 0 ? campi([['lamD', 'Lamatura Ø'], ['lamProf', 'Profondita lamatura']]) : el('span'));
           if (f.passante === false) ed.append(campi([['prof', 'Profondita']]));
         }
         return ed;
