@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.28.1 - Nuova icona, testata e sfondo (fatti con Canva)
+- **Nuova icona**: un calibro che racchiude un ingranaggio con il centro azzurro, acciaio su blu notte. Per il telefono (quadrata e tonda di Android), per il negozio e per il sito. La cornice dell'immagine originale e stata tolta per usarla a tutto campo.
+- **Nuova testata della home**: un ingranaggio, il mandrino e le scintille. Dall'immagine originale sono ritagliati i pannelli con scritte in inglese e dati finti, che nell'app non devono comparire; sopra c'e una sfumatura scura per leggere titolo e ricerca.
+- **Sfondo con immagine** dietro le schermate (metallo scuro con ingranaggi), con una velatura che tiene i testi leggibili. Si toglie da Impostazioni, "Sfondo con immagine"; nel tema chiaro non c'e.
+- Il marchio nella home usa la nuova icona. Le immagini sono leggere (testata e sfondo meno di 200 KB) e funzionano anche senza rete.
+- Una prova controlla misure e peso delle immagini, che il funzionamento senza rete le includa e che lo sfondo non renda illeggibili i testi.
+
 ## 2.28.0 - Grafica: un colore per gruppo
 - La home ha **un colore per ogni gruppo**: Calcola giallo, Controlla verde, Officina viola, con il bordo colorato e l'icona nello stesso colore. Il blu resta il colore principale dell'app.
 - **Blu piu profondo** nel tema scuro (fondo, pannelli e bordi) e testi secondari piu leggibili.

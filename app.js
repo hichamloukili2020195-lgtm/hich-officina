@@ -108,7 +108,7 @@
 
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
-    tema: 'scuro', guanti: false, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
+    tema: 'scuro', guanti: false, sfondo: true, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
     codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1, costoOra: 60,
     postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
@@ -120,6 +120,7 @@
     else document.documentElement.removeAttribute('data-theme');
     document.body.classList.toggle('guanti', !!imp().guanti);
     document.body.classList.toggle('contrasto', !!imp().contrasto);
+    document.body.classList.toggle('con-sfondo', imp().sfondo !== false);
   }
 
   // ----- materiali: quelli di serie con le modifiche fatte sul telefono -----
@@ -447,7 +448,7 @@
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.28.0'
+    schermi: {}, param: {}, VERSIONE: '2.28.1'
   };
   window.App = App;
 
@@ -497,28 +498,9 @@
   window.addEventListener('hashchange', () => { App._dentro = true; mostra(); });
 
   // ----- home -----
-  const SCENA = '<svg class="scena" viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Fresa che lavora un blocco di acciaio">' +
-    '<defs><linearGradient id="gC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2b4a"/><stop offset="1" stop-color="#070c16"/></linearGradient>' +
-    '<linearGradient id="gM" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5b6678"/><stop offset=".45" stop-color="#d9e1ec"/><stop offset="1" stop-color="#4a5466"/></linearGradient>' +
-    '<linearGradient id="gF" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6b7486"/><stop offset=".5" stop-color="#f2f5fa"/><stop offset="1" stop-color="#5a6274"/></linearGradient>' +
-    '<linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aa6b8"/><stop offset="1" stop-color="#4b5567"/></linearGradient>' +
-    '<radialGradient id="gL" cx=".62" cy=".35" r=".6"><stop offset="0" stop-color="#3d7bff" stop-opacity=".35"/><stop offset="1" stop-color="#3d7bff" stop-opacity="0"/></radialGradient></defs>' +
-    '<rect width="400" height="250" fill="url(#gC)"/><rect width="400" height="250" fill="url(#gL)"/>' +
-    '<g opacity=".18" stroke="#8fb4ff" stroke-width=".6">' + Array.from({ length: 9 }, (_, i) => '<path d="M' + (i * 50) + ' 0v250"/>').join('') + '</g>' +
-    // mandrino
-    '<rect x="196" y="-10" width="96" height="62" rx="6" fill="url(#gM)"/><rect x="206" y="52" width="76" height="20" rx="3" fill="#3a4354"/>' +
-    '<path d="M214 72h60l-8 26h-44z" fill="url(#gM)"/><rect x="230" y="98" width="28" height="14" fill="#2c3442"/>' +
-    // fresa con le eliche
-    '<rect x="234" y="112" width="20" height="62" fill="url(#gF)"/>' +
-    '<g stroke="#4a5262" stroke-width="2.2" fill="none"><path d="M234 120l20 9M234 133l20 9M234 146l20 9M234 159l20 9"/></g>' +
-    // blocco
-    '<path d="M70 176l150-34 140 26-150 40z" fill="#c3ccd8"/><path d="M70 176v44l140 30v-42z" fill="url(#gB)"/><path d="M210 208v42l150-38v-44z" fill="#5d6779"/>' +
-    '<path d="M170 168l60-12 58 10-60 13z" fill="#7d889a"/><path d="M170 168v10l58 12v-11z" fill="#6a7486"/>' +
-    // trucioli
-    '<g fill="#e3c27a" opacity=".9"><path d="M262 168c8-6 14-2 10 4-3 4-8 2-6-1"/><path d="M216 172c-6-5-12-1-8 4 3 3 7 1 5-1"/><path d="M280 150c6-3 9 1 6 4"/><path d="M200 160c-5-2-8 2-5 4"/></g>' +
-    '<g fill="#fff" opacity=".7"><circle cx="270" cy="160" r="1.4"/><circle cx="290" cy="170" r="1"/><circle cx="210" cy="164" r="1.2"/></g>' +
-    '<rect y="150" width="400" height="100" fill="url(#gC)" opacity=".35"/></svg>';
-  const MARCHIO = '<svg viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#63b4ff"/><stop offset="1" stop-color="#1f5fe0"/></linearGradient><linearGradient id="ma" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#c9d4e6"/><stop offset="1" stop-color="#8a98b2"/></linearGradient><linearGradient id="mb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17305c"/><stop offset="1" stop-color="#091226"/></linearGradient><radialGradient id="ml" cx=".3" cy=".25" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><path d="M415.1,225.6 L454.4,230.9 L454.4,281.1 L415.1,286.4 L402.6,325.0 L431.3,352.4 L401.8,392.9 L366.9,374.1 L334.0,398.0 L341.2,437.0 L293.5,452.5 L276.3,416.7 L235.7,416.7 L218.5,452.5 L170.8,437.0 L178.0,398.0 L145.1,374.1 L110.2,392.9 L80.7,352.4 L109.4,325.0 L96.9,286.4 L57.6,281.1 L57.6,230.9 L96.9,225.6 L109.4,187.0 L80.7,159.6 L110.2,119.1 L145.1,137.9 L178.0,114.0 L170.8,75.0 L218.5,59.5 L235.7,95.3 L276.3,95.3 L293.5,59.5 L341.2,75.0 L334.0,114.0 L366.9,137.9 L401.8,119.1 L431.3,159.6 L402.6,187.0 Z" fill="url(#mg)"/><circle cx="256" cy="256" r="118.0" fill="#0b1830"/><circle cx="256" cy="256" r="118.0" fill="none" stroke="#5db0ff" stroke-width="5.0" opacity=".9"/><circle cx="256.0" cy="256.0" r="92.0" fill="url(#ma)"/><circle cx="319.8" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="319.8" r="36.8" fill="#0b1830"/><circle cx="192.2" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="319.8" cy="192.2" r="36.8" fill="#0b1830"/><circle cx="256" cy="256" r="41.4" fill="none" stroke="#7d8aa6" stroke-width="3.0"/><circle cx="256" cy="256" r="12.9" fill="#2a3a5c"/></svg>';
+  // testata della home e marchio: immagini (icone/testata.jpg, icone/icona-192.png)
+  const SCENA = '<img class="scena" src="icone/testata.jpg" width="1170" height="630" alt="Fresa che lavora un ingranaggio in acciaio" decoding="async">';
+  const MARCHIO = '<img src="icone/icona-192.png" width="64" height="64" alt="" decoding="async">';
 
   const MENU = [
     ['dalDisegno', 'galleria', 'Dal disegno al pezzo', 'Foto del disegno: le quote lette e confermate diventano il pezzo e il programma'],

@@ -330,11 +330,11 @@
         }
         if (s.ftpChiedi) s.ftpPassword = '';   // chiesta a ogni invio: non si tiene
         A.mem.imp = s; A.salva();
-        if (id === 'tema' || id === 'guanti' || id === 'contrasto') A.applicaTema();
+        if (id === 'tema' || id === 'guanti' || id === 'contrasto' || id === 'sfondo') A.applicaTema();
       };
       const blocco = (tit, campi) => { m.appendChild(el('div', { class: 'sez', testo: tit })); const p = el('div', { class: 'pannello' }); m.appendChild(p); A.modulo(p, campi, v, salva); };
       blocco('Aspetto', [{ id: 'tema', et: 'Tema', tipo: 'scelta', scelte: [['scuro', 'Scuro'], ['chiaro', 'Chiaro'], ['auto', 'Come il telefono']] },
-        { id: 'guanti', et: 'Modalita guanti: testi e pulsanti piu grandi', tipo: 'spunta' }, { id: 'contrasto', et: 'Contrasto alto (officine luminose)', tipo: 'spunta' }, { id: 'tastierino', et: 'Tastierino numerico grande dell\'app (invece della tastiera del telefono)', tipo: 'spunta' }]);
+        { id: 'sfondo', et: 'Sfondo con immagine (solo tema scuro)', tipo: 'spunta' }, { id: 'guanti', et: 'Modalita guanti: testi e pulsanti piu grandi', tipo: 'spunta' }, { id: 'contrasto', et: 'Contrasto alto (officine luminose)', tipo: 'spunta' }, { id: 'tastierino', et: 'Tastierino numerico grande dell\'app (invece della tastiera del telefono)', tipo: 'spunta' }]);
       blocco('Fresatrice', [{ id: 'nmaxFresa', et: 'Giri massimi mandrino', u: 'giri/min' }, { id: 'zSic', et: 'Z di sicurezza', u: 'mm' }, { id: 'zR', et: 'Piano R dei cicli', u: 'mm' },
         { id: 'fineZ', et: 'Z a fine programma', sub: 'vuoto = Z di sicurezza', u: 'mm' }, { id: 'g43', et: 'Correzione lunghezza G43 H', tipo: 'spunta' }]);
       blocco('Tornio', [{ id: 'nmaxTornio', et: 'Giri massimi mandrino', u: 'giri/min' }, { id: 'codLimite', et: 'Limite giri', tipo: 'scelta', scelte: [['G50', 'G50 S...'], ['G92', 'G92 S...']] },

@@ -835,4 +835,21 @@ prova('grafica: contrasto dei colori (WCAG AA) nel tema scuro e in quello chiaro
   assert.notStrictEqual(scuro.fondo, chiaro.fondo);
   assert.ok(parseInt(scuro.accento.slice(5, 7), 16) > parseInt(scuro.accento.slice(1, 3), 16), 'accento blu: piu blu che rosso');
 });
+prova('immagini: icona, testata e sfondo (misure, peso, nel funzionamento senza rete)', () => {
+  const fs = require('fs'), path = require('path'), r = p => path.join(__dirname, '..', p);
+  const png = p => { const b = fs.readFileSync(r(p)); assert.strictEqual(b.slice(1, 4).toString(), 'PNG', p); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+  const jpg = p => { const b = fs.readFileSync(r(p)); assert.strictEqual(b[0], 0xff); assert.strictEqual(b[1], 0xd8); let i = 2; while (i < b.length) { if (b[i] !== 0xff) { i++; continue; } const m = b[i + 1]; if (m >= 0xc0 && m <= 0xc3) return [b.readUInt16BE(i + 7), b.readUInt16BE(i + 5)]; i += 2 + b.readUInt16BE(i + 2); } return null; };
+  assert.deepStrictEqual(png('icone/icona-512.png'), [512, 512]); assert.deepStrictEqual(png('icone/icona-192.png'), [192, 192]); assert.deepStrictEqual(png('icone/icona-maskable-512.png'), [512, 512]);
+  [['mdpi', 48], ['hdpi', 72], ['xhdpi', 96], ['xxhdpi', 144], ['xxxhdpi', 192]].forEach(([d, n]) => assert.deepStrictEqual(png('android/app/src/main/res/mipmap-' + d + '/ic_launcher.png'), [n, n], d));
+  assert.deepStrictEqual(png('android/app/src/main/res/drawable-nodpi/ic_primo_piano.png'), [432, 432]); assert.deepStrictEqual(png('android/app/src/main/res/drawable-nodpi/ic_sfondo.png'), [432, 432]);
+  const th = jpg('icone/testata.jpg'), sf = jpg('icone/sfondo.jpg');
+  assert.deepStrictEqual(th, [1170, 630]); assert.ok(sf[0] >= 600 && sf[1] / sf[0] > 1.6 && sf[1] / sf[0] < 2.1, 'sfondo verticale');
+  ['icone/testata.jpg', 'icone/sfondo.jpg'].forEach(p => assert.ok(fs.statSync(r(p)).size < 300 * 1024, p + ' troppo pesante'));
+  const sw = fs.readFileSync(r('sw.js'), 'utf8');
+  ['testata.jpg', 'sfondo.jpg', 'icona-192.png', 'icona-512.png', 'icona-maskable-512.png'].forEach(f => assert.ok(sw.includes('./icone/' + f), 'sw.js non ha ' + f));
+  const html = ['app.html', 'index.html', 'guida.html', 'novita.html', 'privacy.html', '404.html', 'sw.js', 'manifest.webmanifest', 'tools/sito.js'].map(f => fs.readFileSync(r(f), 'utf8')).join('\n');
+  assert.ok(!html.includes('icona.svg'), 'resta un riferimento a icona.svg, che non c\'e piu');
+  // tutte le immagini nominate dai file esistono
+  (html.match(/icone\/[a-z0-9-]+\.(?:png|jpg)/g) || []).forEach(f => assert.ok(fs.existsSync(r(f)), 'manca ' + f));
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

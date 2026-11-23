@@ -26,14 +26,14 @@ function pagina({ file, titolo, descrizione, corpo, attiva, indicizza = true }) 
 ${indicizza ? '' : '<meta name="robots" content="noindex">\n'}<meta property="og:type" content="website">
 <meta property="og:title" content="${esc(t)}">
 <meta property="og:description" content="${esc(descrizione)}">
-${base ? '<meta property="og:image" content="' + base + 'icone/icona-512.png">\n<link rel="canonical" href="' + base + (file === 'index.html' ? '' : file) + '">\n' : ''}<link rel="icon" href="icone/icona.svg" type="image/svg+xml">
+${base ? '<meta property="og:image" content="' + base + 'icone/icona-512.png">\n<link rel="canonical" href="' + base + (file === 'index.html' ? '' : file) + '">\n' : ''}<link rel="icon" href="icone/icona-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icone/icona-192.png">
 <link rel="stylesheet" href="sito.css">
 </head>
 <body>
 <a class="salta" href="#contenuto">Vai al contenuto</a>
 <header class="testata"><div class="largo">
-  <a class="marchio" href="index.html"><img src="icone/icona.svg" alt="" width="32" height="32"><span>Hich-Officina</span></a>
+  <a class="marchio" href="index.html"><img src="icone/icona-192.png" alt="" width="32" height="32"><span>Hich-Officina</span></a>
   <nav aria-label="Principale"><ul>${NAV.map(([h, n]) => `<li><a href="${h}"${attiva === h ? ' aria-current="page"' : ''}>${n}</a></li>`).join('')}</ul></nav>
   <a class="pul corto" href="app.html">Apri l'app</a>
 </div></header>

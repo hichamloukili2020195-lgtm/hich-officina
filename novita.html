@@ -9,14 +9,14 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Novita · Hich-Officina">
 <meta property="og:description" content="Cronologia delle versioni di Hich-Officina.">
-<link rel="icon" href="icone/icona.svg" type="image/svg+xml">
+<link rel="icon" href="icone/icona-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icone/icona-192.png">
 <link rel="stylesheet" href="sito.css">
 </head>
 <body>
 <a class="salta" href="#contenuto">Vai al contenuto</a>
 <header class="testata"><div class="largo">
-  <a class="marchio" href="index.html"><img src="icone/icona.svg" alt="" width="32" height="32"><span>Hich-Officina</span></a>
+  <a class="marchio" href="index.html"><img src="icone/icona-192.png" alt="" width="32" height="32"><span>Hich-Officina</span></a>
   <nav aria-label="Principale"><ul><li><a href="index.html">Home</a></li><li><a href="index.html#funzioni">Funzioni</a></li><li><a href="index.html#installa">Installa</a></li><li><a href="guida.html">Guida</a></li><li><a href="novita.html" aria-current="page">Novita</a></li><li><a href="privacy.html">Privacy</a></li></ul></nav>
   <a class="pul corto" href="app.html">Apri l'app</a>
 </div></header>
@@ -24,6 +24,7 @@
 <section class="sezione"><div class="largo stretto">
   <h1>Novita</h1>
   <p class="sotto">Cosa e cambiato in ogni versione, dalla piu recente.</p>
+  <article class="versione"><h2><span class="num">2.28.1</span> Nuova icona, testata e sfondo (fatti con Canva)</h2><ul><li>**Nuova icona**: un calibro che racchiude un ingranaggio con il centro azzurro, acciaio su blu notte. Per il telefono (quadrata e tonda di Android), per il negozio e per il sito. La cornice dell'immagine originale e stata tolta per usarla a tutto campo.</li><li>**Nuova testata della home**: un ingranaggio, il mandrino e le scintille. Dall'immagine originale sono ritagliati i pannelli con scritte in inglese e dati finti, che nell'app non devono comparire; sopra c'e una sfumatura scura per leggere titolo e ricerca.</li><li>**Sfondo con immagine** dietro le schermate (metallo scuro con ingranaggi), con una velatura che tiene i testi leggibili. Si toglie da Impostazioni, &quot;Sfondo con immagine&quot;; nel tema chiaro non c'e.</li><li>Il marchio nella home usa la nuova icona. Le immagini sono leggere (testata e sfondo meno di 200 KB) e funzionano anche senza rete.</li><li>Una prova controlla misure e peso delle immagini, che il funzionamento senza rete le includa e che lo sfondo non renda illeggibili i testi.</li></ul></article>
   <article class="versione"><h2><span class="num">2.28.0</span> Grafica: un colore per gruppo</h2><ul><li>La home ha **un colore per ogni gruppo**: Calcola giallo, Controlla verde, Officina viola, con il bordo colorato e l'icona nello stesso colore. Il blu resta il colore principale dell'app.</li><li>**Blu piu profondo** nel tema scuro (fondo, pannelli e bordi) e testi secondari piu leggibili.</li><li>**Tema chiaro** con i colori dei gruppi scuriti per leggersi bene sul bianco.</li><li>Una **prova automatica controlla il contrasto** (livello AA) di testi, pulsanti e colori dei gruppi in entrambi i temi.</li></ul></article>
   <article class="versione"><h2><span class="num">2.27.0</span> Velocita di taglio e avanzamento in primo piano</h2><ul><li>**In cima alla home** c'e il calcolo rapido: materiale, utensile e diametro (con il tastierino grande e i taglienti a un tocco) danno subito **giri al minuto, avanzamento e velocita di taglio**, piu fz o fn, passata e passo laterale.</li><li>Vale per tutti gli utensili (fresa, punta, alesatore, bareno, maschio, lamatore, inserto da tornio) e usa gli stessi dati della calcolatrice completa: i valori restano gli stessi tra le due. Il tasto &quot;Completa&quot; apre la calcolatrice con tutti gli utensili.</li><li>I giri restano limitati al massimo delle Impostazioni, e la nota ricorda che i valori sono di partenza.</li></ul></article>
   <article class="versione"><h2><span class="num">2.26.0</span> Segnala un problema</h2><ul><li>**Impostazioni, &quot;Segnala un problema&quot;**: apre l'email gia scritta con versione, schermata, telefono e misura dello schermo, per i tester e per chi usa l'app.</li><li>L'indirizzo di contatto viene da `sito.json` (copiato in `contatto.js` da `node tools/sito.js`): non e scritto nel codice.</li><li>`docs/TEST_CHIUSO.md`: come iscrivere i tester, il messaggio da mandare, le cinque prove e cosa chiedere nel resoconto.</li></ul></article>
@@ -59,7 +60,7 @@
 </div></section>
 </main>
 <footer class="piede"><div class="largo">
-  <p><b>Hich-Officina</b> 2.28.0 · Hich Tools</p>
+  <p><b>Hich-Officina</b> 2.28.1 · Hich Tools</p>
   <p class="piccolo">I valori di taglio e i programmi sono di partenza e indicativi: vanno sempre controllati e provati a vuoto prima di lavorare. I nomi dei controlli citati nell'app indicano solo la compatibilita e appartengono ai rispettivi proprietari.</p>
   <p class="piccolo"><a href="privacy.html">Privacy</a> · <a href="guida.html">Guida</a> · <a href="novita.html">Novita</a> · <a href="mailto:hichamloukili2020195@gmail.com">hichamloukili2020195@gmail.com</a></p>
 </div></footer>

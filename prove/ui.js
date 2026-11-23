@@ -722,6 +722,42 @@ const server = http.createServer((q, r) => {
     await vai('home');
   }
 
+  // ===== 2.28.1: testata, marchio e sfondo con immagine =====
+  {
+    await vai('home'); await pg.waitForTimeout(150);
+    const imgs = await pg.evaluate(() => ({ testata: (() => { const i = document.querySelector('.eroe img.scena'); return i ? [i.complete, i.naturalWidth, i.naturalHeight, i.getBoundingClientRect().height] : null; })(),
+      marchio: (() => { const i = document.querySelector('.eroe .marchio img'); return i ? [i.complete, i.naturalWidth] : null; })(), svgVecchia: !!document.querySelector('.eroe svg.scena') }));
+    ok(imgs.testata && imgs.testata[0] && imgs.testata[1] === 1170 && imgs.testata[2] === 630 && imgs.testata[3] > 180 && imgs.testata[3] < 240, 'testata della home: ' + JSON.stringify(imgs.testata));
+    ok(imgs.marchio && imgs.marchio[0] && imgs.marchio[1] === 192 && !imgs.svgVecchia, 'marchio con la nuova icona');
+    ok((await pg.textContent('.eroe .marchio')).includes('Hich-Officina'), 'titolo sopra la testata');
+    ok(await pg.evaluate(() => document.body.classList.contains('con-sfondo')), 'sfondo con immagine acceso di serie');
+    const vis = () => pg.evaluate(() => { const s = getComputedStyle(document.body, '::after'); return [s.content !== 'none' && s.display !== 'none', s.backgroundImage.includes('sfondo.jpg'), s.position, s.zIndex]; });
+    const v1 = await vis(); ok(v1[0] && v1[1] && v1[2] === 'fixed' && v1[3] === '-1', 'sfondo dietro i contenuti: ' + JSON.stringify(v1));
+    // si spegne dalle Impostazioni
+    await vai('impostazioni'); await pg.waitForTimeout(80);
+    await pg.uncheck('#f-sfondo'); await pg.waitForTimeout(60);
+    ok(!(await pg.evaluate(() => document.body.classList.contains('con-sfondo'))) && !(await vis())[0], 'sfondo spento dalle impostazioni');
+    await pg.check('#f-sfondo'); await pg.waitForTimeout(60);
+    ok(await pg.evaluate(() => document.body.classList.contains('con-sfondo')), 'sfondo riacceso');
+    // il tema chiaro non ha lo sfondo scuro
+    await pg.selectOption('#f-tema', 'chiaro'); await pg.waitForTimeout(80);
+    ok(!(await vis())[0], 'tema chiaro: niente sfondo con immagine');
+    await foto('49-home-chiaro-con-immagini');
+    await pg.selectOption('#f-tema', 'scuro'); await pg.waitForTimeout(60);
+    // i testi restano leggibili sopra lo sfondo: il colore piu chiaro possibile dell'immagine, sotto la velatura, e scuro
+    const lum = await pg.evaluate(async () => {
+      const im = new Image(); im.src = 'icone/sfondo.jpg'; await im.decode();
+      const c = document.createElement('canvas'); c.width = 90; c.height = 160; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 90, 160);
+      const d = g.getImageData(0, 0, 90, 160).data; let max = 0, somma = 0;
+      for (let i = 0; i < d.length; i += 4) { const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; max = Math.max(max, l); somma += l; }
+      const vel = [7, 13, 26], a = 0.85, pix = (v, k) => a * vel[k] + (1 - a) * v;
+      const resa = 0.2126 * pix(max, 0) + 0.7152 * pix(max, 1) + 0.0722 * pix(max, 2);
+      return [Math.round(max), Math.round(somma / (d.length / 4)), Math.round(resa)];
+    });
+    ok(lum[2] < 70, 'sotto la velatura anche il punto piu chiaro dello sfondo e scuro: ' + lum.join(','));
+    await vai('home');
+  }
+
   // ===== 2.27.0: velocita di taglio e avanzamento in primo piano =====
   {
     await pg.evaluate(() => { Object.keys(App.sezione('utensili')).forEach(k => delete App.sezione('utensili')[k]); App.salva(); App.ridisegna(); });

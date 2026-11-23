@@ -590,3 +590,14 @@ body.con-tastierino .lav-barra{display:none}
 .ingresso[data-gruppo=controlla] .ic{background:color-mix(in srgb,var(--g-controlla) 20%,transparent);color:var(--g-controlla)}
 .ingresso[data-gruppo=officina] .ic{background:color-mix(in srgb,var(--g-officina) 20%,transparent);color:var(--g-officina)}
 .ingresso.primo{background:linear-gradient(135deg,#2f7bff,#1747c9)}
+
+/* ===== 2.28.1: testata e sfondo con immagine ===== */
+.eroe img.scena{display:block;width:100%;height:auto;aspect-ratio:1170/630;max-width:100%;object-fit:cover}
+.eroe::after{content:"";position:absolute;inset:auto 0 0 0;height:62%;background:linear-gradient(to top,rgba(5,10,22,.94),rgba(5,10,22,.55) 55%,transparent);pointer-events:none}
+.eroe .marchio{z-index:1}
+.eroe .marchio img{width:64px;height:64px;flex:0 0 auto;border-radius:15px;box-shadow:0 4px 14px rgba(0,0,0,.55)}
+body.con-sfondo::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(rgba(7,13,26,.82),rgba(7,13,26,.88)),url(icone/sfondo.jpg) center/cover no-repeat}
+:root[data-theme="light"] body.con-sfondo::after{display:none}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) body.con-sfondo::after{display:none}}
+@media (min-width:760px){.eroe img.scena{height:260px;aspect-ratio:auto}}
