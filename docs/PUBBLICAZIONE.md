@@ -22,3 +22,14 @@ Oggi l'app si distribuisce come sito installabile e come APK. Per un negozio di 
 - Programmi di taglio e dati indicativi: serve il testo "controlla sempre" gia presente; valuta con un consulente la responsabilita se l'app e commerciale.
 - L'invio FTP e in chiaro (nessuna cifratura): da dire, o da sostituire con un protocollo cifrato.
 - Il riconoscimento del testo usa un componente di terzi: elencarlo nelle note.
+
+## Passi con l'account confermato (Play Console)
+1. **Crea l'app**: Tutte le app, Crea app. Nome "Hich-Officina" (se e gia preso, un nome in piu dopo il trattino), italiano, App, Gratuita o A pagamento (il prezzo gratuito non si puo cambiare in a pagamento: decidilo prima), categoria Strumenti.
+2. **Contenuti dell'app** (menu Criteri e programmi): privacy (indirizzo di `privacy.html`, da compilare con nome, email e data in `sito.json`), annunci: no, accesso all'app: tutto accessibile senza account, pubblico: adulti, sicurezza dei dati (risposte in `docs/SCHEDA_STORE.md`), classificazione dei contenuti (questionario), app governativa: no.
+3. **Scheda**: testi da `docs/SCHEDA_STORE.md`; icona `icone/icona-512.png`; immagine di presentazione `docs/store/presentazione-1024x500.png`; schermate da telefono `docs/store/1-...7-*.png` (1080x1920).
+4. **Chiave di caricamento e pacchetto AAB**: crea la chiave (fuori dal repository), mettila nei tre segreti di GitHub (`FIRMA_KEYSTORE_B64`, `FIRMA_PASSWORD`, `FIRMA_ALIAS`); alla prossima costruzione il lavoro automatico produce anche l'AAB (release `apk`). Alla prima pubblicazione attiva "Firma dell'app di Play": la chiave vera la custodisce il negozio, la tua serve solo per caricare.
+5. **Test chiuso**: per un account personale nuovo servono almeno **12 tester** (con un account Google, iscritti con il link di invito) che restino iscritti per **14 giorni di fila**; poi si chiede l'accesso alla produzione. Tester: amici e colleghi con telefono Android. Va fatto prima di poter pubblicare.
+6. **Produzione**: dopo l'approvazione si pubblica; la prima revisione puo durare qualche giorno.
+
+### Attenzione alle due chiavi
+La chiave con cui sono firmati gli APK di oggi sta nel repository, che e pubblico: chiunque potrebbe firmare con quella. Per il negozio si usa una chiave nuova e segreta. Chi ha installato l'APK a mano dovra **disinstallare e reinstallare** quando passa alla versione del negozio (le firme sono diverse): prima fa la copia di sicurezza dei dati dall'app.

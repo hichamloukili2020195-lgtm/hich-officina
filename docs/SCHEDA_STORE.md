@@ -15,21 +15,28 @@ CALCOLI E DATI DI TAGLIO
 - Giri, avanzamenti e velocita di taglio per utensile e materiale: fresa, punta, alesatore, bareno, maschio, inserto da tornio.
 - Tolleranze ISO con accoppiamenti foro-albero, filetti metrici, coni, fori su cerchio, peso del grezzo, rugosita, pollici.
 
+DAL DISEGNO AL PROGRAMMA
+- Disegna e lavora in 4 passi (grezzo, forma, lavorazioni, programma), uguale per fresa e tornio.
+- La forma si scrive a quote con un tastierino grande: tratti del tornio con filetto, gola, tolleranza e smusso; tasche, fori, fori a cerchio e a griglia, asole e profili per la fresa.
+- Foto del disegno: l'app legge le quote e dove stanno, tu le confermi una per una e diventano il pezzo. Legge anche i richiami dei fori su piu righe, con lamatura e profondita.
+- Le lavorazioni si propongono da sole nell'ordine di officina: centrino, punta, smusso, maschio, alesatore, lamatura, tasche, contorno. Tempo stimato, utensili da montare, costo del pezzo e foglio di attrezzaggio.
+- Modelli pronti (perno, boccola, piastra, flangia) e lavori salvati con un nome.
+
 PROGRAMMI ISO
-- Fresa: spianatura, tasche, profili, asole, filetti a fresa, fori con tutti i cicli.
-- Tornio: sgrossatura e finitura, profili liberi, filetti, gole, troncatura, cicli fissi.
-- Piu lavorazioni nello stesso programma, nell'ordine di officina.
-- Linguaggi macchina diversi, con le istruzioni su cosa traducono.
+- Fresa: spianatura, tasche anche libere con discesa a rampa, profili con compensazione, asole, filetti a fresa, fori con tutti i cicli.
+- Tornio: sgrossatura e finitura, profili liberi, filetti, gole, barenatura interna, troncatura, cicli fissi.
+- Piu lavorazioni nello stesso programma. Linguaggi macchina diversi, con le istruzioni su cosa traducono.
 
 CONTROLLO E SIMULAZIONE
 - Controlla un programma riga per riga: taglio senza avanzamento, rapidi pericolosi, giri non limitati e altro.
 - Anche da una foto dello schermo, con la lettura del testo sul telefono.
 - Simulazione animata con quote, giri, utensile, centro fresa e urti con le staffe.
 
-DISEGNA E MISURA
-- Disegna il profilo del tornio col dito e guardalo in 3D.
+CALCOLI E TABELLE
+- Giri, avanzamenti e velocita di taglio per utensile e materiale: fresa, punta, alesatore, bareno, maschio, inserto da tornio.
+- Tolleranze ISO da IT01 a IT18 con accoppiamenti foro-albero; filetti metrici, UNC, UNF, NPT, gas, Whitworth, trapezi, ACME e Pg con preforo; coni Morse e 7:24.
+- Barra seno, ingranaggi e divisore, dilatazione termica, potenza e coppia del mandrino, tempo di lavoro, coni, fori su cerchio, peso del grezzo, rugosita, pollici.
 - Misura un angolo da una foto e trova l'utensile giusto.
-- Ciclo di lavoro proposto dal pezzo o dalle quote di un disegno.
 
 IN OFFICINA
 - Macro con simulazione, tabella utensili, materiali modificabili.
@@ -43,7 +50,7 @@ IMPORTANTE
 I valori di taglio e i programmi sono indicativi: controllali sempre e provali a vuoto prima di lavorare.
 
 ## Novita della versione (massimo 500 caratteri)
-Prima versione sul negozio: calcoli di taglio, programmi ISO di fresa e tornio, controllo degli errori, simulazione, disegno del profilo e foto.
+Prima versione: dal disegno al programma in 4 passi per fresa e tornio, foto del disegno con conferma delle quote, tabella filetti completa, tolleranze IT01-IT18, controllo e simulazione dei programmi.
 
 ## Categoria e etichette
 - Categoria: Strumenti (oppure Produttivita).
