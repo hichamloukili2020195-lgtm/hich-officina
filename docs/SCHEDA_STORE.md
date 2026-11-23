@@ -55,8 +55,9 @@ Prima versione: dal disegno al programma in 4 passi per fresa e tornio, foto del
 ## Categoria e etichette
 - Categoria: Strumenti (oppure Produttivita).
 - Lingua predefinita: italiano.
+- Sviluppatore: Hich Tools. App gratuita.
 - Indirizzo web: [indirizzo della pagina principale del sito]
-- Email di contatto pubblica: [email dedicata]
+- Email di contatto pubblica: hichamloukili2020195@gmail.com
 - Informativa sulla privacy: [indirizzo di privacy.html del sito: compila prima sito.json con nome, email e data, poi node tools/sito.js]
 
 ## Sezione "Sicurezza dei dati" (risposte)
