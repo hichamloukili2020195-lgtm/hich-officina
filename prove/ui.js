@@ -722,6 +722,36 @@ const server = http.createServer((q, r) => {
     await vai('home');
   }
 
+  // ===== 2.23.0: funzioni d'officina =====
+  {
+    await vai('calcoli'); await pg.waitForTimeout(60);
+    const ids = await pg.$$eval('.chips button.chip[data-id]', x => x.map(b => b.dataset.id));
+    ok(['seno', 'ingr', 'dilat', 'potenza', 'tempo'].every(i => ids.includes(i)), 'calcolatori nuovi: ' + ids.join());
+    await pg.click('.chips button.chip[data-id][data-id="seno"]'); await pg.waitForTimeout(60);
+    await pg.selectOption('#f-L', '200'); await pg.fill('#f-ang', '30'); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#schermo')).includes('100'), 'barra seno 200 mm a 30 gradi = 100: ' + (await pg.textContent('#schermo')).slice(0, 160));
+    await pg.fill('#f-ang', ''); await pg.fill('#f-h', '50'); await pg.selectOption('#f-L', '100'); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#schermo')).includes('30'), 'angolo dall\'altezza');
+    await pg.click('.chips button.chip[data-id][data-id="ingr"]'); await pg.waitForTimeout(60);
+    await pg.fill('#f-m', '2'); await pg.fill('#f-z', '30'); await pg.fill('#f-z2', '60'); await pg.waitForTimeout(60);
+    let t = await pg.textContent('#schermo');
+    ok(t.includes('64') && t.includes('55') && t.includes('90'), 'ingranaggio m2 z30: esterno 64, fondo 55, interasse 90');
+    await pg.fill('#f-z', '36'); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#schermo')).includes('1 giro e 1/9'), 'divisore 40:1 su 36 = 1 giro e 1/9');
+    await pg.click('.chips button.chip[data-id][data-id="dilat"]'); await pg.waitForTimeout(60);
+    await pg.selectOption('#f-mt', 'Alluminio'); await pg.fill('#f-L', '100'); await pg.fill('#f-t2', '35'); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#schermo')).includes('34,5'), 'dilatazione alluminio 100 mm a 35 gradi: 34,5 micrometri');
+    await pg.click('.chips button.chip[data-id][data-id="potenza"]'); await pg.waitForTimeout(60);
+    await pg.selectOption('#f-mat', { label: 'Alluminio' }); await pg.waitForTimeout(60);
+    ok((await pg.inputValue('#f-kc')) === '800', 'kc dal materiale: ' + (await pg.inputValue('#f-kc')));
+    await pg.click('.chips button.chip[data-id][data-id="tempo"]'); await pg.waitForTimeout(60);
+    ok((await pg.textContent('#schermo')).includes('1,2'), 'tempo di lavoro 120 mm a 300 mm/min su 3 passate = 1,2 min');
+    await vai('tabelle'); await pg.click('#schermo .chips:not(.fam) .chip:text-is("Coni")'); await pg.waitForTimeout(60);
+    t = await pg.textContent('#schermo');
+    ok(t.includes('Morse 3') && t.includes('23,825') && t.includes('ISO 40') && t.includes('7:24'), 'tabella dei coni');
+    await vai('home');
+  }
+
   // ===== 2.19.0: mini CAD/CAM per la fresa =====
   {
   await vai('cad'); await pg.waitForTimeout(150);

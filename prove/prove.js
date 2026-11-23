@@ -680,4 +680,31 @@ prova('tolleranze: tutti i gradi IT01-IT18 e le classi con ogni grado', () => {
   // la tolleranza scritta a mano usa gli stessi gradi
   const t = O.leggiTolleranza(25, 'h12'); vicino(t.sup, 0); vicino(t.inf, -0.21);
 });
+prova('funzioni d\'officina: barra seno, ingranaggi, divisore, dilatazione, potenza, tempo', () => {
+  // barra seno: 200 mm a 30 gradi = 100 mm; l'inverso torna all'angolo
+  vicino(O.barraSeno(200, 30).altezza, 100, 1e-9); vicino(O.barraSeno(100, 0, 50).angolo, 30, 1e-9);
+  assert.strictEqual(O.barraSeno(100, 95), null); assert.strictEqual(O.barraSeno(100, 0, 150), null); assert.strictEqual(O.barraSeno(0, 30), null);
+  // ingranaggio m2 z30: primitivo 60, esterno 64, fondo 55, passo pi*2, altezza 4,5
+  const g = O.ingranaggio(2, 30, 20);
+  vicino(g.primitivo, 60); vicino(g.esterno, 64); vicino(g.fondo, 55); vicino(g.passo, 2 * Math.PI); vicino(g.altezzaDente, 4.5); vicino(g.base, 60 * Math.cos(20 * Math.PI / 180));
+  vicino(g.interasseCon(60), 90); assert.ok(isNaN(g.interasseCon(0)));
+  assert.strictEqual(O.ingranaggio(2, 5), null); assert.strictEqual(O.ingranaggio(2, 30.5), null); assert.strictEqual(O.ingranaggio(0, 30), null);
+  // divisore 40:1
+  assert.deepStrictEqual(O.divisore(40, 36), { giri: 40 / 36, interi: 1, frazione: [1, 9] });
+  assert.deepStrictEqual(O.divisore(40, 8), { giri: 5, interi: 5, frazione: null });
+  assert.deepStrictEqual(O.divisore(40, 7).frazione, [5, 7]); assert.strictEqual(O.divisore(40, 7).interi, 5);
+  assert.strictEqual(O.divisore(40, 1), null); assert.strictEqual(O.divisore(40, 7.5), null);
+  assert.strictEqual(O.divisore(40, 100).interi, 0); assert.deepStrictEqual(O.divisore(40, 100).frazione, [2, 5]);
+  // dilatazione: acciaio 500 mm da 20 a 60 gradi = 230 micrometri; alluminio 100 mm a 35 = 34,5
+  vicino(O.dilatazione(11.5e-6, 500, 20, 60).delta, 230, 1e-6); vicino(O.dilatazione(23e-6, 100, 20, 35).delta, 34.5, 1e-6);
+  vicino(O.dilatazione(11.5e-6, 100, 20, 0).delta, -23, 1e-6); assert.strictEqual(O.dilatazione(0, 100, 20, 30), null);
+  // potenza: 5x10 mm a 800 mm/min = 40 cm3/min; con kc 2000 sono 1,33 kW al tagliente
+  const p = O.potenzaTaglio(5, 10, 800, 2000, 0.8, 3000);
+  vicino(p.asportazione, 40); vicino(p.potenzaTaglio, 4 / 3, 1e-9); vicino(p.potenzaMandrino, 5 / 3, 1e-9); vicino(p.coppia, 5 / 3 * 9550 / 3000, 1e-9);
+  assert.strictEqual(O.potenzaTaglio(0, 10, 800, 2000, 0.8, 3000), null);
+  assert.ok(O.kcMateriale({ g: 'Alluminio e leghe leggere', n: 'Alluminio' }) < O.kcMateriale({ g: 'Acciai al carbonio', n: 'C40' }) && O.kcMateriale({ g: 'Inox', n: 'AISI 304' }) > O.kcMateriale({ g: 'Acciai al carbonio', n: 'C40' }));
+  O.MATERIALI.forEach(m => assert.ok(O.kcMateriale(m) >= 400 && O.kcMateriale(m) <= 3500, m.n));
+  // tempo
+  vicino(O.tempoTaglio(120, 300, 3).minuti, 1.2, 1e-9); assert.strictEqual(O.tempoTaglio(0, 300), null); assert.strictEqual(O.tempoTaglio(10, 300, 0).passate, 1);
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

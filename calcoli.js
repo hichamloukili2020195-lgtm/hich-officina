@@ -172,6 +172,66 @@
   }
 
   // ----- peso e trigonometria -----
+
+  // ----- funzioni d'officina: barra seno, ingranaggi, divisore, dilatazione, potenza, tempo -----
+  /** Barra seno: altezza dei blocchetti per un angolo, o l'angolo da un'altezza. L = interasse dei rulli. */
+  function barraSeno(L, angolo, altezza) {
+    if (!(L > 0)) return null;
+    if (angolo > 0 && angolo < 90) return { altezza: L * Math.sin(angolo * Math.PI / 180), angolo };
+    if (altezza > 0 && altezza < L) return { altezza, angolo: Math.asin(altezza / L) * 180 / Math.PI };
+    return null;
+  }
+  /** Ingranaggio cilindrico a denti dritti, profilo ad evolvente. Ritorna i diametri e le misure del dente (mm). */
+  function ingranaggio(m, z, alfa) {
+    if (!(m > 0) || !(z >= 6) || z !== Math.round(z)) return null;
+    const a = (alfa > 0 ? alfa : 20) * Math.PI / 180;
+    return { primitivo: m * z, esterno: m * (z + 2), fondo: m * (z - 2.5), passo: Math.PI * m, altezzaDente: 2.25 * m, testa: m, piede: 1.25 * m,
+      base: m * z * Math.cos(a), spessoreDente: Math.PI * m / 2, passoBase: Math.PI * m * Math.cos(a), interasseCon: z2 => (z2 > 0 ? m * (z + z2) / 2 : NaN) };
+  }
+  /** Divisore semplice: giri di manovella per N divisioni, con rapporto r (es. 40). Ritorna {giri, frazione:[num, den]} o null. */
+  function divisore(r, n) {
+    if (!(r > 0) || !(n >= 2) || n !== Math.round(n) || r !== Math.round(r)) return null;
+    let num = r, den = n;
+    const mcd = (a, b) => (b ? mcd(b, a % b) : a), g = mcd(num, den);
+    num /= g; den /= g;
+    const interi = Math.floor(num / den), resto = num - interi * den;
+    return { giri: r / n, interi, frazione: resto ? [resto, den] : null };
+  }
+  /** Dilatazione termica lineare: coefficienti in 1/K per i materiali comuni. */
+  const DILATAZIONE = [['Acciaio', 11.5e-6], ['Inox austenitico', 16e-6], ['Ghisa', 10.5e-6], ['Alluminio', 23e-6], ['Ottone', 19e-6], ['Bronzo', 18e-6], ['Rame', 17e-6], ['Titanio', 8.6e-6], ['Plastica (nylon)', 80e-6]];
+  function dilatazione(alfa, L, t1, t2) {
+    if (!(alfa > 0) || !(L > 0) || !isFinite(t1) || !isFinite(t2)) return null;
+    const d = alfa * L * (t2 - t1);
+    return { delta: d * 1000, finale: L + d };   // delta in micrometri
+  }
+  /** Forza specifica di taglio indicativa (N/mm2) dal materiale. */
+  function kcMateriale(m) {
+    const t = ((m && m.g) || '') + ' ' + ((m && m.n) || '');
+    if (/allumin/i.test(t)) return 800;
+    if (/rame|ottone|bronzo/i.test(t)) return 1000;
+    if (/superleghe|nichel/i.test(t)) return 3000;
+    if (/temprat|utensili|420|1\.2379|X153/i.test(t)) return 3200;
+    if (/duplex/i.test(t)) return 2800;
+    if (/inox|AISI|17-4/i.test(t)) return 2400;
+    if (/K12|ghisa/i.test(t)) return 1100;
+    if (/legno|plastic/i.test(t)) return 400;
+    return 2000;
+  }
+  /** Asportazione e potenza di fresatura: ap, ae (mm), vf (mm/min), kc (N/mm2), rendimento, giri. */
+  function potenzaTaglio(ap, ae, vf, kc, eta, n) {
+    if (!(ap > 0 && ae > 0 && vf > 0 && kc > 0)) return null;
+    const q = ap * ae * vf / 1000;                                  // cm3/min
+    const pc = ap * ae * vf * kc / 60e6;                            // kW al tagliente
+    const e = eta > 0 && eta <= 1 ? eta : 0.8, pm = pc / e;          // kW al mandrino
+    return { asportazione: q, potenzaTaglio: pc, potenzaMandrino: pm, coppia: n > 0 ? pm * 9550 / n : NaN };
+  }
+  /** Tempo di taglio (minuti) di un percorso di lunghezza L (mm) con avanzamento vf (mm/min), n passate. */
+  function tempoTaglio(L, vf, passate) {
+    if (!(L > 0) || !(vf > 0)) return null;
+    const n = Math.max(1, Math.round(passate || 1));
+    return { minuti: L * n / vf, passate: n };
+  }
+
   /** Peso in kg: forma 'tondo' {d,l}, 'tubo' {d,di,l}, 'piatto' {a,b,l}, 'esagono' {s,l} (s = chiave). mm e kg/dm3. */
   function peso(forma, q, rho) {
     let area;   // mm2
@@ -731,7 +791,7 @@
   const Officina = {
     leggiTolleranza, campoNonValido, num, MATERIALI, UTENSILI, datiTaglio, leggiMateriali, peso, triangolo, giri, vcDaGiri, fzPerDiametro, fresatura, tornitura, foratura,
     FILETTI_GROSSI, FILETTI_FINI, filetto, passateFiletto,
-    tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT, GRADI_IT,
+    tolleranza, CAMPI_FORI, CAMPI_ALBERI, LIMITI, IT, GRADI_IT, barraSeno, ingranaggio, divisore, DILATAZIONE, dilatazione, kcMateriale, potenzaTaglio, tempoTaglio,
     cono, foriSuCerchio, rugositaN, gc, gcodeTornio
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = Officina;

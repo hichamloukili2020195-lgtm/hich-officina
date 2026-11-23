@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.23.0 - Funzioni d'officina
+- **Barra seno**: altezza dei blocchetti per un angolo, o l'angolo da un'altezza, con l'errore per 0,01 mm.
+- **Ingranaggi e divisore**: da modulo e denti i diametri (primitivo, esterno, di fondo, di base), il passo, l'altezza e lo spessore del dente, l'interasse con la ruota accoppiata e i giri di manovella del divisore (40:1 e altri).
+- **Dilatazione termica** di nove materiali dalla temperatura di riferimento a quella del pezzo.
+- **Potenza e coppia del mandrino**: asportazione in cm3/min, potenza al tagliente e al mandrino, coppia; la forza specifica di taglio si riempie dal materiale.
+- **Tempo di lavoro** di un percorso, per passate e per numero di pezzi.
+- **Tabelle, Coni**: Morse 0-6, attacchi 7:24 (ISO 30-60) e altri coni, con il semiangolo per il carrello del tornio.
+
 ## 2.22.0 - Tolleranze: tutti i gradi IT01-IT18
 - Tutti i **gradi di tolleranza normalizzati da IT01 a IT18** (prima da IT5 a IT11), per ogni classe: H12, h13, D10, js14, f9, k4...
 - **Tabelle, Tolleranze**: scegli la lettera (16) e il grado (20) con i tasti; in fondo la tabella di tutti i gradi IT per ogni campo di diametro.

@@ -145,6 +145,68 @@
       nota: 'Dalla formula teorica Ra = f² / (32 · r); il consigliato tiene un margine del 20%.'
     },
     {
+      id: 'seno', t: 'Barra seno',
+      campi: [{ id: 'L', et: 'Interasse della barra', tipo: 'scelta', scelte: [['100', '100 mm'], ['200', '200 mm'], ['150', '150 mm'], ['300', '300 mm'], ['125', '125 mm (5")'], ['250', '250 mm (10")']], v: '100' },
+        { id: 'ang', et: 'Angolo da ottenere', sub: 'oppure scrivi l\'altezza sotto', u: '°', v: 30 }, { id: 'h', et: 'Altezza dei blocchetti', sub: 'per trovare l\'angolo', u: 'mm', v: '' }],
+      calc(v, g) {
+        const r = O.barraSeno(Number(g.L), v.ang, v.h);
+        if (!r) return { errore: 'Scrivi un angolo tra 0° e 90°, oppure un\'altezza minore dell\'interasse.' };
+        return { gauge: [v.ang > 0 ? 'Altezza dei blocchetti' : 'Angolo', v.ang > 0 ? fmt(r.altezza, 4) : fmt(r.angolo, 4), v.ang > 0 ? 'mm' : '°'], ris: [['Altezza', fmt(r.altezza, 4), 'mm'], ['Angolo', fmt(r.angolo, 4), '°'], ['Errore per 0,01 mm di altezza', fmt(Math.abs(0.01 / Number(g.L) / Math.cos(r.angolo * Math.PI / 180)) * 180 / Math.PI * 3600, 1), '″']] };
+      },
+      nota: 'Altezza = interasse x seno(angolo). Il pezzo si appoggia sulla barra, i blocchetti sotto il rullo alto.'
+    },
+    {
+      id: 'ingr', t: 'Ingranaggi e divisore',
+      campi: [{ id: 'm', et: 'Modulo', u: 'mm', v: 2 }, { id: 'z', et: 'Numero di denti', v: 30 }, { id: 'z2', et: 'Denti della ruota accoppiata', sub: 'facoltativo, per l\'interasse', v: '' },
+        { id: 'al', et: 'Angolo di pressione', u: '°', v: 20 }, { id: 'rd', et: 'Rapporto del divisore', sub: 'di solito 40', v: 40 }],
+      calc(v) {
+        const g = O.ingranaggio(v.m, v.z, v.al);
+        if (!g) return { errore: 'Scrivi il modulo e un numero intero di denti (almeno 6).' };
+        const ris = [['Diametro primitivo', fmt(g.primitivo, 3), 'mm'], ['Diametro esterno (da tornire)', fmt(g.esterno, 3), 'mm'], ['Diametro di fondo', fmt(g.fondo, 3), 'mm'], ['Altezza del dente', fmt(g.altezzaDente, 3), 'mm'],
+          ['Passo', fmt(g.passo, 4), 'mm'], ['Spessore del dente', fmt(g.spessoreDente, 3), 'mm'], ['Diametro di base', fmt(g.base, 3), 'mm']];
+        if (v.z2 > 0) ris.push(['Interasse con ' + fmt(v.z2) + ' denti', fmt(g.interasseCon(v.z2), 3), 'mm'], ['Rapporto di trasmissione', fmt(v.z2 / v.z, 4)]);
+        const d = O.divisore(v.rd, v.z);
+        if (d) ris.push(['Divisore ' + fmt(v.rd) + ':1 per ' + fmt(v.z) + ' divisioni', (d.interi ? d.interi + (d.interi === 1 ? ' giro' : ' giri') : '') + (d.frazione ? (d.interi ? ' e ' : '') + d.frazione[0] + '/' + d.frazione[1] + (d.interi ? ' di giro' : ' di giro') : '')]);
+        return { gauge: ['Diametro esterno', fmt(g.esterno, 3), 'mm'], ris };
+      },
+      nota: 'Denti dritti, dente normale (addendum = modulo). Il divisore da la frazione di giro: sul disco si conta il numero di fori che corrisponde.'
+    },
+    {
+      id: 'dilat', t: 'Dilatazione termica',
+      campi: [{ id: 'mt', et: 'Materiale', tipo: 'scelta', scelte: O.DILATAZIONE.map(x => [x[0], x[0]]), v: 'Acciaio' }, { id: 'L', et: 'Lunghezza', u: 'mm', v: 100 },
+        { id: 't1', et: 'Temperatura di riferimento', u: '°C', v: 20 }, { id: 't2', et: 'Temperatura del pezzo', u: '°C', v: 35 }],
+      calc(v, g) {
+        const a = (O.DILATAZIONE.find(x => x[0] === g.mt) || [])[1];
+        const r = O.dilatazione(a, v.L, v.t1, v.t2);
+        if (!r) return null;
+        return { gauge: ['Variazione di lunghezza', fmt(r.delta, 1), 'µm'], ris: [['Lunghezza a ' + fmt(v.t2) + ' °C', fmt(r.finale, 4), 'mm'], ['Coefficiente', fmt(a * 1e6, 1), '10⁻⁶/K']] };
+      },
+      nota: 'Si misura a 20 °C: un pezzo di alluminio lungo 100 mm a 35 °C e piu lungo di 35 µm. Valori medi.'
+    },
+    {
+      id: 'potenza', t: 'Potenza e coppia del mandrino',
+      campi: [selMat, { id: 'ap', et: 'Profondita di passata', u: 'mm', v: 5 }, { id: 'ae', et: 'Larghezza di passata', u: 'mm', v: 10 }, { id: 'vf', et: 'Avanzamento', u: 'mm/min', v: 800 },
+        { id: 'n', et: 'Giri', u: 'giri/min', v: 3000 }, { id: 'kc', et: 'Forza specifica di taglio kc', u: 'N/mm²', v: 2000 }, { id: 'eta', et: 'Rendimento', v: 0.8 }],
+      mat: m => ({ kc: O.kcMateriale(m) }),
+      calc(v) {
+        const r = O.potenzaTaglio(v.ap, v.ae, v.vf, v.kc, v.eta, v.n);
+        if (!r) return null;
+        return { gauge: ['Potenza al mandrino', fmt(r.potenzaMandrino, 2), 'kW'], ris: [['Asportazione', fmt(r.asportazione, 2), 'cm³/min'], ['Potenza al tagliente', fmt(r.potenzaTaglio, 2), 'kW'], ['Coppia', fmt(r.coppia, 1), 'Nm']] };
+      },
+      nota: 'Stima: P = ap · ae · vf · kc / 60 · 10⁶, divisa per il rendimento. kc dipende dal materiale e dallo spessore del truciolo: confrontala con la potenza e la coppia della macchina alla velocita usata.'
+    },
+    {
+      id: 'tempo', t: 'Tempo di lavoro',
+      campi: [{ id: 'L', et: 'Lunghezza del percorso', u: 'mm', v: 120 }, { id: 'vf', et: 'Avanzamento', u: 'mm/min', v: 300 }, { id: 'p', et: 'Numero di passate', v: 3 }, { id: 'np', et: 'Numero di pezzi', v: 1 }],
+      calc(v) {
+        const r = O.tempoTaglio(v.L, v.vf, v.p);
+        if (!r) return null;
+        const n = Math.max(1, Math.round(v.np || 1));
+        return { gauge: ['Tempo di taglio', fmt(r.minuti, 2), 'min'], ris: [['Per ' + n + (n === 1 ? ' pezzo' : ' pezzi'), fmt(r.minuti * n, 2), 'min'], ['Ore', fmt(r.minuti * n / 60, 2), 'h']] };
+      },
+      nota: 'Solo il tempo con l\'utensile in presa: rapidi, cambi utensile e carico del pezzo si aggiungono.'
+    },
+    {
       id: 'pollici', t: 'Pollici e mm',
       campi: [{ id: 'poll', et: 'Pollici', sub: 'anche 1 1/4 o 3/8', tipo: 'testo', v: '1/2' }, { id: 'mm', et: 'Millimetri', u: 'mm', v: 12 }],
       calc(v, g) {

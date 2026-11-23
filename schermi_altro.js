@@ -100,6 +100,20 @@
       return '<div class="pannello" style="padding:4px 8px"><div class="scorri"><table><tr><th>Classe</th><th>Ra µm</th><th>Lavorazione tipica</th></tr>' +
         c.map(([n, ra]) => '<tr><td><b>' + n + '</b></td><td>' + fmt(ra, 3) + '</td><td>' + (lav[n] || '') + '</td></tr>').join('') + '</table></div></div>';
     },
+    coni() {
+      const MORSE = [['0', 9.045, 19.212], ['1', 12.065, 20.047], ['2', 17.780, 20.020], ['3', 23.825, 19.922], ['4', 31.267, 19.254], ['5', 44.399, 19.002], ['6', 63.348, 19.180]];
+      const riga = ([n, d, r]) => { const semi = Math.atan(1 / (2 * r)) * 180 / Math.PI; return '<tr><td><b>Morse ' + n + '</b></td><td>' + fmt(d, 3) + '</td><td>1:' + fmt(r, 3) + '</td><td>' + fmt(semi, 4) + '</td><td>' + fmt(semi * 2, 4) + '</td></tr>'; };
+      const ISO = [['30', 31.75], ['35', 38.1], ['40', 44.45], ['45', 57.15], ['50', 69.85], ['60', 107.95]];
+      const semi724 = Math.atan(7 / 24 / 2) * 180 / Math.PI;
+      const rig2 = ([n, d]) => '<tr><td><b>ISO ' + n + '</b></td><td>' + fmt(d, 3) + '</td><td>7:24</td><td>' + fmt(semi724, 4) + '</td><td>' + fmt(semi724 * 2, 4) + '</td></tr>';
+      const t = '<tr><th>Cono</th><th>Ø sul piano</th><th>Conicita</th><th>Semiangolo °</th><th>Angolo °</th></tr>';
+      const altri = [['Cono metrico 1:20', '1:20'], ['Cono 1:24', '1:24'], ['Cono 1:10', '1:10'], ['Cono 1:5', '1:5'], ['Cono 1:16 (tubi NPT, gas R)', '1:16'], ['Cono 1:50 (spine coniche)', '1:50']]
+        .map(([n, c]) => [n, c, Math.atan(1 / (2 * Number(c.split(':')[1]))) * 180 / Math.PI]);
+      return '<div class="sez">Coni Morse</div><div class="pannello" style="padding:4px 8px"><div class="scorri"><table>' + t + MORSE.map(riga).join('') + '</table></div></div>' +
+        '<div class="sez">Attacchi 7:24 (mandrini della fresa)</div><div class="pannello" style="padding:4px 8px"><div class="scorri"><table>' + t + ISO.map(rig2).join('') + '</table></div></div>' +
+        '<div class="sez">Altri coni</div><div class="pannello" style="padding:4px 8px"><div class="scorri"><table><tr><th>Cono</th><th>Conicita</th><th>Semiangolo °</th><th>Angolo °</th></tr>' + altri.map(([n, c, a]) => '<tr><td>' + n + '</td><td>' + c + '</td><td>' + fmt(a, 4) + '</td><td>' + fmt(a * 2, 4) + '</td></tr>').join('') + '</table></div></div>' +
+        '<p class="leggenda">Il semiangolo e quello da mettere sul carrello del tornio. Valori teorici: per i coni di precisione vale la norma.</p>';
+    },
     pollici() {
       let h = '<div class="pannello" style="padding:4px 8px"><div class="scorri"><table><tr><th>Pollici</th><th>Decimale</th><th>mm</th></tr>';
       for (let k = 1; k <= 64; k++) { let n = k, d = 64; while (n % 2 === 0) { n /= 2; d /= 2; } const t = d === 1 ? n + '"' : n + '/' + d + '"';
@@ -166,7 +180,7 @@
       const S = A.sezione('tabelleVista');
       const chips = el('div', { class: 'chips' }), corpo = el('div');
       m.append(chips, corpo);
-      const nomi = { filetti: 'Filetti', tolleranze: 'Tolleranze', rugosita: 'Rugosita', pollici: 'Pollici', codici: 'Codici G e M', linguaggi: 'Linguaggi macchina' };
+      const nomi = { filetti: 'Filetti', tolleranze: 'Tolleranze', rugosita: 'Rugosita', pollici: 'Pollici', coni: 'Coni', codici: 'Codici G e M', linguaggi: 'Linguaggi macchina' };
       const mostra = k => {
         S.tab = TAB[k] ? k : 'filetti'; A.salva();
         chips.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.tab));
