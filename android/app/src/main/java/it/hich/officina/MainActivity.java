@@ -59,6 +59,21 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> attesaInput;       // <input type=file> della pagina (foto e file)
     private Uri fotoCamera;
 
+    /** Android 15 e successivi disegnano sotto barra di stato e tasti: lascio i margini al sistema,
+     *  cosi il contenuto non resta coperto (su Android piu vecchi non cambia nulla). */
+    private void margini() {
+        if (Build.VERSION.SDK_INT < 35) return;
+        final android.view.View radice = findViewById(android.R.id.content);
+        radice.setBackgroundColor(0xff0b1220);
+        radice.setOnApplyWindowInsetsListener((v, ins) -> {
+            android.graphics.Insets b = ins.getInsets(android.view.WindowInsets.Type.systemBars()
+                    | android.view.WindowInsets.Type.displayCutout() | android.view.WindowInsets.Type.ime());
+            v.setPadding(b.left, b.top, b.right, b.bottom);
+            return android.view.WindowInsets.CONSUMED;
+        });
+        radice.requestApplyInsets();
+    }
+
     @Override
     protected void onCreate(Bundle stato) {
         super.onCreate(stato);
@@ -123,6 +138,7 @@ public class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new Ponte(), "Android");
         setContentView(web);
+        margini();
         if (stato != null) web.restoreState(stato);
         else web.loadUrl("file:///android_asset/www/index.html");
     }

@@ -722,7 +722,7 @@ const server = http.createServer((q, r) => {
     await vai('home');
   }
 
-  // ===== 2.28.1: testata, marchio e sfondo con immagine =====
+  // ===== 2.29.0: testata, marchio e sfondo con immagine =====
   {
     await vai('home'); await pg.waitForTimeout(150);
     const imgs = await pg.evaluate(() => ({ testata: (() => { const i = document.querySelector('.eroe img.scena'); return i ? [i.complete, i.naturalWidth, i.naturalHeight, i.getBoundingClientRect().height] : null; })(),

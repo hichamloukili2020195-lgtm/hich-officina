@@ -2,6 +2,9 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.29.0 - Margini su Android recente
+- Su Android 15 e successivi la barra in alto e i tasti in basso non coprono piu l'app: il contenuto resta dentro i margini del sistema. Sui telefoni piu vecchi non cambia nulla.
+
 ## 2.28.1 - Nuova icona, testata e sfondo (fatti con Canva)
 - **Nuova icona**: un calibro che racchiude un ingranaggio con il centro azzurro, acciaio su blu notte. Per il telefono (quadrata e tonda di Android), per il negozio e per il sito. La cornice dell'immagine originale e stata tolta per usarla a tutto campo.
 - **Nuova testata della home**: un ingranaggio, il mandrino e le scintille. Dall'immagine originale sono ritagliati i pannelli con scritte in inglese e dati finti, che nell'app non devono comparire; sopra c'e una sfumatura scura per leggere titolo e ricerca.

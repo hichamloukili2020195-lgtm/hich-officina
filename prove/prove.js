@@ -852,4 +852,9 @@ prova('immagini: icona, testata e sfondo (misure, peso, nel funzionamento senza 
   // tutte le immagini nominate dai file esistono
   (html.match(/icone\/[a-z0-9-]+\.(?:png|jpg)/g) || []).forEach(f => assert.ok(fs.existsSync(r(f)), 'manca ' + f));
 });
+prova('android: margini del sistema su Android 15 e successivi (barre non coprono il contenuto)', () => {
+  const j = require('fs').readFileSync(require('path').join(__dirname, '..', 'android/app/src/main/java/it/hich/officina/MainActivity.java'), 'utf8');
+  assert.ok(/private void margini\(\)/.test(j) && /margini\(\);/.test(j), 'manca margini()');
+  assert.ok(/SDK_INT < 35/.test(j) && /Type\.systemBars\(\)/.test(j) && /setPadding\(b\.left, b\.top, b\.right, b\.bottom\)/.test(j));
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');
