@@ -2,6 +2,11 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.32.0 - 3D vero con three.js
+- **Vista 3D vera** nella simulazione (libreria three.js, approvata dall'utente, MIT, inclusa nel programma: non carica nulla dal web). Fresa: il grezzo con il suo materiale che si scava, l'utensile col suo diametro, luci e ombre. Tornio: nuova vista "3D" con il pezzo tornito, tagliato a spicchio per vedere anche l'interno. Si gira con un dito, si ingrandisce con due, doppio tocco per tornare alla vista iniziale.
+- Se il telefono non ha WebGL resta il disegno di prima.
+- La licenza di three.js e in `docs/LICENZE_TERZI.md`.
+
 ## 2.31.0 - Materiale che si asporta, utensile col suo diametro, urti
 - **Utensile con le sue misure** nella simulazione della fresa: il cerchio del diametro dall'alto, il corpo con la parte tagliente di fronte e in 3D. Il diametro viene dalla tabella utensili, dal raggio scritto o dal commento del T (es. `T1 M6 (FRESA D10)`); se non si sa, usa 6 mm e lo dice.
 - **Materiale che si asporta**: il grezzo diventa il pezzo mentre la simulazione va avanti, in 3D, dall'alto (colorato per profondita) e di fronte (sezione). Nel tornio si vede la sezione del grezzo che si trasforma in pezzo, anche con l'alesatura. Il pulsante "Materiale: si/no" lo toglie. In "Controlla un programma" si scrivono le misure del grezzo (fresa: X, Y, spessore; tornio: diametro, lunghezza, sovrametallo davanti); senza misure il grezzo e ipotizzato e la simulazione lo dice.

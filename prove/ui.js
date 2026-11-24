@@ -1295,6 +1295,17 @@ const server = http.createServer((q, r) => {
   ok(await pg.$('.chips .chip:has-text("Materiale: si")'), 'comando del materiale');
   await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(150);
   if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '32-materiale-3d.png') });
+  const con3d = await pg.evaluate(() => !!window.App.webgl3d);
+  if (con3d) {
+    ok((await pg.$$eval('canvas.sim-tela', x => x.filter(c => c.style.display !== 'none').length)) === 1 && !!(await pg.$('.sim-box canvas.sim-tela >> nth=1')), 'vista 3D vera (three.js) nella simulazione');
+    await pg.$eval('#f-passo', e => { e.value = 6; e.dispatchEvent(new Event('input')); }); await pg.waitForTimeout(150);
+    if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '32b-materiale-3d-in-corso.png') });
+    // girare con il dito (trascinamento) non da errori
+    const bb = await (await pg.$('.sim-box canvas.sim-tela >> nth=1')).boundingBox();
+    await pg.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await pg.mouse.down(); await pg.mouse.move(bb.x + bb.width / 2 + 60, bb.y + bb.height / 2 - 30, { steps: 5 }); await pg.mouse.up();
+    await pg.dblclick('.sim-box canvas.sim-tela >> nth=1'); await pg.waitForTimeout(80);
+    await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(100);
+  }
   await pg.click('.schede button[data-id="xy"]'); await pg.waitForTimeout(150);
   if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '33-materiale-alto.png') });
   await pg.click('.schede button[data-id="xz"]'); await pg.waitForTimeout(150);
@@ -1312,6 +1323,11 @@ const server = http.createServer((q, r) => {
   await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(150);
   ok(await pg.$('.chips .chip:has-text("Materiale")'), 'materiale del tornio');
   if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '35-materiale-tornio.png') });
+  if (con3d) {
+    await pg.click('.schede button[data-id="iso"]'); await pg.waitForTimeout(250);
+    if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '36-tornio-3d.png') });
+    ok((await pg.$$eval('.sim-box canvas.sim-tela', x => x.length)) === 2, 'vista 3D del tornio');
+  }
 
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }

@@ -55,6 +55,7 @@
     const d = Math.max(0, Math.min(1, -h / (lz || 1)));
     return d < 0.5 ? lega(ACCIAIO, BLU, d * 2) : lega(BLU, FONDO, (d - 0.5) * 2);
   };
+  A.coloreProfondita = colorePer;
   const tela = (mat, w, h) => { if (!mat._cv) { mat._cv = document.createElement('canvas'); } if (mat._cv.width !== w || mat._cv.height !== h) { mat._cv.width = w; mat._cv.height = h; } return mat._cv; };
 
   /** Il materiale rimasto, nella vista scelta. c: {mat, vista, P2, cur}. */

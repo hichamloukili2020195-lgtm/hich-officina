@@ -618,3 +618,6 @@ body.con-sfondo::after{content:"";position:fixed;inset:0;z-index:-1;pointer-even
 .spiega-frase{font-size:13.5px;color:var(--testo);margin-top:1px}
 .controllo-voce .pul.piccolo{margin-top:6px;padding:6px 12px;min-height:36px;font-size:13px}
 .nota{color:var(--tenue);font-size:12.5px}
+
+.sim-box{position:relative}
+.sim-hint{position:absolute;left:10px;bottom:18px;right:10px;font-size:11.5px;color:var(--tenue);pointer-events:none;text-shadow:0 1px 2px rgba(0,0,0,.5)}

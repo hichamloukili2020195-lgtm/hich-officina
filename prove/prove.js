@@ -944,4 +944,16 @@ prova('materiale: tornio (sfacciatura, tornitura, rapido nel grezzo, alesatura)'
   const pb = (z, raggio) => mb.occ[Math.floor((z - mb.zBot) / mb.cella) * mb.nr + Math.floor(raggio / mb.cella)] === 1;
   assert.ok(!pb(-10, 5) && pb(-10, 15) === false && pb(-10, 21) && !pb(-10, 9), 'foro prima a 12 poi alesato a 20');
 });
+prova('three.js: in locale (non dal web), con la licenza, nel funzionamento senza rete e prima della vista 3D', () => {
+  const fs = require('fs'), path = require('path'), r = p => path.join(__dirname, '..', p);
+  const t = fs.readFileSync(r('three.min.js'), 'utf8');
+  assert.ok(t.startsWith('/* three.js') && /MIT License/.test(t.slice(0, 200)) && /var THREE=/.test(t.slice(0, 400)), 'intestazione e licenza');
+  assert.ok(fs.statSync(r('three.min.js')).size < 900000, 'troppo grande');
+  assert.ok(/MIT/.test(fs.readFileSync(r('docs/LICENZE_TERZI.md'), 'utf8')), 'licenza nella documentazione');
+  const html = fs.readFileSync(r('app.html'), 'utf8');
+  assert.ok(html.indexOf('three.min.js') > 0 && html.indexOf('three.min.js') < html.indexOf('vista3d.js'), 'ordine dei file');
+  assert.ok(!/<script[^>]+src="https?:/.test(html), 'nessun programma caricato dal web');
+  assert.ok(/'\.\/three\.min\.js'/.test(fs.readFileSync(r('sw.js'), 'utf8')) && /'\.\/vista3d\.js'/.test(fs.readFileSync(r('sw.js'), 'utf8')), 'nel funzionamento senza rete');
+  assert.ok(/cp stile\.css \*\.js/.test(fs.readFileSync(r('.github/workflows/apk.yml'), 'utf8')), 'l\'APK copia i file js della radice');
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

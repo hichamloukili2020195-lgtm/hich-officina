@@ -251,7 +251,7 @@
   A.descrUt = descrUt;
 
   // ----- simulazione -----
-  function viste(modo) { return modo === 'tornio' ? [['zx', 'Sezione']] : [['iso', '3D'], ['xy', 'Dall\'alto'], ['xz', 'Di fronte']]; }
+  function viste(modo, con3d) { return modo === 'tornio' ? [['zx', 'Sezione']].concat(con3d ? [['iso', '3D']] : []) : [['iso', '3D'], ['xy', 'Dall\'alto'], ['xz', 'Di fronte']]; }
   A.schermi.simula = {
     titolo: 'Simulazione', preferibile: false,
     render(m) {
@@ -266,10 +266,14 @@
       const modo = r.modo;
       const mat = !P.macro && A.modelloMateriale && N <= 400000 ? A.modelloMateriale(r, P.testo, P.ingombri) : null;
       const conMat = () => !!(mat && sv.materiale !== false && !mat.vuoto && mat.tipo !== 'troppo');
-      if (!viste(modo).some(x => x[0] === sv.vista)) sv.vista = viste(modo)[0][0];
+      const puo3d = () => !!(A.webgl3d && A.crea3D && conMat());
+      if (A.vista3DFine) A.vista3DFine();   // chiude la vista 3D di una simulazione precedente
+      let v3 = null;
+      if (!viste(modo, puo3d()).some(x => x[0] === sv.vista)) sv.vista = viste(modo, puo3d())[0][0];
       const cv = el('canvas', { class: 'vista sim-tela', 'aria-label': 'Simulazione del percorso' });
+      const telaBox = el('div', { class: 'sim-box' }, [cv]);
       const schede = el('div', { class: 'schede' });
-      viste(modo).forEach(([id, t]) => schede.appendChild(el('button', { 'data-id': id, testo: t, onclick: () => { sv.vista = id; A.salva(); schede.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === id)); prepara(); disegna(); } })));
+      viste(modo, puo3d()).forEach(([id, t]) => schede.appendChild(el('button', { 'data-id': id, testo: t, onclick: () => { sv.vista = id; A.salva(); schede.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === id)); prepara(); disegna(); } })));
       schede.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === sv.vista));
       const cursore = el('input', { type: 'range', min: 0, max: N, value: N, id: 'f-passo', style: 'width:100%;accent-color:var(--accento)', 'aria-label': 'Avanzamento della simulazione' });
       const stato = el('div', { class: 'chiamata', style: 'white-space:pre-wrap;font-size:13px' });
@@ -311,7 +315,7 @@
         m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (sv.centro ? ' attiva' : ''), testo: sv.centro ? 'Centro fresa: si' : 'Centro fresa (G41/G42)', onclick: () => { sv.centro = !sv.centro; A.salva(); A.ridisegna(); } }), el('span', { class: 'leggenda', style: 'margin:0 4px;align-self:center', testo: 'raggio' }), rin]));
       }
       if (mat && !mat.vuoto && mat.tipo !== 'troppo') m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (conMat() ? ' attiva' : ''), testo: conMat() ? 'Materiale: si' : 'Materiale: no', onclick: () => { sv.materiale = !conMat(); A.salva(); A.ridisegna(); } })]));
-      m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, cv, cursore, comandi, stato, commento]), pannello]));
+      m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, telaBox, cursore, comandi, stato, commento]), pannello]));
       let rigaVista = -1;
       const aggiornaPannello = (cur, px, riga) => {
         if (tor) { dro.X.textContent = fmt(px[0], 3); dro.Z.textContent = fmt(px[2], 3); }
@@ -393,7 +397,28 @@
         strati = { chiave, W, H, dpr, sc, ox, oy, P2, base, fatto, kFatto: 0 };
         return strati;
       };
+      // testo dello stato, pannello delle quote e commento
+      const aggiornaTesto = (cur, px) => {
+        const riga = k > 0 ? cur.riga : (S[0] ? S[0].riga : 0);
+        aggiornaPannello(cur, px, riga);
+        stato.textContent = 'Riga ' + (riga + 1) + ':  ' + (r.righe[riga] || '').trim() + '\n' +
+          (modo === 'tornio' ? 'X' + fmt(px[0], 3) + '  Z' + fmt(px[2], 3) : 'X' + fmt(px[0], 3) + '  Y' + fmt(px[1], 3) + '  Z' + fmt(px[2], 3)) +
+          '   T' + (cur.t || 0) + '  F' + fmt(cur.f, 3) + '   ' + k + ' / ' + N;
+        commento.textContent = commentoDi(k > 0 ? k - 1 : 0, riga);
+      };
       const disegna = () => {
+        // vista 3D vera (three.js) al posto del disegno 2D
+        const tre = N && sv.vista === 'iso' && puo3d() && (v3 || (v3 = A.crea3D(telaBox, mat)));
+        cv.style.display = tre ? 'none' : '';
+        if (v3) { v3.canvas.style.display = tre ? '' : 'none'; v3.hint.style.display = tre ? '' : 'none'; }
+        if (tre) {
+          const c3 = k > 0 ? S[k - 1] : S[0], p3 = k > 0 ? [c3.x, c3.y, c3.z] : [c3.x0, c3.y0, c3.z0];
+          mat.vaiA(k);
+          const d3 = modo === 'tornio' ? null : A.datiUtensile(r, P.ingombri, c3.t);
+          v3.aggiorna({ k, px: p3, raggio: d3 ? d3.d / 2 : 0, lung: d3 ? d3.l : 0 });
+          aggiornaTesto(c3, p3);
+          return;
+        }
         const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 340, H = cv.clientHeight || 300;
         if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = W * dpr; cv.height = H * dpr; }
         const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -432,13 +457,7 @@
         g.fillStyle = colore('--avviso'); g.strokeStyle = colore('--avviso'); g.lineWidth = 3;
         g.beginPath(); g.arc(p[0], p[1], 5, 0, Math.PI * 2); g.fill();
         if (modo !== 'tornio' && sv.vista !== 'xy' && !(du && du.d > 0)) { g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0], p[1] - 34); g.stroke(); }
-        // testo dello stato
-        const riga = k > 0 ? cur.riga : (S[0] ? S[0].riga : 0);
-        aggiornaPannello(cur, px, riga);
-        stato.textContent = 'Riga ' + (riga + 1) + ':  ' + (r.righe[riga] || '').trim() + '\n' +
-          (modo === 'tornio' ? 'X' + fmt(px[0], 3) + '  Z' + fmt(px[2], 3) : 'X' + fmt(px[0], 3) + '  Y' + fmt(px[1], 3) + '  Z' + fmt(px[2], 3)) +
-          '   T' + (cur.t || 0) + '  F' + fmt(cur.f, 3) + '   ' + k + ' / ' + N;
-        commento.textContent = commentoDi(k > 0 ? k - 1 : 0, riga);
+        aggiornaTesto(cur, px);
       };
       const vai = i => { k = i; cursore.value = String(i); disegna(); };
       const passo = () => {
@@ -455,5 +474,5 @@
       else if (!P.fermo) { k = 0; avvia(); }
     }
   };
-  window.addEventListener('hashchange', () => { if (A.simFerma && location.hash !== '#simula') A.simFerma(); });
+  window.addEventListener('hashchange', () => { if (location.hash !== '#simula') { if (A.simFerma) A.simFerma(); if (A.vista3DFine) A.vista3DFine(); } });
 })();
