@@ -611,8 +611,8 @@ body.con-sfondo::after{content:"";position:fixed;inset:0;z-index:-1;pointer-even
 .spiega-blocco summary{cursor:pointer;display:flex;flex-direction:column;gap:2px}
 .spiega-righe{margin-top:8px;display:flex;flex-direction:column;gap:6px}
 .spiega-riga{border-left:3px solid var(--bordo);padding:2px 0 2px 8px}
-.spiega-riga.rapido{border-left-color:var(--tenue)} .spiega-riga.lavoro,.spiega-riga.ciclo{border-left-color:var(--accento2)}
-.spiega-riga.utensile{border-left-color:var(--avviso)} .spiega-riga.fine{border-left-color:var(--errore)}
+.spiega-riga.t-rapido{border-left-color:var(--tenue)} .spiega-riga.t-lavoro,.spiega-riga.t-ciclo{border-left-color:var(--accento2)}
+.spiega-riga.t-utensile{border-left-color:var(--avviso)} .spiega-riga.t-fine{border-left-color:var(--errore)}
 .spiega-cod{display:flex;gap:8px;align-items:baseline;font:12.5px var(--mono);overflow-wrap:anywhere}
 .spiega-cod .n{color:var(--cod-num);min-width:34px;text-align:right}
 .spiega-frase{font-size:13.5px;color:var(--testo);margin-top:1px}

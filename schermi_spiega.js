@@ -12,7 +12,7 @@
       const s = sp.righe[i];
       const testo = (r.righe[i] || '').trim();
       if (!testo && !s) continue;
-      box.appendChild(el('div', { class: 'spiega-riga ' + (s ? s.tipo : '') }, [
+      box.appendChild(el('div', { class: 'spiega-riga ' + (s ? 't-' + s.tipo : '') }, [
         el('div', { class: 'spiega-cod' }, [el('span', { class: 'n', testo: String(i + 1) }), el('code', { html: A.colora ? A.colora(testo) : esc(testo) })]),
         s ? el('div', { class: 'spiega-frase', testo: s.frase }) : null]));
     }

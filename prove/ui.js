@@ -1269,6 +1269,7 @@ const server = http.createServer((q, r) => {
   await pg.click('.spiega-blocco >> nth=1 >> summary'); await pg.waitForTimeout(80);
   const righeSp = await pg.textContent('.spiega-blocco[open] .spiega-righe');
   ok(righeSp.includes('Cambio utensile: monta il T1') && righeSp.includes('foratura profonda a gradini'), 'spiegazione riga per riga');
+  ok(await pg.$eval('.spiega-riga.t-rapido', e => getComputedStyle(e).borderTopLeftRadius === '0px' && getComputedStyle(e).borderTopWidth === '0px'), 'le righe dei rapidi non prendono lo stile del calcolo rapido');
   ok((await pg.$$eval('.controllo-voce .pul.piccolo', x => x.length)) >= 2, 'pulsanti di correzione');
   const nVoci = await pg.$$eval('.controllo-voce', x => x.length);
   if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '30-spiega.png'), fullPage: true });

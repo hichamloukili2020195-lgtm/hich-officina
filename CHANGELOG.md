@@ -2,6 +2,9 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.32.1 - Correzione grafica nella spiegazione del programma
+- Nella spiegazione riga per riga, le righe dei rapidi (G0) apparivano dentro un riquadro tondo preso dal calcolo rapido della home. Corretto: ora hanno solo la barretta colorata a sinistra come le altre.
+
 ## 2.32.0 - 3D vero con three.js
 - **Vista 3D vera** nella simulazione (libreria three.js, approvata dall'utente, MIT, inclusa nel programma: non carica nulla dal web). Fresa: il grezzo con il suo materiale che si scava, l'utensile col suo diametro, luci e ombre. Tornio: nuova vista "3D" con il pezzo tornito, tagliato a spicchio per vedere anche l'interno. Si gira con un dito, si ingrandisce con due, doppio tocco per tornare alla vista iniziale.
 - Se il telefono non ha WebGL resta il disegno di prima.

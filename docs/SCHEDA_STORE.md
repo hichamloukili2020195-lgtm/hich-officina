@@ -30,7 +30,10 @@ PROGRAMMI ISO
 CONTROLLO E SIMULAZIONE
 - Controlla un programma riga per riga: taglio senza avanzamento, rapidi pericolosi, giri non limitati e altro.
 - Anche da una foto dello schermo, con la lettura del testo sul telefono.
-- Simulazione animata con quote, giri, utensile, centro fresa e urti con le staffe.
+- Simulazione animata con quote, giri, utensile col suo diametro, centro fresa e urti con le staffe.
+- Vista 3D vera: il grezzo si scava mentre la macchina lavora (fresa) e il pezzo tornito si vede tagliato a spicchio (tornio). Si gira con un dito, si ingrandisce con due.
+- Segnala il rapido che entra nel materiale e la fresa che taglia oltre la sua lunghezza tagliente.
+- Spiegazione del programma: riassunto, lavorazioni per utensile e una frase semplice per ogni riga. Correzione con un tocco degli errori piu comuni.
 
 CALCOLI E TABELLE
 - Giri, avanzamenti e velocita di taglio per utensile e materiale: fresa, punta, alesatore, bareno, maschio, inserto da tornio.
@@ -50,7 +53,7 @@ IMPORTANTE
 I valori di taglio e i programmi sono indicativi: controllali sempre e provali a vuoto prima di lavorare.
 
 ## Novita della versione (massimo 500 caratteri)
-Prima versione: dal disegno al programma in 4 passi per fresa e tornio, foto del disegno con conferma delle quote, tabella filetti completa, tolleranze IT01-IT18, controllo e simulazione dei programmi.
+Prima versione: dal disegno al programma in 4 passi per fresa e tornio, foto del disegno con conferma delle quote, tabella filetti completa, tolleranze IT01-IT18, controllo dei programmi con spiegazione riga per riga, simulazione in 3D con il materiale che si asporta.
 
 ## Categoria e etichette
 - Categoria: Strumenti (oppure Produttivita).
@@ -76,5 +79,6 @@ Prima versione: dal disegno al programma in 4 passi per fresa e tornio, foto del
 
 ## Immagini
 - Icona 512x512: `icone/icona-512.png`.
-- Schermate del telefono: `docs/schermate/*.png` (alcune vanno rifatte a 1080x1920 o simile se il negozio le chiede piu grandi).
-- Immagine di presentazione 1024x500: da fare.
+- Schermate del telefono: `docs/store/1-...8-*.png` (1080x1920, 8 schermate).
+- Immagine di presentazione 1024x500: `docs/store/presentazione-1024x500.png`.
+- Si rifanno con `node tools/negozio.js` (scrive in `docs/store`).
