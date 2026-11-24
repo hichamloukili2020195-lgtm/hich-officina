@@ -2,7 +2,7 @@
 // Ogni programma generato deve uscire senza NaN, senza errori e senza segnalazioni del controllo.
 'use strict';
 const O = require('../programmi.js');
-require('../profilo.js'); require('../iso.js'); require('../spiega.js'); require('../post.js'); require('../ciclo.js');
+require('../profilo.js'); require('../iso.js'); require('../spiega.js'); require('../materiale.js'); require('../post.js'); require('../ciclo.js');
 let n = 0, guasti = 0;
 const dice = m => { guasti++; if (guasti <= 40) console.error('GUASTO: ' + m); };
 const nan = r => /NaN|undefined|Infinity/.test(r.righe.join('\n'));

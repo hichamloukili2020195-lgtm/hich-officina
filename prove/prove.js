@@ -8,7 +8,7 @@ require('../cad.js');
 require('../lavoro.js');
 require('../ciclo.js');
 require('../disegno_foto.js');
-require('../iso.js'); require('../spiega.js');
+require('../iso.js'); require('../spiega.js'); require('../materiale.js');
 require('../post.js');
 require('../ciclo.js');
 let n = 0;
@@ -900,5 +900,48 @@ prova('correzioni: parentesi, T senza M6, G80, M30 alla fine (e il programma cor
   const p2 = 'G0 X1 (a (b ; resto'; assert.strictEqual(O.applicaCorrezioni(p2, O.correzioniISO(p2, { segnalazioni: [{ riga: 0, livello: 'errore', testo: 'parentesi del commento non chiuse' }] })), 'G0 X1 (a (b)) ; resto');
   // niente correzione se non si sa cosa fare
   assert.deepStrictEqual(O.correzioniISO('G1 X5', { segnalazioni: [{ riga: 0, livello: 'errore', testo: 'movimento di lavoro senza avanzamento F' }] }), []);
+});
+prova('materiale: fresa (asporto, indietro e avanti, urti, lunghezza tagliente, grezzo ipotizzato)', () => {
+  assert.strictEqual(O.diametroDaCommento('FRESA D10'), 10); assert.strictEqual(O.diametroDaCommento('PUNTA 8.5'), 8.5); assert.strictEqual(O.diametroDaCommento('MASCHIO M8'), 8);
+  assert.strictEqual(O.diametroDaCommento('SPIANATURA'), 0); assert.strictEqual(O.diametroDaCommento('D 12,5'), 12.5);
+  const prog = ['G21 G90', 'T1 M6', 'S1000 M3', 'G0 X0 Y0', 'G0 Z5', 'G1 Z-5 F100', 'G1 X30 F300', 'G1 Y30', 'G0 Z2', 'G0 X15 Y15', 'G0 Z-8', 'G0 Z50', 'M30'].join('\n');
+  const r = O.eseguiISO(prog, { modo: 'fresa' });
+  const m = O.creaMateriale({ modo: 'fresa', S: r.segmenti, utensile: () => ({ d: 10, l: 0 }), grezzo: { lx: 60, ly: 60, lz: 10 } });
+  assert.strictEqual(m.tipo, 'fresa'); assert.strictEqual(m.ipotizzato, false);
+  assert.strictEqual(m.altezza(10, 0), -5, 'dove passa la fresa'); assert.strictEqual(m.altezza(10, 4), -5, 'entro il raggio'); assert.strictEqual(m.altezza(10, 6), 0, 'fuori dal raggio'); assert.strictEqual(m.altezza(45, 45), 0);
+  // il rapido G0 Z-8 entra nel materiale (riga 10); la risalita G0 Z50 dal foro no
+  assert.deepStrictEqual(m.collisioni.map(c => [c.riga, c.livello]), [[10, 'errore']]);
+  assert.ok(/rapido dentro il materiale/.test(m.collisioni[0].testo) && /D10/.test(m.collisioni[0].testo));
+  // avanti e indietro: lo stato dipende solo dal punto della simulazione
+  m.vaiA(0); assert.strictEqual(m.altezza(10, 0), 0); m.vaiA(6); const a6 = m.altezza(10, 0); m.vaiA(m.N); assert.strictEqual(m.altezza(10, 0), -5); m.vaiA(6); assert.strictEqual(m.altezza(10, 0), a6);
+  // lunghezza tagliente
+  const lun = O.creaMateriale({ modo: 'fresa', S: r.segmenti, utensile: () => ({ d: 10, l: 3 }), grezzo: { lx: 60, ly: 60, lz: 10 } });
+  assert.ok(lun.collisioni.some(c => /parte tagliente e lunga 3/.test(c.testo)), JSON.stringify(lun.collisioni));
+  // senza grezzo: ipotizzato, urti solo come avviso, con la nota
+  const ip = O.creaMateriale({ modo: 'fresa', S: r.segmenti, utensile: () => null });
+  assert.strictEqual(ip.ipotizzato, true); assert.ok(ip.note.some(x => /Grezzo ipotizzato/.test(x))); assert.ok(ip.collisioni.every(c => c.livello === 'avviso')); assert.strictEqual(ip.utensili[1].ipotizzato, true);
+  // programma senza lavoro, e troppo lungo
+  assert.strictEqual(O.creaMateriale({ modo: 'fresa', S: [] }).vuoto, true);
+  assert.strictEqual(O.creaMateriale({ modo: 'fresa', S: new Array(400001).fill({}) }).tipo, 'troppo');
+});
+prova('materiale: tornio (sfacciatura, tornitura, rapido nel grezzo, alesatura)', () => {
+  const t = ['G21 G18 G99', 'T0202', 'G50 S2500', 'G96 S180 M3', 'G0 X62 Z2', 'G1 Z0 F.2', 'G1 X-1', 'G0 X62 Z2', 'G0 X50', 'G1 Z-30 F.2', 'G1 X60', 'G0 X100 Z50', 'G0 X30 Z-10', 'M30'].join('\n');
+  const r = O.eseguiISO(t, { modo: 'tornio' });
+  const m = O.creaMateriale({ modo: 'tornio', S: r.segmenti, grezzo: { d: 60, l: 40, s: 1 } });
+  const pieno = (z, raggio) => m.occ[Math.floor((z - m.zBot) / m.cella) * m.nr + Math.floor(raggio / m.cella)] === 1;
+  assert.strictEqual(m.ipotizzato, false);
+  assert.ok(!pieno(0.5, 10), 'sfacciatura'); assert.ok(pieno(-0.6, 10), 'sotto la faccia a Z0 il pezzo resta');
+  assert.ok(pieno(-10, 20) && !pieno(-10, 27), 'tornito a diametro 50'); assert.ok(pieno(-35, 27), 'oltre la lunghezza tornita il grezzo resta');
+  assert.deepStrictEqual(m.collisioni.map(c => c.riga), [12]); assert.ok(/rapido dentro il materiale/.test(m.collisioni[0].testo));
+  m.vaiA(0); assert.ok(pieno(-10, 27) && pieno(0.5, 10), 'all\'inizio il grezzo e intero'); m.vaiA(m.N); assert.ok(!pieno(-10, 27));
+  // senza grezzo: il piu grande lavorato, ipotizzato
+  const ip = O.creaMateriale({ modo: 'tornio', S: r.segmenti });
+  assert.strictEqual(ip.ipotizzato, true); assert.ok(ip.note.length === 1 && ip.collisioni.every(c => c.livello === 'avviso'));
+  // alesatura: il foro prima con la punta sull'asse, poi l'utensile dall'interno toglie fino al diametro 20
+  const b = ['G21 G18 G99', 'T0101', 'G0 X0 Z2', 'G1 Z-25 F.1', 'G0 Z2', 'T0303', 'G0 X14 Z2', 'G1 Z-25 F.1', 'G1 X20', 'G0 X14 Z2', 'M30'].join('\n');
+  const rb = O.eseguiISO(b, { modo: 'tornio' });
+  const mb = O.creaMateriale({ modo: 'tornio', S: rb.segmenti, grezzo: { d: 50, l: 40, s: 1 }, foro: () => 12 });
+  const pb = (z, raggio) => mb.occ[Math.floor((z - mb.zBot) / mb.cella) * mb.nr + Math.floor(raggio / mb.cella)] === 1;
+  assert.ok(!pb(-10, 5) && pb(-10, 15) === false && pb(-10, 21) && !pb(-10, 9), 'foro prima a 12 poi alesato a 20');
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

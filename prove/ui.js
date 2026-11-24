@@ -1284,6 +1284,35 @@ const server = http.createServer((q, r) => {
   await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(80);
   ok(/Rapido|Taglia|Cambio|Ciclo|Fine/.test(await pg.textContent('.sim-commento')), 'commento alla fine');
 
+  // ===== 2.31.0: materiale che si asporta, utensile col suo diametro, urti nel materiale =====
+  await vai('apri'); await pg.waitForTimeout(80);
+  await pg.fill('#f-testo', ['%', 'O0007 (TASCA)', 'G21 G90 G17', 'T1 M6 (FRESA D10)', 'S2000 M3', 'G0 X0 Y0', 'G43 H1 Z5', 'G1 Z-4 F200', 'G1 X40 F400', 'G1 Y30', 'G1 X0', 'G1 Y0', 'G0 Z5', 'G0 X20 Y15', 'G0 Z-6', 'G0 Z50', 'M30', '%'].join('\n'));
+  await pg.click('summary:has-text("Grezzo e staffe")');
+  await pg.fill('#f-glx', '60'); await pg.fill('#f-gly', '50'); await pg.fill('#f-glz', '12');
+  await pg.click('text=Controlla e simula'); await pg.waitForTimeout(200);
+  ok((await pg.textContent('.controllo')).includes('rapido dentro il materiale'), 'urto del rapido nel materiale non segnalato');
+  await pg.click('button.pul:text-is("Simula")'); await pg.waitForTimeout(300);
+  ok(await pg.$('.chips .chip:has-text("Materiale: si")'), 'comando del materiale');
+  await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(150);
+  if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '32-materiale-3d.png') });
+  await pg.click('.schede button[data-id="xy"]'); await pg.waitForTimeout(150);
+  if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '33-materiale-alto.png') });
+  await pg.click('.schede button[data-id="xz"]'); await pg.waitForTimeout(150);
+  if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '34-materiale-fronte.png') });
+  await pg.click('.chips .chip:has-text("Materiale: si")'); await pg.waitForTimeout(150);
+  ok(await pg.$('.chips .chip:has-text("Materiale: no")'), 'materiale spento');
+  await pg.click('.chips .chip:has-text("Materiale: no")'); await pg.waitForTimeout(100);
+  // tornio
+  await vai('apri'); await pg.waitForTimeout(80);
+  await pg.fill('#f-testo', ['%', 'O0008 (ALBERO)', 'G21 G18 G99', 'T0101', 'G50 S2500', 'G96 S180 M3', 'G0 X64 Z2', 'G1 Z0 F.2', 'G1 X-1', 'G0 X62 Z2', 'G0 X54', 'G1 Z-30 F.25', 'G1 X62', 'G0 X50 Z2', 'G1 Z-30 F.15', 'G1 X56', 'G0 X100 Z50', 'M30', '%'].join('\n'));
+  await pg.click('summary:has-text("Grezzo e staffe")');
+  await pg.fill('#f-gtd', '60'); await pg.fill('#f-gtl', '50'); await pg.fill('#f-gts', '1');
+  await pg.click('text=Controlla e simula'); await pg.waitForTimeout(200);
+  await pg.click('button.pul:text-is("Simula")'); await pg.waitForTimeout(300);
+  await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(150);
+  ok(await pg.$('.chips .chip:has-text("Materiale")'), 'materiale del tornio');
+  if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '35-materiale-tornio.png') });
+
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }
   console.log('OK interfaccia');

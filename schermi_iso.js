@@ -152,11 +152,13 @@
         el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('codice') + 'Controlla e simula', onclick: () => analizza() })]), esito);
       const f = A.modulo(pan, [{ id: 'modo', et: 'Macchina', tipo: 'scelta', scelte: [['auto', 'La riconosce da sola'], ['fresa', 'Fresa'], ['tornio', 'Tornio']] },
         { id: 'testo', et: 'Programma (incollalo qui)', tipo: 'area', mono: true, righe: 10 }], v, () => {});
-      const det = el('details', { class: 'carta-det' }, [el('summary', { testo: 'Grezzo e staffe (facoltativo, per la fresa)' })]);
+      const det = el('details', { class: 'carta-det' }, [el('summary', { testo: 'Grezzo e staffe (facoltativo)' })]);
       const panIng = el('div', { class: 'pannello' });
       det.appendChild(panIng);
       pan.parentNode.insertBefore(det, pan.nextSibling);
       A.modulo(panIng, [{ id: 'glx', et: 'Grezzo X', u: 'mm', sub: 'angolo in basso a sinistra in X0 Y0' }, { id: 'gly', et: 'Grezzo Y', u: 'mm' }, { id: 'glz', et: 'Spessore del grezzo', u: 'mm', sub: 'Z0 e la faccia sopra' },
+        { id: 'gtd', et: 'Tornio: diametro del grezzo', u: 'mm', sub: 'serve a vedere il materiale che si asporta' }, { id: 'gtl', et: 'Tornio: lunghezza del grezzo', u: 'mm', sub: 'dalla faccia davanti fino in fondo' },
+        { id: 'gts', et: 'Tornio: sovrametallo davanti', u: 'mm', sub: 'quanto il grezzo sporge oltre Z0 (se vuoto: 1)' },
         { id: 'staffe', et: 'Staffe: X1 Y1 X2 Y2 altezza, una per riga', tipo: 'area', mono: true, righe: 3, sub: 'altezza sopra Z0 della parte alta' },
         { id: 'raggioDef', et: 'Raggio fresa se non e in tabella', u: 'mm', sub: 'serve alla compensazione G41/G42 e agli urti' }], v, () => {});
       const analizza = () => {
@@ -169,6 +171,7 @@
           ing.raggio = raggioDi(v.raggioDef);
           r.segnalazioni = r.segnalazioni.concat(O.controllaIngombri(r, ing)).sort((a, b) => (a.livello === b.livello ? 0 : a.livello === 'errore' ? -1 : 1) || a.riga - b.riga);
         }
+        if (A.modelloMateriale) A.modelloMateriale(r, v.testo, v);
         mostraAnalisi(esito, r, v.testo, 'Programma aperto', true, { ingombri: v, correggi: t => { f.metti('testo', t); analizza(); } });
       };
       if (String(v.testo || '').trim()) analizza();
@@ -261,6 +264,8 @@
       if (haComp && !r.segmentiCentro) r.segmentiCentro = O.centroFresa(r.segmenti, raggioDi(P.ingombri ? P.ingombri.raggioDef : sv.raggio));
       const S = sv.centro && haComp && r.segmentiCentro ? r.segmentiCentro : r.segmenti, N = S.length;
       const modo = r.modo;
+      const mat = !P.macro && A.modelloMateriale && N <= 400000 ? A.modelloMateriale(r, P.testo, P.ingombri) : null;
+      const conMat = () => !!(mat && sv.materiale !== false && !mat.vuoto && mat.tipo !== 'troppo');
       if (!viste(modo).some(x => x[0] === sv.vista)) sv.vista = viste(modo)[0][0];
       const cv = el('canvas', { class: 'vista sim-tela', 'aria-label': 'Simulazione del percorso' });
       const schede = el('div', { class: 'schede' });
@@ -305,6 +310,7 @@
         rin.addEventListener('change', () => { sv.raggio = rin.value; r.segmentiCentro = null; A.salva(); A.ridisegna(); });
         m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (sv.centro ? ' attiva' : ''), testo: sv.centro ? 'Centro fresa: si' : 'Centro fresa (G41/G42)', onclick: () => { sv.centro = !sv.centro; A.salva(); A.ridisegna(); } }), el('span', { class: 'leggenda', style: 'margin:0 4px;align-self:center', testo: 'raggio' }), rin]));
       }
+      if (mat && !mat.vuoto && mat.tipo !== 'troppo') m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (conMat() ? ' attiva' : ''), testo: conMat() ? 'Materiale: si' : 'Materiale: no', onclick: () => { sv.materiale = !conMat(); A.salva(); A.ridisegna(); } })]));
       m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, cv, cursore, comandi, stato, commento]), pannello]));
       let rigaVista = -1;
       const aggiornaPannello = (cur, px, riga) => {
@@ -333,7 +339,10 @@
         if (vv) sotto.appendChild(el('div', { class: 'pannello', style: 'padding:4px 8px;margin-top:10px', html: '<div class="sez" style="margin:6px 0">Variabili alla fine</div><table>' + vv + '</table>' }));
         if (r.errore) sotto.appendChild(el('p', { class: 'errore', testo: r.errore }));
         if (r.avvisi.length) sotto.appendChild(A.info(esc(r.avvisi.join(' · ')), 'avviso'));
-      } else mostraAnalisi(sotto, r, P.testo, P.titolo);
+      } else {
+        if (mat && mat.note && mat.note.length) sotto.appendChild(A.info(mat.note.map(esc).join('<br>'), 'avviso'));
+        mostraAnalisi(sotto, r, P.testo, P.titolo);
+      }
       // proiezione
       let proj = null;
       const prepara = () => {
@@ -347,11 +356,18 @@
         // area: tutti i punti di lavoro e i rapidi vicini al pezzo
         const pts = [];
         const zMaxL = r.limiti.z.maxLavoro !== null ? r.limiti.z.maxLavoro : 0;
-        S.forEach(s => { if (!s.rapido || modo === 'tornio' || s.z <= zMaxL + 10) { pts.push(f(s.x0, s.y0, s.z0)); pts.push(f(s.x, s.y, s.z)); } });
+        const vicino = q => !conMat() || modo !== 'tornio' || (Math.abs(q.x) <= mat.R * 3 && q.z <= mat.zTop + 12 && q.z >= mat.zBot - 5);   // col materiale non si inquadrano i rapidi di ritorno lontani
+        S.forEach(s => {
+          if (!s.rapido) { pts.push(f(s.x0, s.y0, s.z0)); pts.push(f(s.x, s.y, s.z)); } else if (modo === 'tornio') { if (vicino({ x: s.x0, z: s.z0 }) || !conMat()) pts.push(f(s.x0, s.y0, s.z0)); if (vicino(s) || !conMat()) pts.push(f(s.x, s.y, s.z)); } else if (s.z <= zMaxL + 10) { pts.push(f(s.x0, s.y0, s.z0)); pts.push(f(s.x, s.y, s.z)); }
+        });
         if (!pts.length) S.forEach(s => pts.push(f(s.x, s.y, s.z)));
         // minimo e massimo con un ciclo: con centinaia di migliaia di punti Math.min(...) supera la pila
         let mx = Infinity, Mx = -Infinity, my = Infinity, My = -Infinity;
         for (let i = 0; i < pts.length; i++) { const q = pts[i]; if (q[0] < mx) mx = q[0]; if (q[0] > Mx) Mx = q[0]; if (q[1] < my) my = q[1]; if (q[1] > My) My = q[1]; }
+        if (conMat()) {
+          const gr = mat.tipo === 'tornio' ? [[2 * mat.R, 0, mat.zTop], [0, 0, mat.zBot]] : [[mat.x0, mat.y0, 0], [mat.x1, mat.y1, -mat.lz]];
+          gr.forEach(q => { const w = f(q[0], q[1], q[2]); if (w[0] < mx) mx = w[0]; if (w[0] > Mx) Mx = w[0]; if (w[1] < my) my = w[1]; if (w[1] > My) My = w[1]; });
+        }
         proj = { f, mx, Mx, my, My };
         if (modo === 'tornio') proj.My = Math.max(proj.My, 0);
       };
@@ -386,13 +402,15 @@
         // asse e grezzo del tornio
         if (modo === 'tornio') {
           const L = r.limiti;
-          if (L.x.maxLavoro !== null) {
+          if (L.x.maxLavoro !== null && !conMat()) {
             const a = P2(L.x.maxLavoro, 0, Math.max(L.z.maxLavoro, 0)), c = P2(0, 0, L.z.minLavoro);
             g.fillStyle = colore('--tenue'); g.globalAlpha = 0.14; g.fillRect(Math.min(a[0], c[0]), a[1], Math.abs(a[0] - c[0]), c[1] - a[1]); g.globalAlpha = 1;
           }
           g.strokeStyle = colore('--tenue'); g.setLineDash([8, 4, 2, 4]); g.beginPath(); g.moveTo(0, T.oy); g.lineTo(W, T.oy); g.stroke(); g.setLineDash([]);
         }
         const ten = colore('--tenue');
+        const cur0 = k > 0 ? S[k - 1] : S[0];
+        if (conMat()) { mat.vaiA(k); A.disegnaMateriale(g, { mat, vista: sv.vista, P2, cur: { y: k > 0 ? cur0.y : cur0.y0 } }); }
         g.drawImage(T.base.c, 0, 0, W, H);
         // quello fatto fin qui: si aggiunge solo il pezzo nuovo (se si torna indietro si rifa da capo)
         if (k < T.kFatto) { T.fatto.g.clearRect(0, 0, W, H); T.kFatto = 0; }
@@ -401,7 +419,7 @@
           for (let i = T.kFatto; i < k; i++) { const s = S[i]; if (s.rapido) continue; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); f.moveTo(a[0], a[1]); f.lineTo(c[0], c[1]); }
           f.stroke(); T.kFatto = k;
         }
-        g.drawImage(T.fatto.c, 0, 0, W, H);
+        if (!conMat()) g.drawImage(T.fatto.c, 0, 0, W, H);
         g.setLineDash([4, 4]); g.lineWidth = 1; g.beginPath();
         for (let i = Math.max(0, k - 200); i < k; i++) { const s = S[i]; if (!s.rapido) continue; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); }
         g.strokeStyle = ten; g.stroke(); g.setLineDash([]);
@@ -409,9 +427,11 @@
         const cur = k > 0 ? S[k - 1] : S[0];
         const px = k > 0 ? [cur.x, cur.y, cur.z] : [cur.x0, cur.y0, cur.z0];
         const p = P2(...px);
+        const du = modo === 'tornio' ? null : A.datiUtensile(r, P.ingombri, cur.t);
+        A.disegnaUtensile(g, { modo, vista: sv.vista, P2, sc: T.sc, px, raggio: du ? du.d / 2 : 0, lung: du ? du.l : 0, colore });
         g.fillStyle = colore('--avviso'); g.strokeStyle = colore('--avviso'); g.lineWidth = 3;
         g.beginPath(); g.arc(p[0], p[1], 5, 0, Math.PI * 2); g.fill();
-        if (modo !== 'tornio' && sv.vista !== 'xy') { g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0], p[1] - 34); g.stroke(); }
+        if (modo !== 'tornio' && sv.vista !== 'xy' && !(du && du.d > 0)) { g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0], p[1] - 34); g.stroke(); }
         // testo dello stato
         const riga = k > 0 ? cur.riga : (S[0] ? S[0].riga : 0);
         aggiornaPannello(cur, px, riga);

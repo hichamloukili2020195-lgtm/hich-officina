@@ -2,6 +2,12 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.31.0 - Materiale che si asporta, utensile col suo diametro, urti
+- **Utensile con le sue misure** nella simulazione della fresa: il cerchio del diametro dall'alto, il corpo con la parte tagliente di fronte e in 3D. Il diametro viene dalla tabella utensili, dal raggio scritto o dal commento del T (es. `T1 M6 (FRESA D10)`); se non si sa, usa 6 mm e lo dice.
+- **Materiale che si asporta**: il grezzo diventa il pezzo mentre la simulazione va avanti, in 3D, dall'alto (colorato per profondita) e di fronte (sezione). Nel tornio si vede la sezione del grezzo che si trasforma in pezzo, anche con l'alesatura. Il pulsante "Materiale: si/no" lo toglie. In "Controlla un programma" si scrivono le misure del grezzo (fresa: X, Y, spessore; tornio: diametro, lunghezza, sovrametallo davanti); senza misure il grezzo e ipotizzato e la simulazione lo dice.
+- **Urti**: il rapido che entra nel materiale (errore se il grezzo e scritto, avviso se e ipotizzato) e la fresa che taglia piu in profondita della sua lunghezza tagliente (misura L nella tabella utensili). Compaiono nel controllo degli errori.
+- E una stima: utensile piatto, inserto del tornio con misure di prova, niente flessioni. Oltre 400.000 movimenti il materiale non si simula.
+
 ## 2.30.0 - Spiegazione del programma, correzioni e commento della simulazione
 - **Cosa fa il programma** (in "Controlla un programma" e sotto la simulazione): riassunto (macchina, utensili, lavorazioni, tempo, profondita, fori, giri, fine) e il programma diviso per utensile. Ogni lavorazione si apre e mostra, sotto ogni riga, una frase semplice: "Rapido a X 10, Y 10", "Foratura profonda a gradini nel punto X 40 (fondo Z -20, piano R 2, passo Q 4)", "Cambio utensile: monta il T2".
 - **Correzione con un tocco** sotto gli errori che si possono sistemare: chiudere la parentesi, aggiungere M6 dopo il T, aggiungere G80 prima di un movimento, aggiungere M30 alla fine. C'e anche "Correggi tutto". Cambia solo il testo: va riletto prima di usarlo.
