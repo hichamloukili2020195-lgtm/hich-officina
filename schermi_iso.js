@@ -169,7 +169,7 @@
           ing.raggio = raggioDi(v.raggioDef);
           r.segnalazioni = r.segnalazioni.concat(O.controllaIngombri(r, ing)).sort((a, b) => (a.livello === b.livello ? 0 : a.livello === 'errore' ? -1 : 1) || a.riga - b.riga);
         }
-        mostraAnalisi(esito, r, v.testo, 'Programma aperto', true, { ingombri: v });
+        mostraAnalisi(esito, r, v.testo, 'Programma aperto', true, { ingombri: v, correggi: t => { f.metti('testo', t); analizza(); } });
       };
       if (String(v.testo || '').trim()) analizza();
     }
@@ -189,8 +189,11 @@
   }
   A.ingombriDa = ingombriDa; A.raggioDi = raggioDi;
   /** Il controllo del programma: errori e avvisi riga per riga. */
-  function mostraControllo(m, r) {
+  function mostraControllo(m, r, extra) {
     const S = r.segnalazioni || [];
+    // correzioni con un tocco (solo dove il testo si puo cambiare: schermata "Controlla un programma")
+    const fix = extra && extra.correggi && O.correzioniISO ? O.correzioniISO(r.righe.join('\n'), r) : [];
+    const fixDi = x => fix.find(c => c.riga === x.riga && c.testo === x.testo);
     const err = S.filter(x => x.livello === 'errore'), avv = S.filter(x => x.livello === 'avviso'), note = S.filter(x => x.livello === 'nota');
     m.appendChild(el('div', { class: 'sez', testo: 'Controllo del programma' }));
     m.appendChild(el('div', { class: 'controllo-esito ' + (err.length ? 'fuori' : avv.length ? 'avviso' : 'buona'), testo: err.length ? err.length + (err.length === 1 ? ' errore' : ' errori') + (avv.length ? ' e ' + avv.length + (avv.length === 1 ? ' avviso' : ' avvisi') : '') : avv.length ? 'Nessun errore, ' + avv.length + (avv.length === 1 ? ' avviso' : ' avvisi') : 'Nessun errore trovato' }));
@@ -200,14 +203,18 @@
       const riga = x.riga >= 0 ? (r.righe[x.riga] || '').trim() : '';
       lista.appendChild(el('div', { class: 'controllo-voce ' + x.livello }, [
         el('div', { class: 'controllo-riga' }, [el('b', { testo: x.riga >= 0 ? 'Riga ' + (x.riga + 1) : 'Programma' }), riga ? el('code', { testo: riga.length > 60 ? riga.slice(0, 60) + '…' : riga }) : null]),
-        el('div', { testo: x.testo })]));
+        el('div', { testo: x.testo }),
+        fixDi(x) ? el('button', { class: 'pul sec piccolo', testo: fixDi(x).etichetta, onclick: () => extra.correggi(O.applicaCorrezioni(r.righe.join('\n'), [fixDi(x)])) }) : null]));
     });
     m.appendChild(lista);
+    if (fix.length > 1) m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', testo: 'Correggi tutto (' + fix.length + ')', onclick: () => extra.correggi(O.applicaCorrezioni(r.righe.join('\n'), fix)) }),
+      el('span', { class: 'nota', testo: 'Cambia solo il testo del programma: rileggilo prima di usarlo.' })]));
+    else if (fix.length === 1) m.appendChild(el('p', { class: 'nota', testo: 'La correzione cambia solo il testo del programma: rileggilo prima di usarlo.' }));
   }
   A.mostraControllo = mostraControllo;
   function mostraAnalisi(m, r, testo, titolo, controllo, extra) {
     if (r.errore) m.appendChild(el('p', { class: 'errore', testo: 'Il programma si ferma: ' + r.errore }));
-    if (controllo) mostraControllo(m, r);
+    if (controllo) mostraControllo(m, r, extra);
     const Lm = r.limiti, q = (k, w) => (Lm[k][w] === null ? '—' : fmt(Lm[k][w], 3));
     m.appendChild(A.misuratore('Tempo stimato', fmt(r.tempo, r.tempo < 10 ? 1 : 0), 'min'));
     const tor = r.modo === 'tornio';
@@ -230,6 +237,7 @@
         const nome = (righe.find(x => /^\s*O\d+/i.test(x)) || 'O0001').trim().split(/\s|\(/)[0];
         A.param.listato = { righe, nome, tipo: r.modo }; A.vai('listato');
       } })]));
+    if (A.mostraSpiegazione && !(extra && extra.senzaSpiegazione)) A.mostraSpiegazione(m, r, testo);
     m.appendChild(A.info('Senza origini, correttori e cicli fissi del tornio: il percorso e quello scritto nel programma, a centro utensile.'));
   }
   A.mostraAnalisi = mostraAnalisi;
@@ -260,6 +268,12 @@
       schede.querySelectorAll('button').forEach(b => b.classList.toggle('attiva', b.dataset.id === sv.vista));
       const cursore = el('input', { type: 'range', min: 0, max: N, value: N, id: 'f-passo', style: 'width:100%;accent-color:var(--accento)', 'aria-label': 'Avanzamento della simulazione' });
       const stato = el('div', { class: 'chiamata', style: 'white-space:pre-wrap;font-size:13px' });
+      // commento: cosa sta facendo la macchina in questa riga (frase della spiegazione, con il passo dentro il ciclo)
+      const commento = el('div', { class: 'sim-commento', 'aria-live': 'polite' });
+      const spieg = !P.macro && O.spiegaRighe && r.righe.length <= 20000 ? O.spiegaRighe(P.testo, r.modo) : null;
+      const ord = new Uint32Array(N), cnt = new Map();
+      if (spieg) for (let i = 0; i < N; i++) { const q = S[i].riga, c = (cnt.get(q) || 0) + 1; cnt.set(q, c); ord[i] = c; }
+      const commentoDi = (i, riga) => (spieg && N ? O.commentoPasso(spieg, riga, ord[i], cnt.get(riga) || 1) : '');
       const b = (svg, et, fn) => el('button', { class: 'icona-pul', 'aria-label': et, html: '<svg viewBox="0 0 24 24" fill="currentColor">' + svg + '</svg>', onclick: fn });
       let k = N, gira = false, timer = null;
       const vel = el('select', { id: 'f-vel', 'aria-label': 'Velocita' });
@@ -291,7 +305,7 @@
         rin.addEventListener('change', () => { sv.raggio = rin.value; r.segmentiCentro = null; A.salva(); A.ridisegna(); });
         m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (sv.centro ? ' attiva' : ''), testo: sv.centro ? 'Centro fresa: si' : 'Centro fresa (G41/G42)', onclick: () => { sv.centro = !sv.centro; A.salva(); A.ridisegna(); } }), el('span', { class: 'leggenda', style: 'margin:0 4px;align-self:center', testo: 'raggio' }), rin]));
       }
-      m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, cv, cursore, comandi, stato]), pannello]));
+      m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, cv, cursore, comandi, stato, commento]), pannello]));
       let rigaVista = -1;
       const aggiornaPannello = (cur, px, riga) => {
         if (tor) { dro.X.textContent = fmt(px[0], 3); dro.Z.textContent = fmt(px[2], 3); }
@@ -404,6 +418,7 @@
         stato.textContent = 'Riga ' + (riga + 1) + ':  ' + (r.righe[riga] || '').trim() + '\n' +
           (modo === 'tornio' ? 'X' + fmt(px[0], 3) + '  Z' + fmt(px[2], 3) : 'X' + fmt(px[0], 3) + '  Y' + fmt(px[1], 3) + '  Z' + fmt(px[2], 3)) +
           '   T' + (cur.t || 0) + '  F' + fmt(cur.f, 3) + '   ' + k + ' / ' + N;
+        commento.textContent = commentoDi(k > 0 ? k - 1 : 0, riga);
       };
       const vai = i => { k = i; cursore.value = String(i); disegna(); };
       const passo = () => {

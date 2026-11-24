@@ -1259,6 +1259,31 @@ const server = http.createServer((q, r) => {
   ok((await pg2.$$eval('.dro-riga', x => x.length)) === 3, 'simulazione del programma letto');
   await ctx2.close();
 
+  // ===== 2.30.0: cosa fa il programma, correzioni con un tocco, commento della simulazione =====
+  await vai('apri'); await pg.waitForTimeout(80);
+  await pg.fill('#f-testo', ['%', 'O0005 (PROVA)', 'G21 G90 G17', '(PUNTA 8.5)', 'T1 M6', 'S1200 M3', 'G0 X10 Y10', 'G43 H1 Z50', 'G83 X10 Y10 Z-20 R2 Q4 F150', 'X40', 'G80', 'G0 Z100', 'T2', 'G0 X0 Y0 (nota', 'M5', '%'].join('\n'));
+  await pg.click('text=Controlla e simula'); await pg.waitForTimeout(150);
+  let tsp = await pg.textContent('#schermo');
+  ok(tsp.includes('Cosa fa il programma') && tsp.includes('Foratura a gradini: 2 fori'), 'riassunto del programma: ' + tsp.slice(-400));
+  ok((await pg.$$eval('.spiega-blocco', x => x.length)) >= 2, 'lavorazioni a blocchi');
+  await pg.click('.spiega-blocco >> nth=1 >> summary'); await pg.waitForTimeout(80);
+  const righeSp = await pg.textContent('.spiega-blocco[open] .spiega-righe');
+  ok(righeSp.includes('Cambio utensile: monta il T1') && righeSp.includes('foratura profonda a gradini'), 'spiegazione riga per riga');
+  ok((await pg.$$eval('.controllo-voce .pul.piccolo', x => x.length)) >= 2, 'pulsanti di correzione');
+  const nVoci = await pg.$$eval('.controllo-voce', x => x.length);
+  if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '30-spiega.png'), fullPage: true });
+  await pg.click('.controllo-voce .pul.piccolo >> nth=0'); await pg.waitForTimeout(150);
+  ok((await pg.$$eval('.controllo-voce', x => x.length)) < nVoci, 'una correzione tolta');
+  await pg.click('button:has-text("Correggi tutto")').catch(() => {}); await pg.waitForTimeout(150);
+  const corretto = await pg.inputValue('#f-testo');
+  ok(corretto.includes('T2 M6') && corretto.includes('(nota)'), 'correzioni applicate al testo: ' + corretto.slice(-120));
+  await pg.click('button.pul:text-is("Simula")'); await pg.waitForTimeout(300);
+  await pg.click('[aria-label="Dall\'inizio"]'); await pg.click('[aria-label="Passo avanti"]'); await pg.waitForTimeout(80);
+  ok((await pg.textContent('.sim-commento')).length > 8, 'commento della simulazione');
+  if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '31-commento.png') });
+  await pg.click('[aria-label="Alla fine"]'); await pg.waitForTimeout(80);
+  ok(/Rapido|Taglia|Cambio|Ciclo|Fine/.test(await pg.textContent('.sim-commento')), 'commento alla fine');
+
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }
   console.log('OK interfaccia');

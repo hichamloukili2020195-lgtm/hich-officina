@@ -2,6 +2,12 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.30.0 - Spiegazione del programma, correzioni e commento della simulazione
+- **Cosa fa il programma** (in "Controlla un programma" e sotto la simulazione): riassunto (macchina, utensili, lavorazioni, tempo, profondita, fori, giri, fine) e il programma diviso per utensile. Ogni lavorazione si apre e mostra, sotto ogni riga, una frase semplice: "Rapido a X 10, Y 10", "Foratura profonda a gradini nel punto X 40 (fondo Z -20, piano R 2, passo Q 4)", "Cambio utensile: monta il T2".
+- **Correzione con un tocco** sotto gli errori che si possono sistemare: chiudere la parentesi, aggiungere M6 dopo il T, aggiungere G80 prima di un movimento, aggiungere M30 alla fine. C'e anche "Correggi tutto". Cambia solo il testo: va riletto prima di usarlo.
+- **Commento nella simulazione**: sotto il disegno una frase dice cosa sta facendo la macchina in quella riga (con "movimento 2 di 5" dentro i cicli).
+- Le frasi sono indicative: i codici meno comuni possono voler dire altro su un controllo diverso. Il programma si controlla sempre con il manuale e a vuoto.
+
 ## 2.29.0 - Margini su Android recente
 - Su Android 15 e successivi la barra in alto e i tasti in basso non coprono piu l'app: il contenuto resta dentro i margini del sistema. Sui telefoni piu vecchi non cambia nulla.
 

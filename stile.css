@@ -601,3 +601,20 @@ body.con-sfondo::after{content:"";position:fixed;inset:0;z-index:-1;pointer-even
 :root[data-theme="light"] body.con-sfondo::after{display:none}
 @media (prefers-color-scheme: light){:root:not([data-theme="dark"]) body.con-sfondo::after{display:none}}
 @media (min-width:760px){.eroe img.scena{height:260px;aspect-ratio:auto}}
+
+/* spiegazione del programma e commento della simulazione */
+.sim-commento{margin:6px 0;padding:8px 10px;border-radius:10px;background:color-mix(in srgb,var(--accento) 14%,var(--riga));border:1px solid var(--bordo);font-size:14px;line-height:1.4;min-height:2.6em}
+.sim-commento:empty{display:none}
+.spiega-riass table{width:100%;border-collapse:collapse}
+.spiega-riass th{text-align:left;font-weight:600;color:var(--tenue);padding:5px 8px 5px 0;vertical-align:top;white-space:nowrap;font-size:13px}
+.spiega-riass td{padding:5px 0;font-size:14px}
+.spiega-blocco summary{cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.spiega-righe{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.spiega-riga{border-left:3px solid var(--bordo);padding:2px 0 2px 8px}
+.spiega-riga.rapido{border-left-color:var(--tenue)} .spiega-riga.lavoro,.spiega-riga.ciclo{border-left-color:var(--accento2)}
+.spiega-riga.utensile{border-left-color:var(--avviso)} .spiega-riga.fine{border-left-color:var(--errore)}
+.spiega-cod{display:flex;gap:8px;align-items:baseline;font:12.5px var(--mono);overflow-wrap:anywhere}
+.spiega-cod .n{color:var(--cod-num);min-width:34px;text-align:right}
+.spiega-frase{font-size:13.5px;color:var(--testo);margin-top:1px}
+.controllo-voce .pul.piccolo{margin-top:6px;padding:6px 12px;min-height:36px;font-size:13px}
+.nota{color:var(--tenue);font-size:12.5px}

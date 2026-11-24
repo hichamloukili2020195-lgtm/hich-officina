@@ -8,7 +8,7 @@ require('../cad.js');
 require('../lavoro.js');
 require('../ciclo.js');
 require('../disegno_foto.js');
-require('../iso.js');
+require('../iso.js'); require('../spiega.js');
 require('../post.js');
 require('../ciclo.js');
 let n = 0;
@@ -856,5 +856,49 @@ prova('android: margini del sistema su Android 15 e successivi (barre non copron
   const j = require('fs').readFileSync(require('path').join(__dirname, '..', 'android/app/src/main/java/it/hich/officina/MainActivity.java'), 'utf8');
   assert.ok(/private void margini\(\)/.test(j) && /margini\(\);/.test(j), 'manca margini()');
   assert.ok(/SDK_INT < 35/.test(j) && /Type\.systemBars\(\)/.test(j) && /setPadding\(b\.left, b\.top, b\.right, b\.bottom\)/.test(j));
+});
+prova('spiegazione: righe, lavorazioni a blocchi, riassunto, commento della simulazione', () => {
+  const prog = ['%', 'O0001 (PIASTRA)', 'G21 G90 G17 G40 G49', '(PUNTA 8.5)', 'T1 M6', 'G54 G0 X10 Y10', 'G43 H1 Z50 S1200 M3', 'M8', 'G83 X10 Y10 Z-20 R2 Q4 F150', 'X40', 'X70 Y30', 'G80', 'G0 Z100', 'T2 M6', 'G0 X0 Y0', 'G1 Z-3 F300', 'G2 X20 Y0 R10', 'G1 X50', 'M30', '%'].join('\n');
+  const r = O.controllaISO(prog), sp = O.spiegaProgramma(prog, r);
+  const fr = i => sp.righe[i - 1].frase;
+  assert.ok(/Numero del programma: O0001/.test(fr(2)), fr(2));
+  assert.ok(/Misure in millimetri/.test(fr(3)) && /Quote assolute/.test(fr(3)), fr(3));
+  assert.ok(/Cambio utensile: monta il T1/.test(fr(5)), fr(5));
+  assert.ok(/Rapido/.test(fr(6)) && /X 10, Y 10/.test(fr(6)) && /origine pezzo G54/.test(fr(6)), fr(6));
+  assert.ok(/correzione della lunghezza utensile \(correttore H1\)/.test(fr(7)) && /1200 giri/.test(fr(7)), fr(7));
+  assert.ok(/foratura profonda a gradini/.test(fr(9)) && /fondo Z -20/.test(fr(9)) && /passo Q 4/.test(fr(9)), fr(9));
+  assert.ok(/nel punto X 40/.test(fr(10)), fr(10));      // il ciclo resta attivo: la riga con solo X e un altro foro
+  assert.ok(/Annulla il ciclo fisso/.test(fr(12)), fr(12));
+  assert.ok(/Taglia in linea retta fino a Z -3 con avanzamento 300 mm\/min/.test(fr(16)), fr(16));
+  assert.ok(/Arco in senso orario/.test(fr(17)) && /raggio 10/.test(fr(17)), fr(17));
+  assert.ok(/Fine del programma/.test(fr(19)), fr(19));
+  assert.deepStrictEqual(sp.blocchi.filter(b => b.t != null).map(b => [b.t, b.fori]), [[1, 3], [2, 0]]);
+  assert.ok(/Foratura a gradini: 3 fori/.test(sp.blocchi.find(b => b.t === 1).titolo));
+  assert.strictEqual(sp.blocchi.find(b => b.t === 2).titolo, 'Fresatura');
+  assert.strictEqual(sp.blocchi.find(b => b.t === 1).commento, 'PUNTA 8.5');
+  const rs = Object.fromEntries(sp.riassunto);
+  assert.ok(rs.Macchina === 'Fresa' && /T1, T2/.test(rs.Utensili) && /Z -20/.test(rs['Profondita massima']) && /M30/.test(rs.Fine), JSON.stringify(rs));
+  assert.ok(/movimento 2 di 3/.test(O.commentoPasso(sp, 8, 2, 3)) && !/movimento/.test(O.commentoPasso(sp, 5, 1, 1)));
+  // tornio
+  const tor = ['G21 G18 G99', 'T0202', 'G50 S2500', 'G96 S180 M3', 'G0 X52 Z2', 'G1 X50 Z0 F.15', 'G71 U1 R.5', 'G71 P10 Q20 U.5 W.1 F.25', 'M30'].join('\n');
+  const st = O.spiegaProgramma(tor, O.controllaISO(tor, { modo: 'tornio' }));
+  assert.strictEqual(st.modo, 'tornio');
+  assert.ok(/Utensile 2 con correttore 2/.test(st.righe[1].frase) && /Limite massimo dei giri: 2500/.test(st.righe[2].frase) && /Velocita di taglio costante a 180 m\/min/.test(st.righe[3].frase), st.righe.map(x => x && x.frase).join(' | '));
+  assert.ok(/diametro\) 52/.test(st.righe[4].frase) && /Sgrossatura longitudinale/.test(st.righe[7].frase));
+  assert.ok(/Sgrossatura/.test(st.blocchi.find(b => b.t === 2).titolo));
+});
+prova('correzioni: parentesi, T senza M6, G80, M30 alla fine (e il programma corretto non ha piu quegli errori)', () => {
+  const bad = 'G21\nG0 X1 (nota\nT2\nM3 S500\nG1 X5 F100\nG81 X1 Y1 Z-3 R2 F50\nG0 Z50';
+  const r = O.controllaISO(bad), c = O.correzioniISO(bad, r);
+  assert.deepStrictEqual(c.map(x => x.etichetta).sort(), ['Aggiungi G80 prima', 'Aggiungi M30 alla fine', 'Aggiungi M6', 'Chiudi la parentesi']);
+  const buono = O.applicaCorrezioni(bad, c);
+  assert.strictEqual(buono, 'G21\nG0 X1 (nota)\nT2 M6\nM3 S500\nG1 X5 F100\nG81 X1 Y1 Z-3 R2 F50\nG80\nG0 Z50\nM30');
+  const dopo = O.controllaISO(buono).segnalazioni.filter(q => /parentesi|T senza M6|G80|manca la fine/.test(q.testo));
+  assert.deepStrictEqual(dopo, []);
+  // una sola correzione; M30 prima del % finale; una parentesi chiusa prima del ; del commento
+  assert.strictEqual(O.applicaCorrezioni('G0 X1\n%', [{ op: { riga: Infinity, tipo: 'fine', testo: 'M30' } }]), 'G0 X1\nM30\n%');
+  const p2 = 'G0 X1 (a (b ; resto'; assert.strictEqual(O.applicaCorrezioni(p2, O.correzioniISO(p2, { segnalazioni: [{ riga: 0, livello: 'errore', testo: 'parentesi del commento non chiuse' }] })), 'G0 X1 (a (b)) ; resto');
+  // niente correzione se non si sa cosa fare
+  assert.deepStrictEqual(O.correzioniISO('G1 X5', { segnalazioni: [{ riga: 0, livello: 'errore', testo: 'movimento di lavoro senza avanzamento F' }] }), []);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');
