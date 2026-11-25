@@ -308,8 +308,7 @@
         b('<path d="M15 6l-8 6 8 6z"/>', 'Passo indietro', () => { ferma(); vai(Math.max(0, k - 1)); }),
         bPlay,
         b('<path d="M9 6l8 6-8 6z"/>', 'Passo avanti', () => { ferma(); vai(Math.min(N, k + 1)); }),
-        b('<path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/>', 'Alla fine', () => { ferma(); vai(N); }),
-        el('div', { class: 'ctrl', style: 'flex:0 0 auto;min-width:76px' }, [vel])]);
+        b('<path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/>', 'Alla fine', () => { ferma(); vai(N); })]);
       // pannello stile controllo: quote grandi, giri, avanzamento, utensile, righe del programma
       const tor = modo === 'tornio';
       const nmax = tor ? A.imp().nmaxTornio : A.imp().nmaxFresa;
@@ -322,14 +321,16 @@
       righe.innerHTML = r.righe.slice(0, NR).map((x, i) => '<div data-r="' + i + '"><span class="n">' + (i + 1) + '</span><span>' + (A.colora ? A.colora(x) : esc(x)) + '</span></div>').join('');
       const pannello = el('div', { class: 'sim-pannello' }, [el('div', { class: 'dro' }, [tor ? null : quota('X'), tor ? quota('X') : quota('Y'), quota('Z')].filter(Boolean)), el('div', { class: 'dro-sotto' }, [giriBox, info]), righe]);
       if (tor) pannello.firstChild.insertBefore(el('div', { class: 'dro-nota', testo: 'X in diametro' }), pannello.firstChild.firstChild);
+      const opzRiga = [];   // le opzioni della simulazione stanno tutte in una riga
       if (haComp) {
         const rin = el('input', { id: 'f-raggioComp', inputmode: 'decimal', placeholder: 'raggio', value: sv.raggio || '5', style: 'width:70px', 'aria-label': 'Raggio della fresa' });
         rin.addEventListener('change', () => { sv.raggio = rin.value; r.segmentiCentro = null; A.salva(); A.ridisegna(); });
-        m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (sv.centro ? ' attiva' : ''), testo: sv.centro ? 'Centro fresa: si' : 'Centro fresa (G41/G42)', onclick: () => { sv.centro = !sv.centro; A.salva(); A.ridisegna(); } }), el('span', { class: 'leggenda', style: 'margin:0 4px;align-self:center', testo: 'raggio' }), rin]));
+        opzRiga.push(...[el('button', { class: 'chip' + (sv.centro ? ' attiva' : ''), testo: sv.centro ? 'Centro fresa: si' : 'Centro fresa (G41/G42)', onclick: () => { sv.centro = !sv.centro; A.salva(); A.ridisegna(); } }), el('span', { class: 'leggenda', style: 'margin:0 4px;align-self:center', testo: 'raggio' }), rin]);
       }
       const conConf = () => !!(conMat() && mat.bersaglio && sv.confronto !== false);
-      if (mat && !mat.vuoto && mat.tipo !== 'troppo') m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (conMat() ? ' attiva' : ''), testo: conMat() ? 'Materiale: si' : 'Materiale: no', onclick: () => { sv.materiale = !conMat(); A.salva(); A.ridisegna(); } }),
-        mat.bersaglio && conMat() ? el('button', { class: 'chip' + (conConf() ? ' attiva' : ''), id: 'sim-confronto', testo: conConf() ? 'Confronto col disegno: si' : 'Confronto col disegno: no', onclick: () => { sv.confronto = !conConf(); A.salva(); A.ridisegna(); } }) : null].filter(Boolean)));
+      if (mat && !mat.vuoto && mat.tipo !== 'troppo') opzRiga.push(...[el('button', { class: 'chip' + (conMat() ? ' attiva' : ''), testo: conMat() ? 'Materiale: si' : 'Materiale: no', onclick: () => { sv.materiale = !conMat(); A.salva(); A.ridisegna(); } }),
+        mat.bersaglio && conMat() ? el('button', { class: 'chip' + (conConf() ? ' attiva' : ''), id: 'sim-confronto', testo: conConf() ? 'Confronto col disegno: si' : 'Confronto col disegno: no', onclick: () => { sv.confronto = !conConf(); A.salva(); A.ridisegna(); } }) : null].filter(Boolean));
+      if (opzRiga.length) m.appendChild(el('div', { class: 'chips sim-opz' }, opzRiga));
       m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, telaBox, cursore, comandi, stato, commento]), pannello]));
       let rigaVista = -1;
       const aggiornaPannello = (cur, px, riga) => {
@@ -506,7 +507,7 @@
       });
       const rigaDopo = () => { ferma(); if (k >= N) return; const q = S[k].riga; let j = k; while (j + 1 < N && S[j + 1].riga === q) j++; vai(j + 1); };
       const rigaPrima = () => { ferma(); if (k <= 0) return; const q = S[k - 1].riga; let j = k - 1; while (j > 0 && S[j - 1].riga === q) j--; vai(j); };
-      comandi.after(el('div', { class: 'chips sim-righe-pul' }, [el('button', { class: 'chip', id: 'sim-riga-prima', testo: '◀ Riga prima', onclick: rigaPrima }), el('button', { class: 'chip', id: 'sim-riga-dopo', testo: 'Riga dopo ▶', onclick: rigaDopo }), el('span', { class: 'leggenda', style: 'align-self:center', testo: 'oppure tocca una riga del programma' })]));
+      comandi.after(el('div', { class: 'sim-comandi2' }, [el('button', { class: 'pul sec', id: 'sim-riga-prima', testo: '◀ Riga', 'aria-label': 'Riga prima', onclick: rigaPrima }), el('button', { class: 'pul sec', id: 'sim-riga-dopo', testo: 'Riga ▶', 'aria-label': 'Riga dopo', onclick: rigaDopo }), el('div', { class: 'ctrl' }, [vel])]));
       const avvia = () => { if (k >= N) k = 0; gira = true; bPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>'; bPlay.setAttribute('aria-label', 'Pausa'); timer = setInterval(passo, 40); };
       const ferma = () => { gira = false; clearInterval(timer); bPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'; bPlay.setAttribute('aria-label', 'Avvia'); };
       cursore.addEventListener('input', () => { ferma(); vai(Number(cursore.value)); });

@@ -1444,6 +1444,43 @@ const server = http.createServer((q, r) => {
   await vai('apri'); await pg.waitForTimeout(80);
   ok(await pg.$('#f-spMorsa') && await pg.$('#f-dPorta') && await pg.$('#f-spMandrino'), 'campi di morsa, portautensile e mandrino');
 
+  // ===== 2.36.0: barra a 5 voci, impostazioni in testata e in home, bersagli grandi, numeri monospace, vibrazione =====
+  await vai('home'); await pg.waitForTimeout(80);
+  ok((await pg.$$eval('#barra button', x => x.map(b => b.dataset.vai).join(','))) === 'home,cad,lavoro,g-calcola,g-archivio', 'barra a 5 voci');
+  ok(await pg.isVisible('.home-imp') && !(await pg.isVisible('#b-imp')), 'impostazioni dalla home');
+  await pg.click('.home-imp'); await pg.waitForTimeout(100);
+  ok((await pg.evaluate(() => location.hash)) === '#impostazioni' && await pg.isVisible('#b-imp'), 'impostazioni con la rotella');
+  for (const [voce, hash] of [['cad', '#cad'], ['lavoro', '#lavoro'], ['g-calcola', '#g-calcola'], ['g-archivio', '#g-archivio'], ['home', '#home']]) {
+    await pg.click('#barra button[data-vai="' + voce + '"]'); await pg.waitForTimeout(120);
+    const h = await pg.evaluate(() => location.hash);
+    ok(h === hash || (voce === 'home' && (h === '' || h === '#home')), 'barra: ' + voce + ' -> ' + h);
+    if (voce !== 'home') ok((await pg.$eval('#barra button.attiva', b => b.dataset.vai)) === voce, 'voce accesa: ' + voce);
+  }
+  await pg.click('#barra button[data-vai="g-archivio"]'); await pg.waitForTimeout(100);
+  const arch = await pg.$$eval('.tessera', x => x.map(b => b.dataset.vai));
+  ok(['pezzi', 'salvati', 'tabellaUtensili', 'materiali', 'preferiti'].every(v => arch.includes(v)), 'archivio: ' + arch.join(','));
+  await vai('pezzi'); ok((await pg.$eval('#barra button.attiva', b => b.dataset.vai)) === 'g-archivio', 'i pezzi accendono Archivio');
+  await vai('calcoli'); ok((await pg.$eval('#barra button.attiva', b => b.dataset.vai)) === 'g-calcola', 'la calcolatrice accende Calcoli');
+  // bersagli grandi e numeri monospace
+  await vai('calcoli'); await pg.waitForTimeout(100);
+  const gr = await pg.evaluate(() => { const q = s => { const e = document.querySelector(s); return e ? e.getBoundingClientRect().height : 0; }; return { pul: q('#schermo .pul'), nav: q('#barra button'), imp: q('#b-imp'), ris: getComputedStyle(document.querySelector('.ris b, .misuratore b')).fontFamily }; });
+  ok(gr.nav >= 64 && gr.imp >= 48, 'barra e rotella grandi: ' + JSON.stringify(gr));
+  ok(/mono|Consolas|Menlo/i.test(gr.ris), 'risultati in monospace: ' + gr.ris);
+  await vai('lavoro'); await pg.click('.lav-passi button[data-passo="0"]'); await pg.waitForTimeout(80);
+  const pb = await pg.evaluate(() => Math.round(document.querySelector('#schermo .pul, #schermo .lav-macchina').getBoundingClientRect().height));
+  ok(pb >= 56, 'pulsanti da 56 px: ' + pb);
+  // vibrazione: si puo spegnere e il ponte Android viene usato se c'e
+  await vai('impostazioni'); ok(await pg.$('#f-vibra'), 'impostazione della vibrazione');
+  const vib = await pg.evaluate(() => { let n = 0; window.Android = { vibra: () => { n++; } }; App.vibra(10); App.mem.imp = Object.assign({}, App.mem.imp || {}, { vibra: false }); App.vibra(10); const dopo = n; delete window.Android; App.mem.imp.vibra = true; return dopo; });
+  ok(vib === 1, 'vibrazione: una con l\'impostazione accesa, nessuna da spenta (' + vib + ')');
+  // simulazione: una sola riga di opzioni, comandi riordinati
+  await vai('apri'); await pg.fill('#f-testo', 'G21 G90 G17 G40 G49\nT1 M6\nS1500 M3\nG0 X0 Y0\nG43 H1 Z5\nG1 Z-3 F200\nG1 G41 D1 X20 F300\nG1 Y20\nG1 G40 X0\nG0 Z50\nM30');
+  await pg.click('text=Controlla e simula'); await pg.waitForTimeout(150);
+  await pg.click('button.pul:text-is("Simula")'); await pg.waitForTimeout(300);
+  ok((await pg.$$eval('.sim-opz', x => x.length)) <= 1 && await pg.$('.sim-comandi2 #f-vel') && await pg.$('#sim-riga-dopo'), 'comandi della simulazione in due righe');
+  ok((await pg.$$eval('.icona-pul', x => x.filter(b => b.closest('#schermo')).every(b => b.getBoundingClientRect().height >= 48))), 'pulsanti con icona da 48 px');
+  await largo('home a 5 voci');
+
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }
   console.log('OK interfaccia');

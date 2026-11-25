@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- solo per mandare i programmi alla macchina via FTP -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- vibrazione breve sui tasti e sugli avvisi -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <application
         android:label="Hich-Officina"
         android:icon="@mipmap/ic_launcher"

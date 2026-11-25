@@ -2,6 +2,16 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.36.0 - Fase 1: navigazione a 5 voci, bersagli grandi, numeri monospace, vibrazione
+- **Barra in basso a 5 voci**: Home, CAD, CAM, Calcoli, Archivio (prima: Home, Preferiti, Impostazioni). La voce della sezione in cui sei e accesa con una linea in alto. **Archivio** raccoglie pezzi, programmi salvati, tabella utensili, materiali, preferiti e guida.
+- **Impostazioni**: rotella in alto a destra su ogni schermata (e nella testata della home); i Preferiti stanno in Archivio.
+- **Bersagli piu grandi**: pulsanti da 56 px, icone da 48 px, campi da 52 px, barra da 64 px, interruttori da 56 px; con la modalita guanti restano piu grandi.
+- **Numeri sempre in monospace** con cifre di larghezza uguale (risultati, quote, campi numerici, tastierino): si leggono in colonna.
+- **Vibrazione breve** sui tasti del tastierino, sulla barra e sugli avvisi (dal ponte Android, o dal browser); si spegne in Impostazioni, "Vibrazione sui tasti e sugli avvisi".
+- **Simulazione piu ordinata**: le opzioni (centro fresa, materiale, confronto) stanno in una sola riga; sotto i comandi c'e una seconda riga con "Riga" prima e dopo e la velocita, a pulsanti grandi.
+- Animazioni ridotte se il telefono lo chiede.
+- Non ancora fatto della Fase 1: italiano e inglese (decisione da prendere), tema "arancione sicurezza" (da confermare: la grafica e blu come scelto con Canva).
+
 ## 2.35.0 - Foglio di attrezzaggio completo
 - **Foto con didascalia**: apri una foto del pezzo e scegli Morsa, Origine, Utensili, Pezzo o Altro. Nel foglio le foto stanno in quest'ordine, ognuna con la sua didascalia; la didascalia si vede anche sulla miniatura.
 - **Serraggio e origine**: nuovi campi "Sporgenza dal serraggio" e "Posizione dell'origine" (angolo in basso, in alto o centro). Nel foglio c'e lo schema dell'origine: dall'alto per la fresa (X0 Y0 e assi), di lato per il tornio (griffe, asse e Z0 sulla faccia).

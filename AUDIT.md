@@ -1,5 +1,7 @@
 # AUDIT di Hich-Officina (versione 2.35.0)
 
+> **Aggiornamento**: deciso di restare sul web. Fase 1 (grafica e navigazione) fatta nella 2.36.0, tranne le lingue.
+
 Analisi senza modifiche al codice. Serve a decidere cosa fare del lavoro richiesto (grafica, CAD touch, CAM guidato, funzioni da officina). Alla fine ci sono le domande che bloccano la partenza.
 
 ## 1. Com'e fatta l'app davvero

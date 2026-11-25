@@ -108,7 +108,7 @@
 
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
-    tema: 'scuro', guanti: false, sfondo: true, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
+    tema: 'scuro', vibra: true, guanti: false, sfondo: true, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
     codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1, costoOra: 60,
     postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
@@ -135,6 +135,7 @@
   // ----- avvisi brevi -----
   function avviso(t) {
     const x = $('toast'); x.textContent = t; x.classList.add('vedi');
+    vibra(10);
     clearTimeout(avviso._t); avviso._t = setTimeout(() => x.classList.remove('vedi'), 2000);
   }
 
@@ -380,7 +381,7 @@
     let v = String(input.value || ''), nuovo = true;
     const mostraV = () => { disp.textContent = (v === '' ? '0' : v) + (opz.unita ? ' ' + opz.unita : ''); };
     const scrivi = () => { input.value = v; input.dispatchEvent(new Event('input', { bubbles: true })); };
-    const tasto = (t, fz, cl, et) => el('button', { type: 'button', class: 'tast-k' + (cl ? ' ' + cl : ''), 'aria-label': et || t, testo: t, onclick: fz });
+    const tasto = (t, fz, cl, et) => el('button', { type: 'button', class: 'tast-k' + (cl ? ' ' + cl : ''), 'aria-label': et || t, testo: t, onclick: e => { vibra(5); fz(e); } });
     const cifra = c => () => { if (nuovo) { v = ''; nuovo = false; } if (c === ',' && v.includes(',')) return; if (c === ',' && v === '') v = '0'; v += c; mostraV(); scrivi(); };
     const prossimo = () => {
       const visibili = () => Array.from(document.querySelectorAll('input[data-tast]')).filter(x => x.offsetParent !== null);
@@ -448,11 +449,16 @@
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.35.0'
+    schermi: {}, param: {}, VERSIONE: '2.36.0'
   };
   window.App = App;
 
   let attuale = null;
+  // quale voce della barra in basso e "accesa" per ogni schermata
+  const VOCI_BARRA = { cad: ['cad', 'disegno'], lavoro: ['lavoro', 'programma', 'ciclo', 'macro', 'dalDisegno', 'apri', 'listato', 'simula', 'galleria'],
+    'g-calcola': ['g-calcola', 'calcoli', 'tolleranze', 'tabelle', 'angolo', 'misure'],
+    'g-archivio': ['g-archivio', 'pezzi', 'pezzo', 'salvati', 'tabellaUtensili', 'utensile', 'utensili', 'materiali', 'materiale', 'materialiImporta', 'preferiti', 'foglio', 'guida', 'note', 'ripristino', 'scambio', 'g-officina', 'g-controlla'] };
+  function voceBarra(id) { if (id === 'home') return 'home'; for (const k of Object.keys(VOCI_BARRA)) if (VOCI_BARRA[k].includes(id)) return k; return ''; }
   function mostra() {
     chiudiTastierino();
     if (document.body.classList.contains('cad-pieno')) { document.body.classList.remove('cad-pieno'); $('schermo').classList.remove('pieno'); App.esciPieno = null; App.orientaPieno = 0; if (window.Android && window.Android.orientamento) window.Android.orientamento('libero'); }
@@ -471,7 +477,9 @@
         html: icona('stella'), onclick: () => preferito(id) }));
     }
     (s.azioni ? s.azioni() : []).forEach(a => azioni.appendChild(a));
-    document.querySelectorAll('#barra button').forEach(b => { const on = b.dataset.vai === id; b.classList.toggle('attiva', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    const voce = voceBarra(id);
+    document.querySelectorAll('#barra button').forEach(b => { const on = b.dataset.vai === voce; b.classList.toggle('attiva', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    $('b-imp').classList.toggle('attiva', id === 'impostazioni');
     // schermate usate di recente (per la home)
     if (!['home', 'preferiti', 'impostazioni', 'listato', 'simula', 'foglio', 'ripristino', 'macroModifica', 'materiale', 'utensile', 'pezzo', 'misure', 'materialiImporta'].includes(id)) {
       const R = mem.recenti = (mem.recenti || []).filter(x => x !== id); R.unshift(id); if (R.length > 5) R.length = 5; salva();
@@ -486,6 +494,15 @@
     if (i >= 0) { L.splice(i, 1); avviso('Tolto dai preferiti'); } else { L.push(id); avviso('Aggiunto ai preferiti'); }
     salva(); mostra();
   }
+  /** Vibrazione breve (conferme, tasti, avvisi): dal ponte Android se c'e, se no dal browser. Si spegne in Impostazioni. */
+  function vibra(ms) {
+    try {
+      if ((mem.imp || {}).vibra === false) return;
+      if (window.Android && window.Android.vibra) window.Android.vibra(Math.round(ms));
+      else if (navigator.vibrate) navigator.vibrate(ms);
+    } catch (e) { /* nessuna vibrazione */ }
+  }
+  App.vibra = vibra;
   App.vai = function (id) {
     if (('#' + id) === location.hash) mostra(); else location.hash = id;
   };
@@ -518,6 +535,7 @@
     ['salvati', 'salvati', 'Programmi salvati', 'I programmi tenuti su questo telefono'],
     ['pezzi', 'galleria', 'Pezzi e attrezzaggio', 'Foglio di attrezzaggio, note, foto e controllo misure'],
     ['tabellaUtensili', 'utensile', 'Tabella utensili', 'I tuoi utensili: numero T, diametro, lunghezza, taglienti'],
+    ['preferiti', 'stella', 'Preferiti', 'Le schermate che hai segnato con la stella'],
     ['guida', 'info', 'Come si fa', 'Ogni funzione in pochi passi, stampabile in PDF'],
     ['tabelle', 'tabella', 'Tabelle', 'Filetti, tolleranze, rugosita, pollici'],
     ['materiali', 'materiale', 'Materiali', 'Velocita di taglio e avanzamenti per materiale']
@@ -535,6 +553,12 @@
     return el('button', { class: 'tessera', 'data-vai': id, 'aria-label': t, onclick: () => App.vai(id) }, [
       el('span', { class: 'ic', html: icona(ic) }), el('b', { testo: TITOLO_BREVE[id] || t }), el('small', { testo: s })]);
   }
+  App.schermi['g-archivio'] = { titolo: 'Archivio', render(m) {
+    const voci = ['pezzi', 'salvati', 'tabellaUtensili', 'materiali', 'preferiti', 'guida'].map(id => MENU.find(x => x[0] === id)).filter(Boolean);
+    m.appendChild(el('div', { class: 'tessere' }, voci.map(tessera)));
+    m.appendChild(el('div', { class: 'sez', testo: 'Altro' }));
+    m.appendChild(el('div', { class: 'tessere' }, ['apri', 'tolleranze', 'tabelle'].map(id => MENU.find(x => x[0] === id)).filter(Boolean).map(tessera)));
+  } };
   ['calcola', 'controlla', 'officina'].forEach(k => {
     App.schermi['g-' + k] = { titolo: GRUPPI[k].t, render(m) { m.appendChild(el('div', { class: 'tessere' }, GRUPPI[k].voci.map(id => MENU.find(x => x[0] === id)).filter(Boolean).map(tessera))); } };
   });
@@ -548,7 +572,9 @@
   App.schermi.home = {
     titolo: 'Hich-Officina', preferibile: false,
     render(m) {
-      m.appendChild(el('div', { class: 'eroe', html: SCENA + '<div class="marchio">' + MARCHIO + '<div><b>Hich-Officina</b><small>Calcoli e programmi CNC</small></div></div>' }));
+      const eroe = el('div', { class: 'eroe', html: SCENA + '<div class="marchio">' + MARCHIO + '<div><b>Hich-Officina</b><small>Calcoli e programmi CNC</small></div></div>' });
+      eroe.appendChild(el('button', { class: 'icona-pul home-imp', 'aria-label': 'Impostazioni', html: icona('ingranaggio'), onclick: () => { vibra(8); App.vai('impostazioni'); } }));
+      m.appendChild(eroe);
       const cerca = el('input', { id: 'f-cerca-home', type: 'search', placeholder: 'Cerca: M10, H7 25, 316, G83, T5...', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search' });
       const risultati = el('div', { class: 'menu', hidden: true });
       const menu = el('div', { class: 'menu-sezioni' });
@@ -599,7 +625,7 @@
     document.querySelectorAll('[data-ic]').forEach(s => { s.outerHTML = icona(s.dataset.ic); });
     $('b-indietro').innerHTML = icona('indietro');
     $('b-indietro').addEventListener('click', App.indietro);
-    document.querySelectorAll('#barra button').forEach(b => b.addEventListener('click', () => App.vai(b.dataset.vai)));
+    document.querySelectorAll('#barra button, #b-imp').forEach(b => b.addEventListener('click', () => { vibra(8); App.vai(b.dataset.vai); }));
     mostra();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
       try {

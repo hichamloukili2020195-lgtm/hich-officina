@@ -626,3 +626,33 @@ body.con-sfondo::after{content:"";position:fixed;inset:0;z-index:-1;pointer-even
 .foto-griglia .foto{position:relative}
 .foto-dida{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);color:#fff;font-size:11px;padding:2px 4px;text-align:center}
 .foto-chips{justify-content:center;margin:8px 0}
+
+/* ===== 2.36.0: bersagli grandi (56 px), barra a 5 voci, numeri in monospace, testata con impostazioni ===== */
+nav#barra button{min-height:64px;padding:8px 0 9px;font-size:12px;font-weight:600;letter-spacing:.1px;position:relative}
+nav#barra svg{width:26px;height:26px}
+nav#barra button.attiva::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 3px 3px;background:var(--accento2)}
+nav#barra button:active{background:var(--riga)}
+#b-imp{flex:0 0 auto;width:48px;height:48px}
+#b-imp svg{width:26px;height:26px}
+#b-imp.attiva{color:var(--accento2)}
+.eroe{position:relative}
+.home-imp{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));right:8px;width:48px;height:48px;background:rgba(7,13,26,.55);color:#fff;border:1px solid rgba(255,255,255,.25)}
+.home-imp svg{width:26px;height:26px}
+.pul{min-height:56px;font-size:16px}
+.icona-pul{width:48px;height:48px}
+.icona-pul svg{width:24px;height:24px}
+.chip{min-height:44px;display:inline-flex;align-items:center;padding:8px 15px}
+.schede button{min-height:48px}
+.ctrl input,.ctrl select{min-height:52px;padding-top:12px;padding-bottom:12px}
+.interr{min-height:56px}
+.tessera{min-height:72px}
+/* numeri sempre in monospace con cifre di larghezza uguale: si leggono in colonna e non ballano */
+.ris b,.misuratore b,.dro-riga b,.campo-num,.ctrl input[inputmode="decimal"],td.num,.tast-val{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.ris b{font-size:20px;font-weight:650}
+.misuratore b{letter-spacing:-1px}
+table td{font-variant-numeric:tabular-nums}
+.sim-comandi2{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.sim-comandi2 .pul{flex:1;min-height:48px;font-size:14px;padding:8px 6px}
+.sim-comandi2 .ctrl{flex:0 0 38%;min-width:110px}
+.sim-opz{margin:4px 0}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}

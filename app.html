@@ -16,12 +16,15 @@
   <button id="b-indietro" class="icona-pul" aria-label="Indietro" hidden></button>
   <h1 id="titolo">Hich-Officina</h1>
   <div id="azioni"></div>
+  <button id="b-imp" class="icona-pul" aria-label="Impostazioni" data-vai="impostazioni"><span data-ic="ingranaggio"></span></button>
 </header>
 <main id="schermo"></main>
-<nav id="barra">
+<nav id="barra" aria-label="Navigazione principale">
   <button data-vai="home"><span data-ic="home"></span>Home</button>
-  <button data-vai="preferiti"><span data-ic="stella"></span>Preferiti</button>
-  <button data-vai="impostazioni"><span data-ic="ingranaggio"></span>Impostazioni</button>
+  <button data-vai="cad"><span data-ic="fresa"></span>CAD</button>
+  <button data-vai="lavoro"><span data-ic="tornio"></span>CAM</button>
+  <button data-vai="g-calcola"><span data-ic="calcolo"></span>Calcoli</button>
+  <button data-vai="g-archivio"><span data-ic="salvati"></span>Archivio</button>
 </nav>
 <div class="toast" id="toast" role="status"></div>
 <script src="three.min.js"></script>

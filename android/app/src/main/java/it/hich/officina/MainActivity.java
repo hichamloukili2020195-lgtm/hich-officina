@@ -321,6 +321,17 @@ public class MainActivity extends Activity {
 
         /** Schermo intero del disegno: "orizzontale" o "verticale" blocca lo schermo, "libero" segue il sensore. */
         @JavascriptInterface
+        public void vibra(int ms) {
+            try {
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                if (v == null || !v.hasVibrator()) return;
+                int d = Math.max(1, Math.min(ms, 60));
+                if (Build.VERSION.SDK_INT >= 26) v.vibrate(android.os.VibrationEffect.createOneShot(d, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                else v.vibrate(d);
+            } catch (Exception e) { /* senza vibrazione */ }
+        }
+
+        @JavascriptInterface
         public void orientamento(String modo) {
             runOnUiThread(() -> setRequestedOrientation("orizzontale".equals(modo) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : "verticale".equals(modo) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
         }
