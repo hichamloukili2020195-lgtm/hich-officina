@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.37.0 - Fase 2a CAD: Digita, archi, poligono, aggancio intelligente
+- **Digita**: tastierino per scrivere i punti con espressioni (`50/2+3`, `pi`, seno e coseno in gradi), assoluti (`50;30`), incrementali (`@10;5`) e polari (`@20<45`); anteprima in diretta e messaggi d'errore chiari. Per il rettangolo anche le misure `40x30`.
+- **Arco** in tre modi: tre punti, centro-inizio-fine, inizio-fine-raggio (arco piccolo o grande).
+- **Poligono regolare** con numero di lati a scelta.
+- **Aggancio intelligente**: intersezioni, punti e centri, medi, tangenti e perpendicolari, griglia; ogni tipo ha il suo segno e la sua etichetta.
+- **Doppio tocco** sul vuoto = adatta alla vista; **pressione lunga** = menu (duplica, elimina, lavorazioni; adatta, digita, aggancio).
+- Prove: espressioni, archi, poligono, aggancio con 3000 elementi, interfaccia.
+
 ## 2.36.0 - Fase 1: navigazione a 5 voci, bersagli grandi, numeri monospace, vibrazione
 - **Barra in basso a 5 voci**: Home, CAD, CAM, Calcoli, Archivio (prima: Home, Preferiti, Impostazioni). La voce della sezione in cui sei e accesa con una linea in alto. **Archivio** raccoglie pezzi, programmi salvati, tabella utensili, materiali, preferiti e guida.
 - **Impostazioni**: rotella in alto a destra su ogni schermata (e nella testata della home); i Preferiti stanno in Archivio.

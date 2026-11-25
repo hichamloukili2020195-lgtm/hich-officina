@@ -15,6 +15,7 @@
     { id: 4, tipo: 'rett', x0: 28, y0: 15, x1: 52, y1: 35, r: 3, lav: [{ op: 'tasca', prof: 6 }] }];
   const STRUM = [['sel', 'Seleziona', '<path d="M5 3l14 8-6 2-3 6z"/>'], ['poli', 'Profilo', '<path d="M4 18l5-9 5 6 6-10"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="5" r="1.6"/>'],
     ['rett', 'Rettangolo', '<rect x="4" y="6" width="16" height="12" rx="1.5"/>'], ['cerchio', 'Cerchio', '<circle cx="12" cy="12" r="8"/><path d="M12 12h8"/>'],
+    ['arco', 'Arco', '<path d="M4 18a9 9 0 0 1 16 0"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="18" r="1.6"/>'], ['poligono', 'Poligono', '<path d="M12 3l8 6-3 10H7L4 9z"/>'],
     ['punto', 'Foro', '<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'], ['asola', 'Asola', '<rect x="3" y="8" width="18" height="8" rx="4"/>']];
   const COLORE_LAV = { contorno: '--accento2', tasca: '--ok', foro: '--avviso', maschio: '--avviso', alesato: '--avviso', asola: '--ok' };
   const NOME_E = { poli: 'Profilo', rett: 'Rettangolo', cerchio: 'Cerchio', punto: 'Punto', asola: 'Asola' };
@@ -32,6 +33,11 @@
       if (!STRUM.some(t => t[0] === S.strum)) S.strum = 'sel';
       const storia = [], futuro = [];
       const ricorda = () => { storia.push(JSON.stringify(S.entita)); if (storia.length > 100) storia.shift(); futuro.length = 0; };
+      if (!['3p', 'cif', 'ifr'].includes(S.arcoModo)) S.arcoModo = '3p';
+      if (!(S.latiPol >= 3)) S.latiPol = 6;
+      if (S.arcoOrario === undefined) S.arcoOrario = false;
+      let arco = null;                             // arco in costruzione: {punti:[{x,y}], chiede:bool}
+      let Gc = null, GcEsc = undefined;            // geometria per l'aggancio (si rifa a ogni gesto)
       let sel = null, selV = null;                 // entita scelta (id) e suo punto scelto (indice)
       let nuova = null;                            // profilo in costruzione
       let anteprima = null;                        // percorso calcolato, da mostrare
@@ -76,14 +82,15 @@
         L.push([0, 0]);
         return L;
       };
-      /** Aggancia un punto (mm): agli altri punti, alle linee orizzontali/verticali dell'ultimo punto, alla griglia. */
+      const geom = esclusa => { if (!Gc || GcEsc !== esclusa) { Gc = O.geometriaCAD(S.entita, esclusa); GcEsc = esclusa; } return Gc; };
+      /** Aggancia un punto (mm): intersezioni, estremi, centri, punti medi, tangenti e perpendicolari, poi le linee orizzontali/verticali e la griglia. */
       const aggancia = (x, y, ref, esclusa) => {
         if (!S.snap) return { x: R3(x), y: R3(y), tipo: null };
         const tol = 14 / vista.sc;
-        let best = null, bd = tol;
-        puntiAggancio(esclusa).forEach(p => { const d = Math.hypot(p[0] - x, p[1] - y); if (d < bd) { bd = d; best = p; } });
-        if (nuova && nuova.punti.length > 2) { const p0 = nuova.punti[0], d = Math.hypot(num(p0.x) - x, num(p0.y) - y); if (d < bd) { bd = d; best = [num(p0.x), num(p0.y)]; } }
-        if (best) return { x: best[0], y: best[1], tipo: 'punto' };
+        const a = O.agganciCAD(S.entita, x, y, tol, ref, esclusa, geom(esclusa));
+        if (a) return a;
+        if (Math.hypot(x, y) < tol) return { x: 0, y: 0, tipo: 'punto' };
+        if (nuova && nuova.punti.length > 2) { const p0 = nuova.punti[0], d = Math.hypot(num(p0.x) - x, num(p0.y) - y); if (d < tol) return { x: num(p0.x), y: num(p0.y), tipo: 'punto' }; }
         const pg = passoGriglia();
         let gx = Math.round(x / pg) * pg, gy = Math.round(y / pg) * pg, tipo = 'griglia';
         if (ref) {
@@ -105,6 +112,18 @@
         return null;
       };
       let mirino = null, tratto = null;   // posizione agganciata del mirino, anteprima in corso
+      /** Il segno dell'aggancio: ogni tipo ha la sua forma (estremo quadrato, centro cerchio col punto, intersezione X, medio triangolo...). */
+      const segnoAggancio = (g, x, y, tipo) => {
+        g.beginPath();
+        if (tipo === 'intersezione') { g.moveTo(x - 9, y - 9); g.lineTo(x + 9, y + 9); g.moveTo(x + 9, y - 9); g.lineTo(x - 9, y + 9); }
+        else if (tipo === 'punto') g.rect(x - 9, y - 9, 18, 18);
+        else if (tipo === 'medio') { g.moveTo(x, y - 10); g.lineTo(x + 10, y + 8); g.lineTo(x - 10, y + 8); g.closePath(); }
+        else if (tipo === 'centro') { g.arc(x, y, 10, 0, 7); g.moveTo(x + 2, y); g.arc(x, y, 2, 0, 7); }
+        else if (tipo === 'tangente') { g.arc(x, y, 7, 0, 7); g.moveTo(x - 12, y - 11); g.lineTo(x + 12, y - 11); }
+        else if (tipo === 'perpendicolare') { g.moveTo(x - 10, y + 9); g.lineTo(x - 10, y - 9); g.moveTo(x - 10, y + 9); g.lineTo(x + 10, y + 9); g.moveTo(x - 10, y); g.lineTo(x, y); g.lineTo(x, y + 9); }
+        else g.arc(x, y, 7, 0, 7);
+        g.stroke();
+      };
       const disegna = () => {
         const { W, H } = dim();
         const dpr = window.devicePixelRatio || 1;
@@ -179,15 +198,32 @@
           if (a.tipo === 'rett') g.strokeRect(X(Math.min(a.x, mirino.x)), Y(Math.max(a.y, mirino.y)), Math.abs(mirino.x - a.x) * vista.sc, Math.abs(mirino.y - a.y) * vista.sc);
           else if (a.tipo === 'cerchio') { g.beginPath(); g.arc(X(a.x), Y(a.y), Math.hypot(mirino.x - a.x, mirino.y - a.y) * vista.sc, 0, 7); g.stroke(); g.beginPath(); g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(mirino.x), Y(mirino.y)); g.stroke(); }
           else if (a.tipo === 'asola') { g.beginPath(); g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(mirino.x), Y(mirino.y)); g.stroke(); }
+          else if (a.tipo === 'poligono') {
+            const r = Math.hypot(mirino.x - a.x, mirino.y - a.y);
+            if (r > 0.05) { const pts = O.poligonoRegolare(a.x, a.y, r, S.latiPol, Math.atan2(mirino.y - a.y, mirino.x - a.x) * 180 / Math.PI); g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo(X(q.x), Y(q.y)) : g.moveTo(X(q.x), Y(q.y)))); g.closePath(); g.stroke(); }
+            g.beginPath(); g.moveTo(X(a.x), Y(a.y)); g.lineTo(X(mirino.x), Y(mirino.y)); g.stroke();
+          }
           g.setLineDash([]);
+        }
+        // arco in costruzione
+        if (arco && arco.punti.length) {
+          g.strokeStyle = col('--avviso'); g.fillStyle = col('--testo'); g.lineWidth = 2.2; g.setLineDash([6, 4]);
+          const P = arco.punti.concat(mirino ? [{ x: mirino.x, y: mirino.y }] : []);
+          if (P.length >= 3 && S.arcoModo !== 'ifr') { const r = calcolaArco(P.slice(0, 3)); if (!r.errore) tracciaPunti(g, r.punti); }
+          else if (P.length >= 2) { g.beginPath(); g.moveTo(X(P[0].x), Y(P[0].y)); g.lineTo(X(P[1].x), Y(P[1].y)); g.stroke(); }
+          g.setLineDash([]);
+          arco.punti.forEach((q, i) => { g.fillStyle = i === 0 ? col('--ok') : col('--testo'); g.beginPath(); g.arc(X(q.x), Y(q.y), 6, 0, 7); g.fill(); });
         }
         // mirino con le quote e lente
         if (mirino) {
           const x = X(mirino.x), y = Y(mirino.y);
           g.strokeStyle = col('--avviso'); g.lineWidth = 1; g.setLineDash([3, 3]);
           g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); g.setLineDash([]);
-          g.lineWidth = 2; g.beginPath(); g.arc(x, y, mirino.tipo === 'punto' ? 11 : 7, 0, 7); g.stroke();
-          lettura.textContent = 'X' + fmt(mirino.x, 3) + '  Y' + fmt(mirino.y, 3) + (mirino.tipo === 'punto' ? '  · punto' : mirino.tipo === 'oriz' ? '  · orizzontale' : mirino.tipo === 'vert' ? '  · verticale' : '');
+          g.lineWidth = 2.4; segnoAggancio(g, x, y, mirino.tipo);
+          const NOMI = { punto: 'estremo', centro: 'centro', intersezione: 'intersezione', medio: 'punto medio', tangente: 'tangente', perpendicolare: 'perpendicolare', oriz: 'orizzontale', vert: 'verticale', griglia: '' };
+          const nm = NOMI[mirino.tipo] || '';
+          lettura.textContent = 'X' + fmt(mirino.x, 3) + '  Y' + fmt(mirino.y, 3) + (nm ? '  · ' + nm : '');
+          if (nm && ['punto', 'centro', 'intersezione', 'medio', 'tangente', 'perpendicolare'].includes(mirino.tipo)) { g.font = '700 11px system-ui'; const w = g.measureText(nm).width + 10; g.fillStyle = col('--pannello'); g.globalAlpha = 0.92; g.fillRect(x + 14, y - 30, w, 18); g.globalAlpha = 1; g.fillStyle = col('--avviso'); g.textAlign = 'left'; g.fillText(nm, x + 19, y - 17); }
         }
       };
       const ridisegna = () => { if (!adattato && cv.clientWidth > 10) { adattato = true; adatta(); } disegna(); };
@@ -206,7 +242,7 @@
 
       // ----- gesti -----
       const attivi = new Map();
-      let gesto = null, pinch = null, tocchiDue = null, ultimoTocco = 0;
+      let gesto = null, pinch = null, tocchiDue = null, ultimoTocco = 0, timerLungo = null, ultimoTap = null;
       const pos = e => { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
       const dito = e => e.pointerType === 'mouse' ? 0 : (S.mirino ? 56 : 0);   // mirino sopra il dito
       const mondo = (e, esclusa, ref) => { const [px, py] = pos(e); const a = aggancia(mx(px), my(py - dito(e)), ref, esclusa); return Object.assign(a, { px, py }); };
@@ -257,6 +293,7 @@
       cv.addEventListener('pointerdown', e => {
         attivi.set(e.pointerId, pos(e));
         try { cv.setPointerCapture(e.pointerId); } catch (x) { /* niente */ }
+        Gc = null; chiudiMenu();
         if (attivi.size === 2) {
           // due dita: zoom e spostamento (o un tocco veloce = annulla)
           gesto = null; mirino = null; tratto = tratto && tratto.fermo ? tratto : null;
@@ -276,6 +313,10 @@
             if (sel !== t.e.id) { sel = t.e.id; selV = t.h ? t.h.i : null; pannelloAgg(); } else selV = t.h ? t.h.i : selV;
           }
           else gesto = { tipo: 'vuoto', px, py, mosso: false };
+          // pressione lunga: menu contestuale
+          clearTimeout(timerLungo);
+          const gg = gesto;
+          timerLungo = setTimeout(() => { if (gesto === gg && !gg.mosso && attivi.size === 1) { gg.lungo = true; menuContestuale(px, py, t ? t.e : null); } }, 550);
           disegna(); return;
         }
         // strumenti di disegno
@@ -283,7 +324,7 @@
         const w = mondo(e, null, ref);
         mirino = w;
         gesto = { tipo: 'disegna', strum, px, py, mosso: false, inizio: tratto && tratto.fermo ? tratto : null };
-        if ((strum === 'rett' || strum === 'cerchio' || strum === 'asola') && !gesto.inizio) tratto = { tipo: strum, x: w.x, y: w.y };
+        if ((strum === 'rett' || strum === 'cerchio' || strum === 'asola' || strum === 'poligono') && !gesto.inizio) tratto = { tipo: strum, x: w.x, y: w.y };
         disegna(); if (e.pointerType !== 'mouse') lente(w.px, w.py);
       });
       cv.addEventListener('pointermove', e => {
@@ -300,6 +341,7 @@
         if (!gesto) { if (e.pointerType === 'mouse') { const w = mondo(e); if (S.strum !== 'sel') { mirino = w; disegna(); } else lettura.textContent = 'X' + fmt(w.x, 3) + '  Y' + fmt(w.y, 3); } return; }
         const [px, py] = pos(e);
         if (Math.hypot(px - gesto.px, py - gesto.py) > 7) gesto.mosso = true;
+        if (gesto.mosso) clearTimeout(timerLungo);
         if (gesto.tipo === 'sposta' && gesto.mosso) {
           S.entita = JSON.parse(gesto.prima); gesto.e = trovaE(gesto.id);
           const dx = mx(px) - gesto.wx, dy = my(py) - gesto.wy;
@@ -331,11 +373,22 @@
           if (attivi.size === 0) { if (Date.now() - tocchiDue.t0 < 350) ripeti(); tocchiDue = null; }
           return;
         }
+        Gc = null; clearTimeout(timerLungo);
         const g = gesto; gesto = null;
         if (!g) { mirino = null; disegna(); return; }
+        if (g.lungo) { mirino = null; disegna(); return; }
         const w = g.tipo === 'disegna' ? mirino : null;
         const ultimo = mirino; mirino = null;
-        if (g.tipo === 'vuoto') { if (!g.mosso) { sel = null; selV = null; pannelloAgg(); } disegna(); return; }
+        if (g.tipo === 'vuoto') {
+          if (!g.mosso) {
+            // doppio tap sul vuoto = adatta alla vista
+            const ora = Date.now();
+            if (ultimoTap && ora - ultimoTap.t < 330 && Math.hypot(g.px - ultimoTap.px, g.py - ultimoTap.py) < 28) { ultimoTap = null; adatta(); A.vibra && A.vibra(10); disegna(); return; }
+            ultimoTap = { t: ora, px: g.px, py: g.py };
+            sel = null; selV = null; pannelloAgg();
+          }
+          disegna(); return;
+        }
         if (g.tipo === 'sposta') {
           if (g.mosso) { storia.push(g.prima); futuro.length = 0; A.salva(); pannelloAgg(); }
           else { sel = g.e.id; if (g.h) selV = g.h.i; pannelloAgg(); }
@@ -354,23 +407,74 @@
           statoBarra(); pannelloAgg(); disegna(); return;
         }
         if (strum === 'punto') { nuovaE({ tipo: 'punto', x: w.x, y: w.y }); return; }
-        if (strum === 'rett' || strum === 'cerchio' || strum === 'asola') {
+        if (strum === 'arco') { arcoAggiungi(w); return; }
+        if (strum === 'rett' || strum === 'cerchio' || strum === 'asola' || strum === 'poligono') {
           const a = g.inizio || tratto;
           if (!a || (!g.inizio && !g.mosso)) { tratto = Object.assign({}, tratto, { fermo: true }); lettura.textContent = 'Tocca il punto finale'; disegna(); return; }   // un tocco: primo punto, poi il secondo
           tratto = null;
           if (strum === 'rett') { if (Math.abs(w.x - a.x) < 0.01 || Math.abs(w.y - a.y) < 0.01) { disegna(); return; } nuovaE({ tipo: 'rett', x0: Math.min(a.x, w.x), y0: Math.min(a.y, w.y), x1: Math.max(a.x, w.x), y1: Math.max(a.y, w.y), r: 0 }); }
           else if (strum === 'cerchio') { const r = R3(Math.hypot(w.x - a.x, w.y - a.y)); if (r < 0.05) { disegna(); return; } nuovaE({ tipo: 'cerchio', cx: a.x, cy: a.y, r }); }
+          else if (strum === 'poligono') { if (!creaPoligono(a, w)) disegna(); }
           else { if (Math.hypot(w.x - a.x, w.y - a.y) < 0.05) { disegna(); return; } nuovaE({ tipo: 'asola', x1: a.x, y1: a.y, x2: w.x, y2: w.y, w: 8 }); }
         }
         void ultimo;
       };
       cv.addEventListener('pointerup', fine);
-      cv.addEventListener('pointercancel', e => { attivi.delete(e.pointerId); pinch = null; gesto = null; mirino = null; tocchiDue = null; disegna(); });
+      cv.addEventListener('pointercancel', e => { attivi.delete(e.pointerId); clearTimeout(timerLungo); pinch = null; gesto = null; mirino = null; tocchiDue = null; disegna(); });
       cv.addEventListener('wheel', e => { e.preventDefault(); const [px, py] = pos(e), wx = mx(px), wy = my(py); vista.sc = Math.max(0.3, Math.min(400, vista.sc * (e.deltaY < 0 ? 1.2 : 1 / 1.2))); vista.cx = wx - (px - dim().W / 2) / vista.sc; vista.cy = wy + (py - dim().H / 2) / vista.sc; disegna(); }, { passive: false });
       cv.addEventListener('dblclick', () => { if (nuova && S.strum === 'poli') chiudiProfilo(false); });
 
+      // ----- poligono, arco -----
+      const creaPoligono = (a, w) => {
+        const r = R3(Math.hypot(w.x - a.x, w.y - a.y));
+        if (r < 0.05) return false;
+        const ang = Math.atan2(w.y - a.y, w.x - a.x) * 180 / Math.PI;
+        tratto = null; nuovaE({ tipo: 'poli', punti: O.poligonoRegolare(a.x, a.y, r, S.latiPol, ang), chiuso: true }); return true;
+      };
+      const calcolaArco = (P, o) => S.arcoModo === '3p' ? O.arcoDa3Punti(P[0], P[1], P[2]) : S.arcoModo === 'cif' ? O.arcoCentroInizioFine(P[0], P[1], P[2], !S.arcoOrario) : O.arcoInizioFineRaggio(P[0], P[1], (o || {}).raggio, (o || {}).grande, S.arcoOrario);
+      const arcoAggiungi = (w, raggio, grande) => {
+        arco = arco || { punti: [] };
+        const ult = arco.punti[arco.punti.length - 1];
+        if (raggio === undefined && ult && Math.hypot(ult.x - w.x, ult.y - w.y) < 1e-6) { A.avviso('Quel punto e uguale al precedente'); return; }
+        if (raggio === undefined) arco.punti.push({ x: w.x, y: w.y });
+        const n = arco.punti.length;
+        if (S.arcoModo === 'ifr' && n === 2 && raggio === undefined) { statoBarra(); disegna(); promptRaggio(); return; }
+        if ((S.arcoModo !== 'ifr' && n === 3) || (S.arcoModo === 'ifr' && raggio !== undefined)) {
+          const r = calcolaArco(arco.punti, { raggio, grande });
+          if (r.errore) { A.avviso(r.errore); if (S.arcoModo !== 'ifr') arco.punti.pop(); statoBarra(); disegna(); return; }
+          arco = null; nuovaE({ tipo: 'poli', punti: r.punti, chiuso: false }); return;
+        }
+        statoBarra(); pannelloAgg(); disegna();
+      };
+      let promptRaggio = () => {};   // si completa dopo, col pannello "Digita"
+      /** Un arco (o altra forma) a pezzi su canvas: dai punti del profilo. */
+      const tracciaPunti = (g, punti) => {
+        const gg = O.costruisciProfilo(punti.map(p => ({ a: p.x, b: p.y, tratto: p.tratto, r: p.r })), false);
+        if (gg.errore || !gg.tratti.length) return;
+        const poli = O.polilineaProfilo(gg.tratti, Math.max(0.15, 1 / vista.sc));
+        g.beginPath(); poli.forEach((q, i) => (i ? g.lineTo(X(q.a), Y(q.b)) : g.moveTo(X(q.a), Y(q.b)))); g.stroke();
+      };
+
+      // ----- menu contestuale (pressione lunga) -----
+      let menuEl = null;
+      const chiudiMenu = () => { if (menuEl) { menuEl.remove(); menuEl = null; } };
+      const duplica = e => { ricorda(); const c = JSON.parse(JSON.stringify(e)); c.id = S.prossimo++; muoviTutto(c, 5, 5); S.entita.push(c); sel = c.id; selV = null; anteprima = null; A.salva(); aggiorna(); };
+      const menuContestuale = (px, py, e) => {
+        chiudiMenu();
+        if (e) { sel = e.id; selV = null; pannelloAgg(); disegna(); }
+        const voci = e ? [['Duplica', () => duplica(e)], ['Elimina', () => { sel = e.id; elimina(); }], ['Lavorazioni e quote', () => { radice.classList.add('pannello-aperto'); aggiorna(); }]]
+          : [['Adatta alla vista', () => { adatta(); disegna(); }], ['Digita un punto', () => apriDigita()], [S.snap ? 'Aggancio: spegni' : 'Aggancio: accendi', () => { S.snap = !S.snap; A.salva(); aggiorna(); }]];
+        menuEl = el('div', { class: 'cad-menu', role: 'menu', 'aria-label': e ? 'Menu dell\'elemento' : 'Menu del disegno' }, voci.map(([t, fn]) => el('button', { class: 'cad-menu-voce', role: 'menuitem', testo: t, onclick: ev => { ev.stopPropagation(); chiudiMenu(); fn(); } })));
+        const box = cv.parentNode; box.appendChild(menuEl);
+        const W = box.clientWidth, H = box.clientHeight, mw = menuEl.offsetWidth || 190, mh = menuEl.offsetHeight || voci.length * 56;
+        menuEl.style.left = Math.max(6, Math.min(W - mw - 6, px - mw / 2)) + 'px';
+        menuEl.style.top = Math.max(6, Math.min(H - mh - 6, py - mh - 30 < 6 ? py + 30 : py - mh - 30)) + 'px';
+        A.vibra && A.vibra(15);
+      };
+
       // ----- annulla / ripeti / elimina -----
       const annulla = () => {
+        if (arco && arco.punti.length) { arco.punti.pop(); if (!arco.punti.length) arco = null; chiudiDigitaSeRaggio(); statoBarra(); disegna(); return; }
         if (nuova && nuova.punti.length) { nuova.punti.pop(); if (!nuova.punti.length) nuova = null; statoBarra(); pannelloAgg(); disegna(); return; }
         if (!storia.length) return;
         futuro.push(JSON.stringify(S.entita)); S.entita = JSON.parse(storia.pop()); if (!trovaE(sel)) { sel = null; selV = null; } anteprima = null; A.salva(); aggiorna();
@@ -378,10 +482,117 @@
       const ripeti = () => { if (!futuro.length) return; storia.push(JSON.stringify(S.entita)); S.entita = JSON.parse(futuro.pop()); if (!trovaE(sel)) { sel = null; selV = null; } anteprima = null; A.salva(); aggiorna(); };
       const elimina = () => { const e = trovaE(sel); if (!e) return; ricorda(); S.entita = S.entita.filter(x => x.id !== e.id); sel = null; selV = null; anteprima = null; A.salva(); aggiorna(); };
 
+      // ----- inserimento numerico: tastierino con espressioni, assolute, incrementali, polari -----
+      let digitaBox = null;
+      const chiudiDigita = () => { if (digitaBox) { digitaBox.remove(); digitaBox = null; mirino = null; disegna(); } };
+      const chiudiDigitaSeRaggio = () => { if (digitaBox && digitaBox.dataset.tipo === 'raggio') chiudiDigita(); };
+      const ultimoPunto = () => nuova && nuova.punti.length ? { x: num(nuova.punti[nuova.punti.length - 1].x), y: num(nuova.punti[nuova.punti.length - 1].y) } : tratto ? { x: tratto.x, y: tratto.y } : arco && arco.punti.length ? arco.punti[arco.punti.length - 1] : null;
+      /** Cosa si aspetta lo strumento adesso: {titolo, aiuto, tipo:'punto'|'misura'|'raggio'}. */
+      const attesa = () => {
+        const st = S.strum, n = arco ? arco.punti.length : 0;
+        if (digitaBox && digitaBox.dataset.tipo === 'raggio') return { titolo: 'Raggio dell\'arco', aiuto: 'Un numero (anche 50/2); poi scegli arco piccolo o grande', tipo: 'raggio' };
+        if (st === 'punto') return { titolo: 'Foro: dove?', aiuto: '50; 30  ·  @10; 5 dall\'ultimo punto  ·  @20<45 polare', tipo: 'punto' };
+        if (st === 'poli') return { titolo: 'Punto ' + ((nuova ? nuova.punti.length : 0) + 1) + ' del profilo', aiuto: '50; 30  ·  @10; 5 (relativo)  ·  @20<45 (lunghezza<angolo)', tipo: 'punto' };
+        if (st === 'rett') return tratto ? { titolo: 'Angolo opposto', aiuto: 'Un punto (50; 30, @40; 30) oppure le misure 40x30', tipo: 'punto', misure: true } : { titolo: 'Primo angolo', aiuto: '0; 0  ·  @10; 5  ·  espressioni, per esempio 50/2; 10+5', tipo: 'punto' };
+        if (st === 'cerchio') return tratto ? { titolo: 'Raggio', aiuto: 'Il raggio (25/2), oppure d20 per il diametro, oppure un punto', tipo: 'punto', raggio: true } : { titolo: 'Centro del cerchio', aiuto: '40; 25  ·  @10; 0', tipo: 'punto' };
+        if (st === 'asola') return { titolo: tratto ? 'Centro finale' : 'Centro iniziale', aiuto: '20; 10  ·  @30; 0 (relativo)', tipo: 'punto' };
+        if (st === 'poligono') return tratto ? { titolo: 'Raggio (' + S.latiPol + ' lati)', aiuto: 'Il raggio dal centro ai vertici, oppure un punto', tipo: 'punto', raggio: true } : { titolo: 'Centro del poligono', aiuto: '40; 25', tipo: 'punto' };
+        if (st === 'arco') return { titolo: S.arcoModo === '3p' ? ['Inizio dell\'arco', 'Un punto sull\'arco', 'Fine dell\'arco'][n] : S.arcoModo === 'cif' ? ['Centro dell\'arco', 'Punto iniziale', 'Punto finale'][n] : ['Inizio dell\'arco', 'Fine dell\'arco'][n], aiuto: '50; 30  ·  @10; 5  ·  @20<45', tipo: 'punto' };
+        if (sel && selV !== null) return { titolo: 'Sposta il punto scelto', aiuto: '50; 30  ·  @1; 0 (relativo al punto)', tipo: 'sposta' };
+        return { titolo: 'Scegli uno strumento', aiuto: 'Poi scrivi qui il punto', tipo: 'niente' };
+      };
+      const daTesto = (testo, o) => {
+        const att = attesa(), ref = ultimoPunto();
+        if (att.tipo === 'raggio') {
+          const r = O.espressione(testo); if (!(r > 0)) return { errore: 'Il raggio deve essere un numero positivo' };
+          arcoAggiungi(null, r, !!o.grande); return { ok: true };
+        }
+        if (att.tipo === 'niente') return { errore: att.aiuto };
+        const t = String(testo).trim();
+        if (att.misure && tratto && /^[^x]+x[^x]+$/i.test(t.replace(/\s+/g, ''))) {
+          const [a, b] = t.replace(/\s+/g, '').toLowerCase().split('x'), L = O.espressione(a), H = O.espressione(b);
+          if (!isFinite(L) || !isFinite(H) || !L || !H) return { errore: 'Misure non valide: scrivi, per esempio, 40x30' };
+          return finisciPunto({ x: R3(tratto.x + L), y: R3(tratto.y + H) });
+        }
+        if (att.raggio && tratto) {
+          const d = /^[dDØø]\s*/.test(t); const v = O.espressione(d ? t.replace(/^[dDØø]\s*/, '') : t);
+          if (isFinite(v) && !/[;<@]/.test(t)) { const r = d ? v / 2 : v; if (!(r > 0)) return { errore: 'Il raggio deve essere positivo' }; return finisciPunto({ x: R3(tratto.x + r), y: tratto.y }); }
+        }
+        const p = O.puntoDaTesto(t, ref || { x: 0, y: 0 });
+        if (p.errore) return p;
+        if (att.tipo === 'sposta') { const e = trovaE(sel), h = e && maniglie(e).find(q => q.i === selV); if (!e || !h) return { errore: 'Scegli prima un punto' }; const q = O.puntoDaTesto(t, { x: h.x, y: h.y }); if (q.errore) return q; ricorda(); sposta(e, h, q.x, q.y); anteprima = null; A.salva(); aggiorna(); return { ok: true }; }
+        return finisciPunto(p);
+      };
+      /** Mette un punto scritto a mano come se fosse toccato: stessa strada del dito. */
+      const finisciPunto = w => {
+        const st = S.strum;
+        if (st === 'punto') { nuovaE({ tipo: 'punto', x: w.x, y: w.y }); return { ok: true }; }
+        if (st === 'poli') { nuova = nuova || { punti: [] }; nuova.punti.push({ x: w.x, y: w.y }); statoBarra(); pannelloAgg(); disegna(); return { ok: true }; }
+        if (st === 'arco') { arcoAggiungi(w); return { ok: true }; }
+        if (st === 'rett' || st === 'cerchio' || st === 'asola' || st === 'poligono') {
+          if (!tratto) { tratto = { tipo: st, x: w.x, y: w.y, fermo: true }; statoBarra(); disegna(); return { ok: true }; }
+          const a = tratto; tratto = null;
+          if (st === 'rett') { if (Math.abs(w.x - a.x) < 0.01 || Math.abs(w.y - a.y) < 0.01) { tratto = a; return { errore: 'Larghezza e altezza devono essere diverse da zero' }; } nuovaE({ tipo: 'rett', x0: Math.min(a.x, w.x), y0: Math.min(a.y, w.y), x1: Math.max(a.x, w.x), y1: Math.max(a.y, w.y), r: 0 }); }
+          else if (st === 'cerchio') { const r = R3(Math.hypot(w.x - a.x, w.y - a.y)); if (r < 0.05) { tratto = a; return { errore: 'Il raggio e troppo piccolo' }; } nuovaE({ tipo: 'cerchio', cx: a.x, cy: a.y, r }); }
+          else if (st === 'poligono') { if (!creaPoligono(a, w)) { tratto = a; return { errore: 'Il raggio e troppo piccolo' }; } }
+          else { if (Math.hypot(w.x - a.x, w.y - a.y) < 0.05) { tratto = a; return { errore: 'I due centri sono uguali' }; } nuovaE({ tipo: 'asola', x1: a.x, y1: a.y, x2: w.x, y2: w.y, w: 8 }); }
+          return { ok: true };
+        }
+        return { errore: 'Scegli uno strumento di disegno' };
+      };
+      const apriDigita = (tipo) => {
+        if (digitaBox) chiudiDigita();
+        let testo = '', grande = false;
+        const box = el('div', { class: 'cad-digita', role: 'dialog', 'aria-label': 'Inserimento numerico' });
+        if (tipo) box.dataset.tipo = tipo;
+        const tit = el('div', { class: 'cad-dg-tit' }), aiuto = el('div', { class: 'cad-dg-aiuto' }), campo = el('div', { class: 'cad-dg-campo', 'aria-live': 'polite' }), prev = el('div', { class: 'cad-dg-prev', 'aria-live': 'polite' });
+        const extra = el('div', { class: 'chips cad-dg-extra' });
+        const aggiornaDg = () => {
+          const att = attesa();
+          tit.textContent = att.titolo; aiuto.textContent = att.aiuto; campo.textContent = testo || ' '; mostraAz();
+          extra.innerHTML = '';
+          if (att.tipo === 'raggio') {
+            extra.append(el('button', { class: 'chip' + (!grande ? ' attiva' : ''), testo: 'Arco piccolo', onclick: () => { grande = false; aggiornaDg(); } }), el('button', { class: 'chip' + (grande ? ' attiva' : ''), testo: 'Arco grande', onclick: () => { grande = true; aggiornaDg(); } }),
+              el('button', { class: 'chip', testo: S.arcoOrario ? 'Orario' : 'Antiorario', onclick: () => { S.arcoOrario = !S.arcoOrario; A.salva(); aggiornaDg(); } }));
+          }
+          // anteprima del punto
+          prev.classList.remove('errore');
+          if (!testo.trim()) { prev.textContent = ''; mirino = null; disegna(); return; }
+          if (att.tipo === 'raggio' || (att.raggio && !/[;<@,]/.test(testo))) { const d = /^[dDØø]/.test(testo.trim()); const v = O.espressione(testo.trim().replace(/^[dDØø]\s*/, '')); prev.textContent = isFinite(v) ? (d ? 'Diametro ' + fmt(v, 3) + ' → raggio ' + fmt(v / 2, 3) : 'Raggio ' + fmt(v, 3)) : 'Scrivi un numero'; prev.classList.toggle('errore', !isFinite(v)); return; }
+          if (att.misure && /^[^x;<@,]+x[^x]+$/i.test(testo.replace(/\s+/g, ''))) { prev.textContent = 'Misure ' + testo.replace(/\s+/g, ''); return; }
+          const ref = att.tipo === 'sposta' ? (() => { const e = trovaE(sel), h = e && maniglie(e).find(q => q.i === selV); return h ? { x: h.x, y: h.y } : null; })() : ultimoPunto();
+          const p = O.puntoDaTesto(testo, ref || { x: 0, y: 0 });
+          if (p.errore) { prev.textContent = p.errore; prev.classList.add('errore'); mirino = null; disegna(); return; }
+          prev.textContent = 'X ' + fmt(p.x, 3) + '   Y ' + fmt(p.y, 3) + '  (' + p.tipo + ')';
+          mirino = { x: p.x, y: p.y, tipo: 'griglia' }; disegna();
+        };
+        const premi = t => { A.vibra && A.vibra(5); if (t === '⌫') testo = testo.slice(0, -1); else if (t === 'C') testo = ''; else testo += t; aggiornaDg(); };
+        const TASTI = [['7', '8', '9', '/', '⌫'], ['4', '5', '6', '*', 'C'], ['1', '2', '3', '-', '('], ['0', ',', ';', '+', ')'], ['@', '<', '^', 'x', 'pi']];
+        const griglia = el('div', { class: 'cad-dg-tasti' }, [].concat(...TASTI).map(t => el('button', { class: 'cad-dg-k' + (/[0-9]/.test(t) ? ' num' : ''), type: 'button', 'aria-label': t === '⌫' ? 'Cancella' : t === 'C' ? 'Cancella tutto' : t === 'sqrt(' ? 'radice' : t, testo: t === 'sqrt(' ? '√(' : t, onclick: () => premi(t) })));
+        const ok = () => {
+          const r = daTesto(testo, { grande });
+          if (r.errore) { prev.textContent = r.errore; prev.classList.add('errore'); A.vibra && A.vibra(25); return; }
+          testo = ''; mirino = null;
+          if (box.dataset.tipo === 'raggio') { box.remove(); digitaBox = null; disegna(); return; }
+          aggiornaDg(); disegna();
+        };
+        const azioniDg = el('div', { class: 'cad-dg-az' }, [
+          el('button', { class: 'chip', id: 'cad-dg-annulla', testo: 'Annulla', onclick: () => { annulla(); aggiornaDg(); } }),
+          el('button', { class: 'chip', id: 'cad-dg-fine', testo: 'Fine profilo', onclick: () => { chiudiProfilo(false); aggiornaDg(); } }),
+          el('button', { class: 'chip', id: 'cad-dg-chiudi', testo: 'Chiudi profilo', onclick: () => { chiudiProfilo(true); aggiornaDg(); } })]);
+        const mostraAz = () => { const inProfilo = !!(nuova && nuova.punti.length); azioniDg.querySelector('#cad-dg-fine').hidden = azioniDg.querySelector('#cad-dg-chiudi').hidden = !inProfilo; azioniDg.querySelector('#cad-dg-chiudi').disabled = !(nuova && nuova.punti.length > 2); };
+        box.append(el('div', { class: 'cad-dg-testa' }, [tit, el('button', { class: 'icona-pul', 'aria-label': 'Chiudi l\'inserimento numerico', testo: '✕', onclick: chiudiDigita })]), aiuto, campo, prev, extra, griglia, azioniDg,
+          el('button', { class: 'pul cad-dg-ok', id: 'cad-dg-ok', testo: 'OK', onclick: ok }));
+        digitaBox = box; radice.appendChild(box);
+        aggiornaDg();
+      };
+      promptRaggio = () => apriDigita('raggio');
+
       // ----- barra degli strumenti e delle azioni -----
       const icoSvg = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
       STRUM.forEach(([id, nome, d]) => barra.appendChild(el('button', { class: 'cad-b', 'data-strum': id, 'aria-label': nome, title: nome, html: icoSvg(d) + '<span>' + nome + '</span>', onclick: () => {
         if (nuova) chiudiProfilo(false);
+        arco = null; chiudiDigita();
         S.strum = id; tratto = null; A.salva(); if (id !== 'sel') { sel = null; selV = null; } aggiorna();
       } })));
       const bUndo = el('button', { class: 'cad-b', id: 'cad-annulla', 'aria-label': 'Annulla', html: icoSvg('<path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/>') + '<span>Annulla</span>', onclick: annulla });
@@ -394,7 +605,8 @@
       const bSnap = el('button', { class: 'cad-b', id: 'cad-snap', 'aria-label': 'Aggancio', html: icoSvg('<path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="4"/>') + '<span>Aggancio</span>', onclick: () => { S.snap = !S.snap; A.salva(); aggiorna(); } });
       const bMir = el('button', { class: 'cad-b', id: 'cad-mirino', 'aria-label': 'Mirino sopra il dito', html: icoSvg('<circle cx="12" cy="9" r="5"/><path d="M12 14v7"/>') + '<span>Mirino</span>', onclick: () => { S.mirino = !S.mirino; A.salva(); aggiorna(); } });
       const bPan = el('button', { class: 'cad-b cad-solopieno', id: 'cad-pannello-b', 'aria-label': 'Apri o chiudi il pannello', html: icoSvg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>') + '<span>Pannello</span>', onclick: () => radice.classList.toggle('pannello-aperto') });
-      azioni.append(bUndo, bRedo, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
+      const bDigita = el('button', { class: 'cad-b', id: 'cad-digita', 'aria-label': 'Scrivi le coordinate con il tastierino', html: icoSvg('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>') + '<span>Digita</span>', onclick: () => (digitaBox ? chiudiDigita() : apriDigita()) });
+      azioni.append(bUndo, bRedo, bDigita, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
 
       // ----- pannello: lavorazioni dell'entita scelta, dati del pezzo, crea -----
       const OP_TESTO = { contorno: ['Contorno', 'Taglia lungo la linea con G41/G42'], tasca: ['Tasca', 'Svuota l\'interno'], foro: ['Foro', 'Centrino, punta e smusso'], maschio: ['Maschio', 'Foro filettato'], alesato: ['Alesato', 'Foro con alesatore'], asola: ['Asola', 'Fresa a spirale lungo la linea'] };
@@ -543,14 +755,26 @@
         A.vai('listato');
       };
 
+      const sub = el('div', { class: 'cad-sub', role: 'group', 'aria-label': 'Opzioni dello strumento' });
+      area.insertBefore(sub, area.children[1]);
+      const sottoBarra = () => {
+        sub.innerHTML = '';
+        const chip = (t, on, fn, id) => el('button', { class: 'chip' + (on ? ' attiva' : ''), id, testo: t, onclick: () => { fn(); A.salva(); aggiorna(); } });
+        if (S.strum === 'arco') {
+          sub.append(...[['3p', 'Tre punti'], ['cif', 'Centro'], ['ifr', 'Raggio']].map(([m, t]) => chip(t, S.arcoModo === m, () => { S.arcoModo = m; arco = null; chiudiDigita(); }, 'cad-arco-' + m)));
+          if (S.arcoModo !== '3p') sub.append(chip(S.arcoOrario ? 'Orario' : 'Antiorario', false, () => { S.arcoOrario = !S.arcoOrario; }, 'cad-arco-verso'));
+        } else if (S.strum === 'poligono') sub.append(...[3, 4, 5, 6, 8, 10, 12].map(n => chip(n + ' lati', S.latiPol === n, () => { S.latiPol = n; }, 'cad-lati-' + n)));
+        sub.hidden = !sub.childNodes.length;
+      };
       const statoBarra = () => {
+        sottoBarra();
         barra.querySelectorAll('[data-strum]').forEach(b => b.classList.toggle('attiva', b.dataset.strum === S.strum));
         bUndo.disabled = !storia.length && !(nuova && nuova.punti.length); bRedo.disabled = !futuro.length;
         bFine.hidden = bChiudi.hidden = !(nuova && nuova.punti.length); bChiudi.disabled = !(nuova && nuova.punti.length > 2);
         bSnap.classList.toggle('attiva', !!S.snap); bMir.classList.toggle('attiva', !!S.mirino);
         radice.dataset.strum = S.strum;
       };
-      const aggiorna = () => { statoBarra(); pannelloAgg(); ridisegna(); };
+      const aggiorna = () => { Gc = null; statoBarra(); pannelloAgg(); ridisegna(); };
       A.cadRidisegna = () => { adatta(); disegna(); };
       A.cadStato = { S, vista, get sel() { return sel; }, set sel(v) { sel = v; }, aggiorna, adatta, disegna, nuovaE, X, Y, mondo: mx, calcola: () => { const t = el('div'); calcola(false, t); return t; } };
       aggiorna();

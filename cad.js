@@ -5,7 +5,7 @@
 (function (radice) {
   'use strict';
   const O = typeof module !== 'undefined' && module.exports ? require('./calcoli.js') : radice.Officina;
-  const r3 = x => Math.round(x * 1000) / 1000;
+  const r3 = x => Math.round(x * 1000) / 1000 + 0;   // + 0: niente -0
   const num = v => { const n = Number(String(v === undefined || v === null ? '' : v).replace(',', '.')); return v === '' || v === null || v === undefined ? NaN : n; };
 
   /** Lavorazioni possibili per ogni tipo di entita (la prima e quella proposta). */
@@ -212,7 +212,210 @@
     return { fasi: ordinate, note: testi };
   }
 
-  const Cad = { CAD_LAVORAZIONI: LAVORAZIONI, CAD_NOMI_LAV: NOMI_LAV, profiloCAD: profiloDi, limitiCAD: limiti, pianificaCAD };
+  // ======================= inserimento numerico: espressioni, coordinate assolute, incrementali, polari =======================
+  /**
+   * Valore di un'espressione scritta a mano: 50/2+3, (10+5)*2, sqrt(2)*10, 30*sin(45), pi*20. Virgola o punto decimale.
+   * Niente eval: un piccolo interprete. Ritorna il numero oppure NaN. Gli angoli di sin, cos e tan sono in gradi.
+   */
+  function espressione(testo) {
+    const t = String(testo === undefined || testo === null ? '' : testo).replace(/,/g, '.').replace(/\s+/g, '').toLowerCase();
+    if (!t) return NaN;
+    let i = 0;
+    const FUNZ = { sqrt: Math.sqrt, abs: Math.abs, sin: x => Math.sin(x * Math.PI / 180), cos: x => Math.cos(x * Math.PI / 180), tan: x => Math.tan(x * Math.PI / 180), asin: x => Math.asin(x) * 180 / Math.PI, acos: x => Math.acos(x) * 180 / Math.PI, atan: x => Math.atan(x) * 180 / Math.PI };
+    const fallisci = () => { throw new Error('x'); };
+    function somma() { let v = prodotto(); while (i < t.length && (t[i] === '+' || t[i] === '-')) { const o = t[i++]; const w = prodotto(); v = o === '+' ? v + w : v - w; } return v; }
+    function prodotto() { let v = potenza(); while (i < t.length && (t[i] === '*' || t[i] === '/')) { const o = t[i++]; const w = potenza(); if (o === '/') { if (w === 0) fallisci(); v /= w; } else v *= w; } return v; }
+    function potenza() { const b = unario(); if (t[i] === '^') { i++; return Math.pow(b, potenza()); } return b; }
+    function unario() { if (t[i] === '-') { i++; return -unario(); } if (t[i] === '+') { i++; return unario(); } return atomo(); }
+    function atomo() {
+      if (t[i] === '(') { i++; const v = somma(); if (t[i] !== ')') fallisci(); i++; return v; }
+      const n = /^(\d+\.?\d*|\.\d+)/.exec(t.slice(i));
+      if (n) { i += n[0].length; return Number(n[0]); }
+      const w = /^[a-z]+/.exec(t.slice(i));
+      if (!w) fallisci();
+      i += w[0].length;
+      if (w[0] === 'pi') return Math.PI;
+      if (FUNZ[w[0]] && t[i] === '(') { i++; const v = somma(); if (t[i] !== ')') fallisci(); i++; return FUNZ[w[0]](v); }
+      return fallisci();
+    }
+    try { const v = somma(); return i === t.length && isFinite(v) ? v : NaN; } catch (e) { return NaN; }
+  }
+  /**
+   * Un punto scritto a mano. Forme: "50; 30" o "50,30" (assoluto), "@10; 5" (incrementale dall'ultimo punto), "@20<45" (polare dall'ultimo punto:
+   * lunghezza < angolo in gradi), "20<45" (polare dall'origine). Ogni parte puo essere un'espressione. Ritorna {x, y, tipo} oppure {errore}.
+   */
+  function puntoDaTesto(testo, ref) {
+    let t = String(testo || '').trim();
+    if (!t) return { errore: 'Scrivi un punto, per esempio 50; 30' };
+    const incr = t[0] === '@';
+    if (incr) t = t.slice(1).trim();
+    const base = incr && ref && isFinite(ref.x) && isFinite(ref.y) ? ref : { x: 0, y: 0 };
+    if (incr && !(ref && isFinite(ref.x))) { /* senza punto di partenza parte dall'origine */ }
+    if (t.indexOf('<') >= 0) {
+      const [l, a] = t.split('<');
+      const L = espressione(l), ang = espressione(a);
+      if (!isFinite(L) || !isFinite(ang)) return { errore: 'Polare non valido: scrivi lunghezza<angolo, per esempio @20<45' };
+      return { x: r3(base.x + L * Math.cos(ang * Math.PI / 180)), y: r3(base.y + L * Math.sin(ang * Math.PI / 180)), tipo: 'polare' };
+    }
+    let parti;
+    if (t.indexOf(';') >= 0) parti = t.split(';');
+    else if ((t.match(/,/g) || []).length === 1) parti = t.split(',');
+    else parti = null;
+    if (!parti || parti.length !== 2) return { errore: 'Scrivi X e Y separati da punto e virgola, per esempio 50; 30' };
+    const x = espressione(parti[0]), y = espressione(parti[1]);
+    if (!isFinite(x) || !isFinite(y)) return { errore: 'Non capisco "' + t + '": controlla i numeri e le parentesi' };
+    return { x: r3(base.x + x), y: r3(base.y + y), tipo: incr ? 'incrementale' : 'assoluto' };
+  }
+
+  // ======================= archi e poligoni =======================
+  const dist2 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const norm2pi = a => { a = a % (2 * Math.PI); return a < 0 ? a + 2 * Math.PI : a; };
+  /** Arco da tre punti (inizio, un punto sull'arco, fine). Ritorna {cx, cy, r, tratto:'ccw'|'cw', raggio (negativo se oltre 180 gradi), sweep (gradi), punti} o {errore}. */
+  function arcoDa3Punti(p1, p2, p3) {
+    const d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
+    if (Math.abs(d) < 1e-9) return { errore: 'I tre punti sono su una linea: non c\'e un arco.' };
+    const q1 = p1.x * p1.x + p1.y * p1.y, q2 = p2.x * p2.x + p2.y * p2.y, q3 = p3.x * p3.x + p3.y * p3.y;
+    const cx = (q1 * (p2.y - p3.y) + q2 * (p3.y - p1.y) + q3 * (p1.y - p2.y)) / d, cy = (q1 * (p3.x - p2.x) + q2 * (p1.x - p3.x) + q3 * (p2.x - p1.x)) / d;
+    const r = Math.hypot(p1.x - cx, p1.y - cy);
+    const cross = (p2.x - p1.x) * (p3.y - p2.y) - (p2.y - p1.y) * (p3.x - p2.x);
+    const ccw = cross > 0, a1 = Math.atan2(p1.y - cy, p1.x - cx), a3 = Math.atan2(p3.y - cy, p3.x - cx);
+    const sweep = ccw ? norm2pi(a3 - a1) : norm2pi(a1 - a3);
+    return arcoPunti(p1, p3, { cx, cy, r, tratto: ccw ? 'ccw' : 'cw', sweep });
+  }
+  function arcoPunti(s, f, a) {
+    const lungo = a.sweep > Math.PI + 1e-9;
+    return { cx: r3(a.cx), cy: r3(a.cy), r: r3(a.r), tratto: a.tratto, raggio: r3(lungo ? -a.r : a.r), sweep: r3(a.sweep * 180 / Math.PI),
+      punti: [{ x: r3(s.x), y: r3(s.y) }, { x: r3(f.x), y: r3(f.y), tratto: a.tratto, r: r3(lungo ? -a.r : a.r) }] };
+  }
+  /** Arco da centro, punto iniziale e punto che da la direzione della fine (si proietta sul cerchio). antiorario = verso. */
+  function arcoCentroInizioFine(c, s, f, antiorario) {
+    const r = dist2(c, s);
+    if (r < 1e-6) return { errore: 'Il punto iniziale e sul centro.' };
+    if (dist2(c, f) < 1e-6) return { errore: 'Il punto finale e sul centro.' };
+    const a1 = Math.atan2(s.y - c.y, s.x - c.x), a2 = Math.atan2(f.y - c.y, f.x - c.x), ccw = antiorario !== false;
+    const sweep = ccw ? norm2pi(a2 - a1) : norm2pi(a1 - a2);
+    if (sweep < 1e-6) return { errore: 'Inizio e fine sono nello stesso punto.' };
+    return arcoPunti(s, { x: c.x + r * Math.cos(a2), y: c.y + r * Math.sin(a2) }, { cx: c.x, cy: c.y, r, tratto: ccw ? 'ccw' : 'cw', sweep });
+  }
+  /** Arco da punto iniziale, punto finale e raggio. grande = arco oltre i 180 gradi; orario = verso. */
+  function arcoInizioFineRaggio(s, f, raggio, grande, orario) {
+    const R = Math.abs(Number(raggio)), d = dist2(s, f);
+    if (!(R > 0)) return { errore: 'Scrivi il raggio.' };
+    if (d < 1e-6) return { errore: 'Inizio e fine sono nello stesso punto.' };
+    if (R < d / 2 - 1e-6) return { errore: 'Il raggio (' + R + ') e piu piccolo di meta della distanza tra i punti (' + r3(d / 2) + ').' };
+    const tratto = orario ? 'cw' : 'ccw', lato = tratto === 'cw' ? -1 : 1 * (grande ? -1 : 1) * 1;
+    void lato;
+    const h = Math.sqrt(Math.max(0, R * R - d * d / 4)), m = { x: (s.x + f.x) / 2, y: (s.y + f.y) / 2 }, ux = (f.x - s.x) / d, uy = (f.y - s.y) / d;
+    // come nel profilo: arco corto, centro a destra per l'orario e a sinistra per l'antiorario; grande = centro dall'altra parte
+    let l = tratto === 'cw' ? -1 : 1; if (grande) l = -l;
+    const c = { x: m.x + l * -uy * h, y: m.y + l * ux * h };
+    const a1 = Math.atan2(s.y - c.y, s.x - c.x), a2 = Math.atan2(f.y - c.y, f.x - c.x);
+    const sweep = tratto === 'ccw' ? norm2pi(a2 - a1) : norm2pi(a1 - a2);
+    return arcoPunti(s, f, { cx: c.x, cy: c.y, r: R, tratto, sweep });
+  }
+  /** Poligono regolare inscritto nel cerchio (cx, cy, r) con n lati; il primo vertice a angolo0 gradi. Ritorna i punti. */
+  function poligonoRegolare(cx, cy, r, n, angolo0) {
+    n = Math.round(n);
+    if (!(n >= 3) || !(r > 0)) return [];
+    const a0 = (Number(angolo0) || 0) * Math.PI / 180, out = [];
+    for (let k = 0; k < n; k++) { const a = a0 + k * 2 * Math.PI / n; out.push({ x: r3(cx + r * Math.cos(a)), y: r3(cy + r * Math.sin(a)) }); }
+    return out;
+  }
+
+  // ======================= aggancio intelligente =======================
+  /** Segmenti, cerchi e punti notevoli di tutte le entita (per l'aggancio). */
+  function geometriaCAD(entita, esclusa) {
+    const G = { seg: [], cerchi: [], estremi: [], centri: [], medi: [] };
+    const seg = (a, b, e) => { if (Math.hypot(a.x - b.x, a.y - b.y) > 1e-9) G.seg.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, e: e.id }); };
+    (entita || []).forEach(e => {
+      if (e.id === esclusa) return;
+      if (e.tipo === 'punto') { G.estremi.push({ x: num(e.x), y: num(e.y) }); return; }
+      if (e.tipo === 'cerchio') {
+        const c = { cx: num(e.cx), cy: num(e.cy), r: num(e.r) };
+        G.cerchi.push(Object.assign(c, { e: e.id })); G.centri.push({ x: c.cx, y: c.cy });
+        [[c.r, 0], [-c.r, 0], [0, c.r], [0, -c.r]].forEach(q => G.estremi.push({ x: c.cx + q[0], y: c.cy + q[1] }));
+        return;
+      }
+      if (e.tipo === 'asola') {
+        const a = { x: num(e.x1), y: num(e.y1) }, b = { x: num(e.x2), y: num(e.y2) };
+        G.estremi.push(a, b); G.medi.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }); seg(a, b, e); return;
+      }
+      const pr = profiloDi(e);
+      if (!pr) return;
+      const g = O.costruisciProfilo ? O.costruisciProfilo(pr.punti.map(p => ({ a: p.x, b: p.y, tratto: p.tratto, r: p.r, raccordo: p.raccordo, smusso: p.smusso })), pr.chiuso) : { errore: 'x', tratti: [] };
+      if (g.errore || !g.tratti.length) { pr.punti.forEach(p => { if (isFinite(p.x) && isFinite(p.y)) G.estremi.push({ x: p.x, y: p.y }); }); return; }
+      g.tratti.forEach(t => {
+        const p = { x: t.p.a, y: t.p.b }, q = { x: t.q.a, y: t.q.b };
+        G.estremi.push(p, q);
+        if (t.tipo === 'L') { seg(p, q, e); G.medi.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }); }
+        else {
+          G.centri.push({ x: t.c.a, y: t.c.b });
+          const poli = O.polilineaProfilo([t], Math.max(0.1, t.r / 40));
+          for (let i = 1; i < poli.length; i++) seg({ x: poli[i - 1].a, y: poli[i - 1].b }, { x: poli[i].a, y: poli[i].b }, e);
+          const m = poli[Math.floor(poli.length / 2)]; if (m) G.medi.push({ x: m.a, y: m.b });
+        }
+      });
+    });
+    return G;
+  }
+  const interSegSeg = (s, t) => {
+    const d1x = s.bx - s.ax, d1y = s.by - s.ay, d2x = t.bx - t.ax, d2y = t.by - t.ay, den = d1x * d2y - d1y * d2x;
+    if (Math.abs(den) < 1e-12) return null;
+    const u = ((t.ax - s.ax) * d2y - (t.ay - s.ay) * d2x) / den, v = ((t.ax - s.ax) * d1y - (t.ay - s.ay) * d1x) / den;
+    if (u < -1e-9 || u > 1 + 1e-9 || v < -1e-9 || v > 1 + 1e-9) return null;
+    return { x: s.ax + u * d1x, y: s.ay + u * d1y };
+  };
+  const interSegCerchio = (s, c) => {
+    const dx = s.bx - s.ax, dy = s.by - s.ay, fx = s.ax - c.cx, fy = s.ay - c.cy, a = dx * dx + dy * dy, b = 2 * (fx * dx + fy * dy), cc = fx * fx + fy * fy - c.r * c.r, D = b * b - 4 * a * cc;
+    if (a < 1e-12 || D < 0) return [];
+    const r = Math.sqrt(D), out = [];
+    [(-b - r) / (2 * a), (-b + r) / (2 * a)].forEach(u => { if (u >= -1e-9 && u <= 1 + 1e-9) out.push({ x: s.ax + u * dx, y: s.ay + u * dy }); });
+    return out;
+  };
+  const interCerchioCerchio = (c1, c2) => {
+    const d = Math.hypot(c2.cx - c1.cx, c2.cy - c1.cy);
+    if (d < 1e-9 || d > c1.r + c2.r + 1e-9 || d < Math.abs(c1.r - c2.r) - 1e-9) return [];
+    const a = (c1.r * c1.r - c2.r * c2.r + d * d) / (2 * d), h = Math.sqrt(Math.max(0, c1.r * c1.r - a * a)), mx = c1.cx + a * (c2.cx - c1.cx) / d, my = c1.cy + a * (c2.cy - c1.cy) / d;
+    return [{ x: mx + h * (c2.cy - c1.cy) / d, y: my - h * (c2.cx - c1.cx) / d }, { x: mx - h * (c2.cy - c1.cy) / d, y: my + h * (c2.cx - c1.cx) / d }];
+  };
+  /**
+   * Il punto di aggancio piu utile vicino a (x, y), entro tol mm. Priorita: intersezione, punto (estremo/centro/quadrante), punto medio,
+   * perpendicolare e tangente dall'ultimo punto (ref). Ritorna {x, y, tipo} con tipo: 'intersezione' | 'punto' | 'centro' | 'medio' |
+   * 'perpendicolare' | 'tangente', oppure null.
+   */
+  function agganciCAD(entita, x, y, tol, ref, esclusa, G) {
+    G = G || geometriaCAD(entita, esclusa);
+    const vicini = (a, b) => Math.hypot(a.x - x, a.y - y) <= b;
+    const dSeg = s => { const dx = s.bx - s.ax, dy = s.by - s.ay, l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / l2)) : 0; return Math.hypot(x - s.ax - t * dx, y - s.ay - t * dy); };
+    const cand = [];   // {x, y, tipo, pri}
+    const metti = (p, tipo, pri) => { const d = Math.hypot(p.x - x, p.y - y); if (d <= tol) cand.push({ x: p.x, y: p.y, tipo, pri, d }); };
+    // solo la geometria vicina al cursore entra nel calcolo delle intersezioni (veloce anche con migliaia di entita)
+    const sv = G.seg.filter(s => dSeg(s) < tol * 3), cv = G.cerchi.filter(c => Math.abs(Math.hypot(x - c.cx, y - c.cy) - c.r) < tol * 3);
+    for (let i = 0; i < sv.length; i++) {
+      for (let j = i + 1; j < sv.length; j++) if (sv[i].e !== sv[j].e || true) { const p = interSegSeg(sv[i], sv[j]); if (p && !(sv[i].e === sv[j].e && (Math.hypot(sv[i].bx - sv[j].ax, sv[i].by - sv[j].ay) < 1e-6 || Math.hypot(sv[i].ax - sv[j].bx, sv[i].ay - sv[j].by) < 1e-6))) metti(p, 'intersezione', 0); }
+      cv.forEach(c => interSegCerchio(sv[i], c).forEach(p => metti(p, 'intersezione', 0)));
+    }
+    for (let i = 0; i < cv.length; i++) for (let j = i + 1; j < cv.length; j++) interCerchioCerchio(cv[i], cv[j]).forEach(p => metti(p, 'intersezione', 0));
+    G.centri.forEach(p => metti(p, 'centro', 1));
+    G.estremi.forEach(p => metti(p, 'punto', 1));
+    G.medi.forEach(p => metti(p, 'medio', 2));
+    if (ref && isFinite(ref.x)) {
+      sv.forEach(s => { const dx = s.bx - s.ax, dy = s.by - s.ay, l2 = dx * dx + dy * dy; if (!l2) return; const t = ((ref.x - s.ax) * dx + (ref.y - s.ay) * dy) / l2; if (t > 0.001 && t < 0.999) metti({ x: s.ax + t * dx, y: s.ay + t * dy }, 'perpendicolare', 3); });
+      cv.forEach(c => {
+        const dx = ref.x - c.cx, dy = ref.y - c.cy, d = Math.hypot(dx, dy);
+        if (d <= c.r + 1e-9) return;
+        const a = Math.atan2(dy, dx), b = Math.acos(c.r / d);
+        [a + b, a - b].forEach(t => metti({ x: c.cx + c.r * Math.cos(t), y: c.cy + c.r * Math.sin(t) }, 'tangente', 3));
+      });
+    }
+    if (!cand.length) return null;
+    cand.sort((p, q) => p.pri - q.pri || p.d - q.d);
+    // un punto notevole molto piu vicino batte un'intersezione lontana
+    const migliore = cand.find(p => p.d <= cand[0].d + tol * 0.6) || cand[0];
+    return { x: r3(migliore.x), y: r3(migliore.y), tipo: migliore.tipo };
+  }
+
+  const Cad = { CAD_LAVORAZIONI: LAVORAZIONI, CAD_NOMI_LAV: NOMI_LAV, profiloCAD: profiloDi, limitiCAD: limiti, pianificaCAD, espressione, puntoDaTesto, arcoDa3Punti, arcoCentroInizioFine, arcoInizioFineRaggio, poligonoRegolare, geometriaCAD, agganciCAD };
   Object.assign(O, Cad);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

@@ -1115,4 +1115,64 @@ prova('tornio: profilo interno a tratti, smusso prima della troncatura, lato B (
   const sov = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 40, lg: 90 }, tratti: [{ tipo: 'cil', d: 30, l: 40 }], troncatura: true, fase2: { on: true, lTot: 50, tratti: [{ tipo: 'cil', d: 25, l: 15 }] } }, ctx);
   assert.ok(/sono piu lunghi del pezzo finito/.test(sov.fase2.errore), sov.fase2.errore);
 });
+prova('CAD: espressioni, punti assoluti, incrementali e polari scritti a mano', () => {
+  assert.strictEqual(O.espressione('50/2+3'), 28); assert.strictEqual(O.espressione('(10+5)*2'), 30); assert.strictEqual(O.espressione('1,5*4'), 6); assert.strictEqual(O.espressione('2^3'), 8);
+  assert.ok(Math.abs(O.espressione('30*sin(45)') - 21.2132034) < 1e-6); assert.ok(Math.abs(O.espressione('sqrt(2)*10') - 14.1421356) < 1e-6); assert.ok(Math.abs(O.espressione('pi*20') - 62.8318530) < 1e-6);
+  assert.strictEqual(O.espressione('-(3+2)'), -5); assert.strictEqual(O.espressione('  7 - 2 '), 5);
+  ['', 'abc', '5/0', '(2+3', '2+', 'alert(1)', '2**3', '1;2'].forEach(t => assert.ok(Number.isNaN(O.espressione(t)), 'deve rifiutare: ' + t));
+  assert.deepStrictEqual(O.puntoDaTesto('50; 30'), { x: 50, y: 30, tipo: 'assoluto' });
+  assert.deepStrictEqual(O.puntoDaTesto('50,30'), { x: 50, y: 30, tipo: 'assoluto' });
+  assert.deepStrictEqual(O.puntoDaTesto('12,5;40/2'), { x: 12.5, y: 20, tipo: 'assoluto' });
+  assert.deepStrictEqual(O.puntoDaTesto('@10;5', { x: 1, y: 2 }), { x: 11, y: 7, tipo: 'incrementale' });
+  assert.deepStrictEqual(O.puntoDaTesto('@20<90', { x: 5, y: 5 }), { x: 5, y: 25, tipo: 'polare' });
+  assert.deepStrictEqual(O.puntoDaTesto('10*2<180'), { x: -20, y: 0, tipo: 'polare' });
+  ['', '50', '1;2;3', 'a;b', '@<5'].forEach(t => assert.ok(O.puntoDaTesto(t, { x: 0, y: 0 }).errore, 'deve rifiutare: ' + t));
+});
+prova('CAD: archi (tre punti, centro, raggio) e poligono regolare', () => {
+  const a = O.arcoDa3Punti({ x: 0, y: 0 }, { x: 5, y: 5 }, { x: 10, y: 0 });
+  assert.deepStrictEqual([a.cx, a.cy, a.r, a.tratto, a.raggio, a.sweep], [5, 0, 5, 'cw', 5, 180]);
+  const b = O.arcoDa3Punti({ x: 0, y: 0 }, { x: 5, y: -5 }, { x: 10, y: 0 });
+  assert.strictEqual(b.tratto, 'ccw');
+  const grande = O.arcoDa3Punti({ x: 10, y: 0 }, { x: 0, y: 10 }, { x: 0, y: -10 });   // da 0 a 270 gradi in senso antiorario
+  assert.strictEqual(grande.tratto, 'ccw'); assert.strictEqual(grande.sweep, 270); assert.strictEqual(grande.raggio, -10, 'oltre 180 gradi: raggio negativo');
+  assert.ok(O.arcoDa3Punti({ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }).errore, 'tre punti allineati');
+  // il profilo costruito torna sul centro e sulla lunghezza giusti
+  [a, b, grande].forEach(q => {
+    const g = O.costruisciProfilo(q.punti.map(p => ({ a: p.x, b: p.y, tratto: p.tratto, r: p.r })), false);
+    assert.ok(!g.errore && g.tratti.length === 1 && g.tratti[0].tipo === 'A', g.errore);
+    assert.ok(Math.abs(g.tratti[0].c.a - q.cx) < 1e-6 && Math.abs(g.tratti[0].c.b - q.cy) < 1e-6, 'centro del profilo');
+    const poli = O.polilineaProfilo(g.tratti, 0.05), midp = poli[Math.floor(poli.length / 2)];
+    assert.ok(Math.abs(Math.hypot(midp.a - q.cx, midp.b - q.cy) - q.r) < 1e-3);
+  });
+  const c = O.arcoCentroInizioFine({ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 20 }, true);
+  assert.deepStrictEqual([c.r, c.sweep, c.punti[1].x, c.punti[1].y], [10, 90, 0, 10]);
+  assert.strictEqual(O.arcoCentroInizioFine({ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 20 }, false).sweep, 270);
+  const r1 = O.arcoInizioFineRaggio({ x: 0, y: 0 }, { x: 10, y: 0 }, 10, false, false), r2 = O.arcoInizioFineRaggio({ x: 0, y: 0 }, { x: 10, y: 0 }, 10, true, false);
+  assert.deepStrictEqual([r1.sweep, r1.cy, r2.sweep, r2.cy], [60, 8.66, 300, -8.66]);
+  assert.ok(O.arcoInizioFineRaggio({ x: 0, y: 0 }, { x: 10, y: 0 }, 4, false, false).errore, 'raggio troppo piccolo');
+  assert.deepStrictEqual(O.poligonoRegolare(0, 0, 10, 6, 0).map(p => p.x + ',' + p.y), ['10,0', '5,8.66', '-5,8.66', '-10,0', '-5,-8.66', '5,-8.66']);
+  assert.strictEqual(O.poligonoRegolare(0, 0, 10, 2, 0).length, 0);
+  assert.strictEqual(O.poligonoRegolare(3, 4, 5, 4, 45).length, 4);
+});
+prova('CAD: aggancio a intersezione, punto medio, centro, tangente, perpendicolare', () => {
+  const E = [{ id: 1, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 0 }, { x: 10, y: 10 }] }, { id: 2, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 10 }, { x: 10, y: 0 }] },
+    { id: 3, tipo: 'rett', x0: 20, y0: 0, x1: 30, y1: 10, r: 0 }, { id: 4, tipo: 'cerchio', cx: 50, cy: 0, r: 5 }];
+  assert.deepStrictEqual(O.agganciCAD(E, 5.1, 4.9, 1), { x: 5, y: 5, tipo: 'intersezione' });
+  assert.deepStrictEqual(O.agganciCAD(E, 25.2, 0.3, 1), { x: 25, y: 0, tipo: 'medio' });
+  assert.deepStrictEqual(O.agganciCAD(E, 0.2, 0.2, 1), { x: 0, y: 0, tipo: 'punto' });
+  assert.deepStrictEqual(O.agganciCAD(E, 50, 0.4, 1), { x: 50, y: 0, tipo: 'centro' });
+  assert.deepStrictEqual(O.agganciCAD(E, 52.4, 4.4, 1.5, { x: 70, y: 0 }), { x: 51.25, y: 4.841, tipo: 'tangente' });
+  assert.strictEqual(O.agganciCAD(E, 15, 15, 1), null);
+  assert.deepStrictEqual(O.agganciCAD(E, 3.1, 8.0, 1, { x: 0, y: 10 }, 2), null, 'la linea esclusa non si aggancia');
+  // intersezione cerchio-linea e cerchio-cerchio
+  const C = [{ id: 1, tipo: 'cerchio', cx: 0, cy: 0, r: 10 }, { id: 2, tipo: 'cerchio', cx: 10, cy: 0, r: 10 }, { id: 3, tipo: 'poli', chiuso: false, punti: [{ x: -20, y: 0 }, { x: 20, y: 0 }] }];
+  assert.deepStrictEqual(O.agganciCAD(C, 5.2, 8.5, 1), { x: 5, y: 8.66, tipo: 'intersezione' });
+  // perpendicolare dal punto di partenza
+  const P = [{ id: 1, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 0 }, { x: 20, y: 0 }] }];
+  assert.deepStrictEqual(O.agganciCAD(P, 7.3, 0.4, 1, { x: 7, y: 15 }), { x: 7, y: 0, tipo: 'perpendicolare' });
+  // veloce con migliaia di entita
+  const molte = []; for (let i = 0; i < 3000; i++) molte.push({ id: i + 1, tipo: 'poli', chiuso: false, punti: [{ x: i % 100 * 3, y: Math.floor(i / 100) * 3 }, { x: i % 100 * 3 + 2, y: Math.floor(i / 100) * 3 + 2 }] });
+  const t0 = Date.now(); const G = O.geometriaCAD(molte); for (let k = 0; k < 50; k++) O.agganciCAD(molte, 100 + k, 50, 2, null, null, G);
+  assert.ok(Date.now() - t0 < 1500, 'aggancio con 3000 entita: ' + (Date.now() - t0) + ' ms');
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

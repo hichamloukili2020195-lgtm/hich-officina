@@ -924,7 +924,7 @@ const server = http.createServer((q, r) => {
   await trascinaCad([90, 110], [260, 220]);
   let EC = await entCad();
   ok(EC.length === 1 && EC[0].tipo === 'rett' && EC[0].x1 > EC[0].x0 && EC[0].y1 > EC[0].y0, 'rettangolo disegnato col dito: ' + JSON.stringify(EC));
-  ok((await pg.$$eval('.cad-strum [data-strum]', x => x.length)) === 6, 'strumenti del CAD');
+  ok((await pg.$$eval('.cad-strum [data-strum]', x => x.length)) === 8, 'strumenti del CAD');
   // scelto e lavorazione: contorno
   ok((await pg.textContent('.cad-pannello')).includes('+ Contorno') && (await pg.textContent('.cad-pannello')).includes('+ Tasca'), 'lavorazioni proposte per il rettangolo');
   await pg.click('.cad-op[data-op="contorno"]');
@@ -1480,6 +1480,106 @@ const server = http.createServer((q, r) => {
   ok((await pg.$$eval('.sim-opz', x => x.length)) <= 1 && await pg.$('.sim-comandi2 #f-vel') && await pg.$('#sim-riga-dopo'), 'comandi della simulazione in due righe');
   ok((await pg.$$eval('.icona-pul', x => x.filter(b => b.closest('#schermo')).every(b => b.getBoundingClientRect().height >= 48))), 'pulsanti con icona da 48 px');
   await largo('home a 5 voci');
+
+  // ===== 2.37.0: CAD, Digita (espressioni, assolute, incrementali, polari), Arco, Poligono, aggancio, doppio tap, pressione lunga =====
+  await vai('cad'); await pg.waitForTimeout(150);
+  await pg.evaluate(() => { const c = App.cadStato; c.S.entita = []; c.S.prossimo = 1; c.aggiorna(); c.adatta(); c.disegna(); });
+  const ent = () => pg.evaluate(() => App.cadStato.S.entita);
+  const strumento = async id => { await pg.evaluate(() => window.scrollTo(0, 0)); await pg.click('.cad-strum [data-strum="' + id + '"]'); await pg.waitForTimeout(40); };
+  const digita = async t => { await pg.evaluate(() => { const b = document.querySelector('.cad-digita'); if (b) b.remove(); }); await pg.click('#cad-digita'); for (const k of t) { await pg.click('.cad-dg-k[aria-label="' + (k === '(' ? '(' : k) + '"]'); } };
+  // foro: punto scritto con un'espressione
+  await strumento('punto');
+  await pg.click('#cad-digita'); await pg.waitForTimeout(80);
+  ok(await pg.isVisible('.cad-digita') && (await pg.$$eval('.cad-dg-k', x => x.length)) === 25, 'tastierino con 25 tasti');
+  ok((await pg.$$eval('.cad-dg-k', x => x.every(b => b.getBoundingClientRect().height >= 40))), 'tasti grandi');
+  for (const k of ['5', '0', '/', '2', '+', '3', ';', '1', '0']) await pg.click('.cad-dg-k[aria-label="' + k + '"]');
+  ok((await pg.textContent('.cad-dg-prev')).includes('X 28') && (await pg.textContent('.cad-dg-prev')).includes('Y 10'), 'anteprima: ' + await pg.textContent('.cad-dg-prev'));
+  await pg.click('#cad-dg-ok'); await pg.waitForTimeout(80);
+  let E1 = await ent();
+  ok(E1.length === 1 && E1[0].tipo === 'punto' && E1[0].x === 28 && E1[0].y === 10, 'foro 50/2+3; 10: ' + JSON.stringify(E1));
+  // profilo: assoluto, incrementale e polare
+  await strumento('poli'); await pg.click('#cad-digita');
+  const scrivi = async t => { await pg.click('.cad-dg-k[aria-label="Cancella tutto"]'); for (const k of t) await pg.click('.cad-dg-k[aria-label="' + k + '"]'); await pg.click('#cad-dg-ok'); await pg.waitForTimeout(40); };
+  await scrivi('0;0'); await scrivi('@40;0'); await scrivi('@30<90'); await scrivi('@(0-40);0');
+  await pg.click('#cad-dg-chiudi'); await pg.waitForTimeout(80);
+  E1 = await ent();
+  const pr = E1.find(e => e.tipo === 'poli');
+  ok(pr && pr.chiuso && JSON.stringify(pr.punti.map(p => [p.x, p.y])) === JSON.stringify([[0, 0], [40, 0], [40, 30], [0, 30]]), 'profilo a coordinate assolute, incrementali e polari: ' + JSON.stringify(pr && pr.punti));
+  // errore leggibile
+  await strumento('rett'); await pg.click('#cad-digita');
+  await pg.click('.cad-dg-k[aria-label="5"]'); await pg.click('#cad-dg-ok');
+  ok((await pg.textContent('.cad-dg-prev')).includes('punto e virgola'), 'messaggio d\'errore: ' + await pg.textContent('.cad-dg-prev'));
+  // rettangolo con le misure
+  await scrivi('10;10'); await scrivi('40x30');
+  E1 = await ent();
+  ok(E1.some(e => e.tipo === 'rett' && e.x0 === 10 && e.y0 === 10 && e.x1 === 50 && e.y1 === 40), 'rettangolo 40x30 da (10;10)');
+  // cerchio: centro e diametro
+  await strumento('cerchio'); await pg.click('#cad-digita');
+  await scrivi('100;50');
+  await pg.click('.cad-dg-k[aria-label="Cancella tutto"]');
+  await pg.evaluate(() => { const campo = document.querySelector('.cad-dg-campo'); void campo; });
+  // il diametro si scrive d20: le lettere non sono sul tastierino, si prova con il raggio (20/2)
+  for (const k of '20/2') await pg.click('.cad-dg-k[aria-label="' + k + '"]');
+  await pg.click('#cad-dg-ok'); await pg.waitForTimeout(60);
+  E1 = await ent();
+  ok(E1.some(e => e.tipo === 'cerchio' && e.cx === 100 && e.cy === 50 && e.r === 10), 'cerchio con raggio 20/2');
+  // poligono: 6 lati
+  await strumento('poligono'); await pg.waitForTimeout(60);
+  ok(await pg.isVisible('#cad-lati-6') && (await pg.$eval('#cad-lati-6', b => b.classList.contains('attiva'))), 'sotto-barra del poligono');
+  await pg.evaluate(() => window.scrollTo(0, 0)); await pg.click('#cad-lati-8'); await pg.click('#cad-digita'); await scrivi('0;80'); await scrivi('15');
+  E1 = await ent();
+  const pol = E1.filter(e => e.tipo === 'poli' && e.chiuso && e.punti.length === 8);
+  ok(pol.length === 1 && pol[0].punti[0].x === 15 && pol[0].punti[0].y === 80, 'ottagono di raggio 15: ' + JSON.stringify(pol[0] && pol[0].punti.slice(0, 2)));
+  // arco: tre punti, centro, raggio
+  await strumento('arco'); await pg.waitForTimeout(60);
+  ok(await pg.isVisible('#cad-arco-3p') && await pg.isVisible('#cad-arco-cif') && await pg.isVisible('#cad-arco-ifr'), 'tre modi per l\'arco');
+  await pg.click('#cad-digita'); await scrivi('0;-20'); await scrivi('10;-10'); await scrivi('20;-20');
+  E1 = await ent();
+  let ar = E1.filter(e => e.tipo === 'poli' && !e.chiuso && e.punti.length === 2 && e.punti[1].tratto);
+  ok(ar.length === 1 && ar[0].punti[1].tratto === 'cw' && ar[0].punti[1].r === 10, 'arco per tre punti: ' + JSON.stringify(ar[0]));
+  await strumento('arco'); await pg.click('#cad-arco-cif'); await pg.click('#cad-digita'); await scrivi('60;-20'); await scrivi('70;-20'); await scrivi('60;-10');
+  E1 = await ent();
+  ar = E1.filter(e => e.tipo === 'poli' && !e.chiuso && e.punti.length === 2 && e.punti[1].tratto === 'ccw' && e.punti[0].x === 70);
+  ok(ar.length === 1 && ar[0].punti[1].x === 60 && ar[0].punti[1].y === -10, 'arco centro, inizio, fine: ' + JSON.stringify(ar[0]));
+  await strumento('arco'); await pg.click('#cad-arco-ifr'); await pg.click('#cad-digita'); await scrivi('100;-20'); await scrivi('120;-20');
+  ok(await pg.isVisible('.cad-digita[data-tipo="raggio"]') && (await pg.textContent('.cad-dg-tit')).includes('Raggio'), 'dopo i due punti chiede il raggio');
+  await pg.click('.chip:text-is("Arco grande")'); for (const k of '15') await pg.click('.cad-dg-k[aria-label="' + k + '"]'); await pg.click('#cad-dg-ok'); await pg.waitForTimeout(80);
+  E1 = await ent();
+  ar = E1.filter(e => e.tipo === 'poli' && !e.chiuso && e.punti.length === 2 && e.punti[1].r === -15);
+  ok(ar.length === 1, 'arco grande per inizio, fine e raggio (raggio negativo): ' + JSON.stringify(E1.filter(e => e.tipo === 'poli' && !e.chiuso).slice(-2)));
+  ok(!(await pg.$('.cad-digita')), 'il pannello si chiude dopo il raggio');
+  // programma da una forma con arco: il disegno si calcola senza errori
+  await pg.evaluate(() => { const c = App.cadStato; c.S.entita.forEach(e => { if (e.tipo === 'poli' && e.chiuso) e.lav = [{ op: 'contorno', prof: 5, lato: 'esterno' }]; }); });
+  // aggancio: intersezione, punto medio, centro e tangente con il dito
+  await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [{ id: 1, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 0 }, { x: 20, y: 20 }], lav: [] }, { id: 2, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 20 }, { x: 20, y: 0 }], lav: [] }, { id: 3, tipo: 'cerchio', cx: 60, cy: 10, r: 8, lav: [] }]; c.S.prossimo = 4; c.S.strum = 'punto'; c.S.snap = true; c.aggiorna(); c.adatta(); c.disegna(); });
+  const sulloSchermo = (x, y) => pg.evaluate(([x, y]) => { const c = document.querySelector('.cad-tela').getBoundingClientRect(), s = App.cadStato; return [c.left + s.X(x), c.top + s.Y(y)]; }, [x, y]);
+  await pg.evaluate(() => { App.cadStato.S.mirino = false; });
+  let q = await sulloSchermo(10.3, 9.8); await pg.mouse.move(q[0], q[1]); await pg.waitForTimeout(60);
+  ok((await pg.textContent('.cad-lettura')).includes('intersezione'), 'aggancio all\'intersezione: ' + await pg.textContent('.cad-lettura'));
+  q = await sulloSchermo(60.2, 10.1); await pg.mouse.move(q[0], q[1]); await pg.waitForTimeout(60);
+  ok((await pg.textContent('.cad-lettura')).includes('centro'), 'aggancio al centro: ' + await pg.textContent('.cad-lettura'));
+  await pg.mouse.click(q[0], q[1]); await pg.waitForTimeout(60);
+  ok((await ent()).some(e => e.tipo === 'punto' && e.x === 60 && e.y === 10), 'punto messo sul centro del cerchio');
+  // doppio tap sul vuoto = adatta alla vista
+  await strumento('sel'); await pg.evaluate(() => { const s = App.cadStato; s.vista.sc = 0.7; s.vista.cx = 500; s.disegna(); });
+  const sc0 = await pg.evaluate(() => App.cadStato.vista.sc);
+  q = await sulloSchermo(500, 300); const cvb = await pg.$eval('.cad-tela', c => { const b = c.getBoundingClientRect(); return [b.left + 40, b.top + 40]; });
+  await pg.mouse.click(cvb[0], cvb[1]); await pg.waitForTimeout(80); await pg.mouse.click(cvb[0], cvb[1]); await pg.waitForTimeout(100);
+  const sc1 = await pg.evaluate(() => App.cadStato.vista.sc);
+  ok(sc1 > sc0 * 1.5, 'doppio tap = adatta alla vista: ' + sc0 + ' -> ' + sc1);
+  // pressione lunga: menu su un elemento e sul vuoto
+  q = await sulloSchermo(60, 18);   // sul bordo del cerchio
+  await pg.mouse.move(q[0], q[1]); await pg.mouse.down(); await pg.waitForTimeout(750); await pg.mouse.up(); await pg.waitForTimeout(80);
+  const vociM = await pg.$$eval('.cad-menu-voce', x => x.map(b => b.textContent));
+  ok(vociM.includes('Duplica') && vociM.includes('Elimina'), 'menu della pressione lunga su un elemento: ' + vociM.join(','));
+  const n0 = (await ent()).length;
+  await pg.click('.cad-menu-voce:text-is("Duplica")'); await pg.waitForTimeout(80);
+  ok((await ent()).length === n0 + 1, 'Duplica aggiunge un elemento');
+  await pg.mouse.move(cvb[0], cvb[1] + 30); await pg.mouse.down(); await pg.waitForTimeout(750); await pg.mouse.up(); await pg.waitForTimeout(80);
+  ok((await pg.$$eval('.cad-menu-voce', x => x.map(b => b.textContent))).includes('Adatta alla vista'), 'menu sul vuoto');
+  await pg.mouse.click(cvb[0] + 5, cvb[1] + 5); await pg.waitForTimeout(60);
+  ok(!(await pg.$('.cad-menu')), 'il menu si chiude toccando fuori');
+  await largo('CAD con Digita');
 
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }
