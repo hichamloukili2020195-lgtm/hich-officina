@@ -16,7 +16,7 @@
   const STRUM = [['sel', 'Seleziona', '<path d="M5 3l14 8-6 2-3 6z"/>'], ['poli', 'Profilo', '<path d="M4 18l5-9 5 6 6-10"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="5" r="1.6"/>'],
     ['rett', 'Rettangolo', '<rect x="4" y="6" width="16" height="12" rx="1.5"/>'], ['cerchio', 'Cerchio', '<circle cx="12" cy="12" r="8"/><path d="M12 12h8"/>'],
     ['arco', 'Arco', '<path d="M4 18a9 9 0 0 1 16 0"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="18" r="1.6"/>'], ['poligono', 'Poligono', '<path d="M12 3l8 6-3 10H7L4 9z"/>'],
-    ['punto', 'Foro', '<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'], ['asola', 'Asola', '<rect x="3" y="8" width="18" height="8" rx="4"/>']];
+    ['punto', 'Foro', '<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'], ['asola', 'Asola', '<rect x="3" y="8" width="18" height="8" rx="4"/>'], ['fin', 'Finestra', '<path d="M4 4h4M12 4h4M20 4v4M20 12v4M20 20h-4M12 20H8M4 20v-4M4 12V8"/>']];
   const COLORE_LAV = { contorno: '--accento2', tasca: '--ok', foro: '--avviso', maschio: '--avviso', alesato: '--avviso', asola: '--ok' };
   const NOME_E = { poli: 'Profilo', rett: 'Rettangolo', cerchio: 'Cerchio', punto: 'Punto', asola: 'Asola' };
 
@@ -38,6 +38,7 @@
       if (S.arcoOrario === undefined) S.arcoOrario = false;
       let arco = null;                             // arco in costruzione: {punti:[{x,y}], chiede:bool}
       let Gc = null, GcEsc = undefined;            // geometria per l'aggancio (si rifa a ogni gesto)
+      let multi = [];                              // elementi scelti con la finestra
       let sel = null, selV = null;                 // entita scelta (id) e suo punto scelto (indice)
       let nuova = null;                            // profilo in costruzione
       let anteprima = null;                        // percorso calcolato, da mostrare
@@ -67,6 +68,8 @@
       };
       const passoGriglia = () => { const p = [0.5, 1, 2, 5, 10, 20, 50, 100, 200].find(q => q * vista.sc >= 14) || 200; return p; };
       const trovaE = id => S.entita.find(e => e.id === id);
+      const nascosta = e => (S.nascosti || []).includes(e.layer || '0');
+      const vis = () => S.entita.filter(e => !nascosta(e));
 
       // ----- punti notevoli per l'aggancio e le maniglie -----
       const maniglie = e => {
@@ -82,12 +85,12 @@
         L.push([0, 0]);
         return L;
       };
-      const geom = esclusa => { if (!Gc || GcEsc !== esclusa) { Gc = O.geometriaCAD(S.entita, esclusa); GcEsc = esclusa; } return Gc; };
+      const geom = esclusa => { if (!Gc || GcEsc !== esclusa) { Gc = O.geometriaCAD(vis(), esclusa); GcEsc = esclusa; } return Gc; };
       /** Aggancia un punto (mm): intersezioni, estremi, centri, punti medi, tangenti e perpendicolari, poi le linee orizzontali/verticali e la griglia. */
       const aggancia = (x, y, ref, esclusa) => {
         if (!S.snap) return { x: R3(x), y: R3(y), tipo: null };
         const tol = 14 / vista.sc;
-        const a = O.agganciCAD(S.entita, x, y, tol, ref, esclusa, geom(esclusa));
+        const a = O.agganciCAD(vis(), x, y, tol, ref, esclusa, geom(esclusa));
         if (a) return a;
         if (Math.hypot(x, y) < tol) return { x: 0, y: 0, tipo: 'punto' };
         if (nuova && nuova.punti.length > 2) { const p0 = nuova.punti[0], d = Math.hypot(num(p0.x) - x, num(p0.y) - y); if (d < tol) return { x: num(p0.x), y: num(p0.y), tipo: 'punto' }; }
@@ -148,7 +151,8 @@
         // entita
         const percorso = (poli, chiuso) => { g.beginPath(); poli.forEach((p, i) => (i ? g.lineTo(X(p.a), Y(p.b)) : g.moveTo(X(p.a), Y(p.b)))); if (chiuso) g.closePath(); };
         S.entita.forEach(e => {
-          const scelta = e.id === sel;
+          if (nascosta(e)) return;
+          const scelta = e.id === sel || multi.includes(e.id);
           const c0 = (e.lav && e.lav[0]) ? col(COLORE_LAV[e.lav[0].op] || '--accento2') : col('--testo');
           g.strokeStyle = scelta ? col('--avviso') : c0; g.fillStyle = c0; g.lineWidth = scelta ? 3 : 2;
           if (e.tipo === 'punto') { g.beginPath(); g.arc(X(e.x), Y(e.y), 5, 0, 7); g.fill(); g.beginPath(); g.moveTo(X(e.x) - 9, Y(e.y)); g.lineTo(X(e.x) + 9, Y(e.y)); g.moveTo(X(e.x), Y(e.y) - 9); g.lineTo(X(e.x), Y(e.y) + 9); g.stroke(); return; }
@@ -168,7 +172,7 @@
         // etichette delle lavorazioni
         g.font = '700 11px system-ui'; g.textAlign = 'left';
         S.entita.forEach((e, k) => {
-          if (!e.lav || !e.lav.length) return;
+          if (!e.lav || !e.lav.length || nascosta(e)) return;
           const b = O.limitiCAD([e]); if (!b) return;
           const t = (k + 1) + ' ' + e.lav.map(l => O.CAD_NOMI_LAV[l.op]).join(' + ');
           const px = X((b.x0 + b.x1) / 2), py = Y(b.y1) - 8;
@@ -185,6 +189,10 @@
         // maniglie dell'entita scelta
         const es = trovaE(sel);
         if (es) maniglie(es).forEach(h => { g.fillStyle = h.i === selV ? col('--avviso') : col('--testo'); g.strokeStyle = col('--fondo'); g.lineWidth = 2; g.beginPath(); g.arc(X(h.x), Y(h.y), h.i === selV ? 8 : 6, 0, 7); g.fill(); g.stroke(); });
+        if (gesto && gesto.tipo === 'finestra' && gesto.mosso) {
+          const x0 = Math.min(gesto.px, gesto.px2), y0 = Math.min(gesto.py, gesto.py2), w = Math.abs(gesto.px2 - gesto.px), h = Math.abs(gesto.py2 - gesto.py), inc = gesto.px2 < gesto.px;
+          g.save(); g.setLineDash(inc ? [6, 4] : []); g.strokeStyle = col(inc ? '--ok' : '--accento'); g.fillStyle = col(inc ? '--ok' : '--accento'); g.globalAlpha = 0.12; g.fillRect(x0, y0, w, h); g.globalAlpha = 1; g.lineWidth = 1.5; g.strokeRect(x0, y0, w, h); g.restore();
+        }
         // profilo in costruzione
         if (nuova) {
           const pts = nuova.punti.map(p => ({ x: num(p.x), y: num(p.y) }));
@@ -253,6 +261,7 @@
         if (es) { let bd = 22; let hit = null; maniglie(es).forEach(h => { const d = Math.hypot(X(h.x) - px, Y(h.y) - py); if (d < bd) { bd = d; hit = h; } }); if (hit) return { e: es, h: hit }; }
         let best = null, bd = 16;
         S.entita.forEach(e => {
+          if (nascosta(e)) return;
           let d = Infinity;
           if (e.tipo === 'punto') d = Math.hypot(X(e.x) - px, Y(e.y) - py);
           else if (e.tipo === 'asola') d = distSeg(px, py, X(e.x1), Y(e.y1), X(e.x2), Y(e.y2)) - (num(e.w) || 8) / 2 * vista.sc;
@@ -305,6 +314,8 @@
         if (attivi.size > 3) return;
         const [px, py] = pos(e);
         const strum = S.strum;
+        if (pick && strum === 'sel') { const t = trova(px, py); const pk = pick; pick = null; if (t && t.e.id !== pk.A) eseguiPick(pk, t.e); else A.avviso('Operazione annullata: non hai toccato un altro elemento.'); gesto = null; disegna(); return; }
+        if (strum === 'fin') { gesto = { tipo: 'finestra', px, py, px2: px, py2: py, mosso: false }; disegna(); return; }
         if (strum === 'sel') {
           const t = trova(px, py);
           if (t) {
@@ -353,6 +364,7 @@
           }
           anteprima = null; disegna(); if (e.pointerType !== 'mouse') lente(px, py); return;
         }
+        if (gesto.tipo === 'finestra') { gesto.px2 = px; gesto.py2 = py; if (Math.hypot(px - gesto.px, py - gesto.py) > 8) gesto.mosso = true; disegna(); return; }
         if (gesto.tipo === 'vuoto' && gesto.mosso) { const dx = px - gesto.px, dy = py - gesto.py; vista.cx -= dx / vista.sc; vista.cy += dy / vista.sc; gesto.px = px; gesto.py = py; disegna(); return; }
         if (gesto.tipo === 'disegna') {
           const ref = nuova && nuova.punti.length ? { x: num(nuova.punti[nuova.punti.length - 1].x), y: num(nuova.punti[nuova.punti.length - 1].y) } : (tratto ? { x: tratto.x, y: tratto.y } : null);
@@ -379,13 +391,18 @@
         if (g.lungo) { mirino = null; disegna(); return; }
         const w = g.tipo === 'disegna' ? mirino : null;
         const ultimo = mirino; mirino = null;
+        if (g.tipo === 'finestra') {
+          if (g.mosso) { multi = O.entitaInFinestra(vis(), mx(g.px), my(g.py), mx(g.px2), my(g.py2), g.px2 < g.px); sel = multi.length === 1 ? multi[0] : null; selV = null; A.avviso(multi.length ? multi.length + (multi.length === 1 ? ' elemento scelto' : ' elementi scelti') : 'Nessun elemento nella finestra'); }
+          else { const t = trova(g.px, g.py); if (t) { multi = multi.includes(t.e.id) ? multi.filter(i => i !== t.e.id) : multi.concat([t.e.id]); } else multi = []; sel = multi.length === 1 ? multi[0] : null; }
+          pannelloAgg(); statoBarra(); disegna(); return;
+        }
         if (g.tipo === 'vuoto') {
           if (!g.mosso) {
             // doppio tap sul vuoto = adatta alla vista
             const ora = Date.now();
             if (ultimoTap && ora - ultimoTap.t < 330 && Math.hypot(g.px - ultimoTap.px, g.py - ultimoTap.py) < 28) { ultimoTap = null; adatta(); A.vibra && A.vibra(10); disegna(); return; }
             ultimoTap = { t: ora, px: g.px, py: g.py };
-            sel = null; selV = null; pannelloAgg();
+            sel = null; selV = null; multi = []; pannelloAgg();
           }
           disegna(); return;
         }
@@ -462,8 +479,8 @@
       const menuContestuale = (px, py, e) => {
         chiudiMenu();
         if (e) { sel = e.id; selV = null; pannelloAgg(); disegna(); }
-        const voci = e ? [['Duplica', () => duplica(e)], ['Elimina', () => { sel = e.id; elimina(); }], ['Lavorazioni e quote', () => { radice.classList.add('pannello-aperto'); aggiorna(); }]]
-          : [['Adatta alla vista', () => { adatta(); disegna(); }], ['Digita un punto', () => apriDigita()], [S.snap ? 'Aggancio: spegni' : 'Aggancio: accendi', () => { S.snap = !S.snap; A.salva(); aggiorna(); }]];
+        const voci = e ? [['Duplica', () => duplica(e)], ['Elimina', () => { sel = e.id; elimina(); }], ['Modifica...', () => apriModifica()], ['Lavorazioni e quote', () => { radice.classList.add('pannello-aperto'); aggiorna(); }]]
+          : [['Adatta alla vista', () => { adatta(); disegna(); }], ['Digita un punto', () => apriDigita()], ['Importa DXF', () => importaDXF()], [S.snap ? 'Aggancio: spegni' : 'Aggancio: accendi', () => { S.snap = !S.snap; A.salva(); aggiorna(); }]];
         menuEl = el('div', { class: 'cad-menu', role: 'menu', 'aria-label': e ? 'Menu dell\'elemento' : 'Menu del disegno' }, voci.map(([t, fn]) => el('button', { class: 'cad-menu-voce', role: 'menuitem', testo: t, onclick: ev => { ev.stopPropagation(); chiudiMenu(); fn(); } })));
         const box = cv.parentNode; box.appendChild(menuEl);
         const W = box.clientWidth, H = box.clientHeight, mw = menuEl.offsetWidth || 190, mh = menuEl.offsetHeight || voci.length * 56;
@@ -480,7 +497,7 @@
         futuro.push(JSON.stringify(S.entita)); S.entita = JSON.parse(storia.pop()); if (!trovaE(sel)) { sel = null; selV = null; } anteprima = null; A.salva(); aggiorna();
       };
       const ripeti = () => { if (!futuro.length) return; storia.push(JSON.stringify(S.entita)); S.entita = JSON.parse(futuro.pop()); if (!trovaE(sel)) { sel = null; selV = null; } anteprima = null; A.salva(); aggiorna(); };
-      const elimina = () => { const e = trovaE(sel); if (!e) return; ricorda(); S.entita = S.entita.filter(x => x.id !== e.id); sel = null; selV = null; anteprima = null; A.salva(); aggiorna(); };
+      const elimina = () => { if (multi.length > 1) { ricorda(); S.entita = S.entita.filter(x => !multi.includes(x.id)); multi = []; sel = null; selV = null; anteprima = null; A.salva(); aggiorna(); return; } const e = trovaE(sel); if (!e) return; ricorda(); S.entita = S.entita.filter(x => x.id !== e.id); sel = null; selV = null; anteprima = null; A.salva(); aggiorna(); };
 
       // ----- inserimento numerico: tastierino con espressioni, assolute, incrementali, polari -----
       let digitaBox = null;
@@ -593,7 +610,7 @@
       STRUM.forEach(([id, nome, d]) => barra.appendChild(el('button', { class: 'cad-b', 'data-strum': id, 'aria-label': nome, title: nome, html: icoSvg(d) + '<span>' + nome + '</span>', onclick: () => {
         if (nuova) chiudiProfilo(false);
         arco = null; chiudiDigita();
-        S.strum = id; tratto = null; A.salva(); if (id !== 'sel') { sel = null; selV = null; } aggiorna();
+        S.strum = id; tratto = null; pick = null; A.salva(); if (id !== 'sel' && id !== 'fin') { sel = null; selV = null; multi = []; } aggiorna();
       } })));
       const bUndo = el('button', { class: 'cad-b', id: 'cad-annulla', 'aria-label': 'Annulla', html: icoSvg('<path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/>') + '<span>Annulla</span>', onclick: annulla });
       const bRedo = el('button', { class: 'cad-b', id: 'cad-ripeti', 'aria-label': 'Ripeti', html: icoSvg('<path d="M15 7l5 5-5 5"/><path d="M20 12H10a6 6 0 0 0 0 12"/>') + '<span>Ripeti</span>', onclick: ripeti });
@@ -606,7 +623,155 @@
       const bMir = el('button', { class: 'cad-b', id: 'cad-mirino', 'aria-label': 'Mirino sopra il dito', html: icoSvg('<circle cx="12" cy="9" r="5"/><path d="M12 14v7"/>') + '<span>Mirino</span>', onclick: () => { S.mirino = !S.mirino; A.salva(); aggiorna(); } });
       const bPan = el('button', { class: 'cad-b cad-solopieno', id: 'cad-pannello-b', 'aria-label': 'Apri o chiudi il pannello', html: icoSvg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>') + '<span>Pannello</span>', onclick: () => radice.classList.toggle('pannello-aperto') });
       const bDigita = el('button', { class: 'cad-b', id: 'cad-digita', 'aria-label': 'Scrivi le coordinate con il tastierino', html: icoSvg('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>') + '<span>Digita</span>', onclick: () => (digitaBox ? chiudiDigita() : apriDigita()) });
-      azioni.append(bUndo, bRedo, bDigita, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
+      // ----- 2.38.0: Modifica (sposta, ruota, scala, specchia, serie, parallela, raccordo, smusso, taglia, layer), layer e DXF -----
+      let modBox = null, pick = null;
+      const chiudiMod = () => { if (modBox) { modBox.remove(); modBox = null; } };
+      const bersagli = () => (multi.length ? multi : sel ? [sel] : []).map(trovaE).filter(Boolean);
+      const centroSel = () => { const b = O.limitiCAD(bersagli()); return b ? { x: R3((b.x0 + b.x1) / 2), y: R3((b.y0 + b.y1) / 2) } : { x: 0, y: 0 }; };
+      const OPS = [['sposta', 'Sposta'], ['ruota', 'Ruota'], ['scala', 'Scala'], ['specchia', 'Specchia'], ['slin', 'Serie in fila'], ['spol', 'Serie in cerchio'], ['offset', 'Parallela'], ['raccordo', 'Raccordo'], ['smusso', 'Smusso'], ['taglia', 'Taglia / estendi'], ['angolo', 'Angolo vivo'], ['layer', 'Layer']];
+      const cambiaE = (vecchio, nuovo) => { nuovo.id = vecchio.id; const i = S.entita.findIndex(x => x.id === vecchio.id); S.entita[i] = nuovo; };
+      const aggiungiE = n => { n.id = S.prossimo++; S.entita.push(n); return n.id; };
+      const finito = ids => { multi = ids && ids.length > 1 ? ids : []; sel = ids && ids.length === 1 ? ids[0] : (ids && ids.length ? null : sel); selV = null; anteprima = null; A.salva(); aggiorna(); };
+      const eseguiPick = (pk, B) => {
+        const Ae = trovaE(pk.A); if (!Ae) return;
+        if (pk.op === 'taglia') {
+          const r = O.tagliaEstendiCAD(Ae, pk.fine, B); if (r.errore) { A.avviso(r.errore); return; }
+          ricorda(); cambiaE(Ae, r); finito([Ae.id]); A.avviso('Fatto: estremo portato sul taglio'); return;
+        }
+        const r = O.unisciAngoloCAD(Ae, pk.fine, B, pk.fineB); if (r.errore) { A.avviso(r.errore); return; }
+        ricorda(); cambiaE(Ae, r.a); cambiaE(B, r.b); finito([Ae.id]); A.avviso('Fatto: i due estremi si incontrano nell\'angolo');
+      };
+      const apriModifica = op0 => {
+        chiudiMod(); chiudiMenu(); chiudiDigita();
+        const B = bersagli();
+        if (!B.length) { A.avviso('Scegli prima un elemento (con Seleziona) o piu elementi (con Finestra).'); return; }
+        const st = { op: op0 || 'sposta', copia: false, lato: 'fuori', fine: 'fine', fineB: 'fine', asse: 'V', tutti: false };
+        const box = modBox = el('div', { class: 'cad-digita cad-mod', role: 'dialog', 'aria-label': 'Modifica' });
+        const testa = el('div', { class: 'cad-dg-testa' }, [el('b', { class: 'cad-dg-tit', testo: 'Modifica: ' + B.length + (B.length === 1 ? ' elemento' : ' elementi') }), el('button', { class: 'cad-dg-x', id: 'cad-mod-x', type: 'button', 'aria-label': 'Chiudi', testo: '✕', onclick: chiudiMod })]);
+        const ops = el('div', { class: 'cad-mod-ops', role: 'tablist' });
+        const form = el('div', { class: 'cad-mod-form' }), msg = el('p', { class: 'errore', id: 'cad-mod-msg', role: 'alert', hidden: true });
+        let campi = {}; const memo = {};
+        const c = centroSel();
+        const unica = B.length === 1 ? B[0] : null;
+        const chip = (t, on, fn, id) => el('button', { class: 'chip' + (on ? ' attiva' : ''), type: 'button', id, testo: t, onclick: fn });
+        const campo = (id, et, v, aiuto) => { const i = el('input', { type: 'text', inputmode: 'text', id: 'cad-mod-' + id, value: String(memo[st.op + id] !== undefined ? memo[st.op + id] : v), oninput: () => { memo[st.op + id] = i.value; }, autocomplete: 'off', 'aria-label': et }); campi[id] = i; return el('label', { class: 'cad-mod-c' }, [el('span', { testo: et + (aiuto ? ' (' + aiuto + ')' : '') }), i]); };
+        const val = id => { const v = O.espressione(campi[id].value); if (!isFinite(v)) throw new Error('Scrivi un numero valido in "' + campi[id].getAttribute('aria-label') + '" (puoi usare anche 50/2+3).'); return v; };
+        const pt = id => { const r = O.puntoDaTesto(campi[id].value, null); if (r.errore) throw new Error(r.errore); return r; };
+        const errore = t => { msg.textContent = t; msg.hidden = !t; };
+        const ridisegnaForm = () => {
+          form.innerHTML = ''; campi = {}; errore('');
+          ops.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.op === st.op));
+          const F = [];
+          const copiaChip = () => chip(st.copia ? 'Copia: si' : 'Copia: no (sposta l\'originale)', st.copia, () => { st.copia = !st.copia; ridisegnaForm(); }, 'cad-mod-copia');
+          if (st.op === 'sposta') F.push(campo('dx', 'Sposta X', 0, 'mm'), campo('dy', 'Sposta Y', 0, 'mm'), copiaChip());
+          else if (st.op === 'ruota') F.push(campo('cx', 'Centro X', c.x), campo('cy', 'Centro Y', c.y), campo('ang', 'Angolo', 90, 'gradi, + antiorario'), copiaChip());
+          else if (st.op === 'scala') F.push(campo('cx', 'Centro X', c.x), campo('cy', 'Centro Y', c.y), campo('k', 'Fattore', 2, '2 = doppio, 0,5 = meta'), copiaChip());
+          else if (st.op === 'specchia') {
+            F.push(el('div', { class: 'cad-mod-righe' }, [['V', 'Asse verticale'], ['O', 'Asse orizzontale'], ['P', 'Due punti']].map(([k, t]) => chip(t, st.asse === k, () => { st.asse = k; ridisegnaForm(); }, 'cad-mod-asse-' + k))));
+            if (st.asse === 'V') F.push(campo('a', 'X dell\'asse', c.x, 'mm')); else if (st.asse === 'O') F.push(campo('a', 'Y dell\'asse', c.y, 'mm'));
+            else F.push(campo('p1', 'Primo punto', c.x + ';' + c.y, 'X;Y'), campo('p2', 'Secondo punto', (c.x + 10) + ';' + c.y, 'X;Y'));
+            if (!st.copiaSet) { st.copia = true; st.copiaSet = true; }
+            F.push(copiaChip());
+          }
+          else if (st.op === 'slin') F.push(campo('dx', 'Passo X', 20, 'mm'), campo('dy', 'Passo Y', 0, 'mm'), campo('n', 'Elementi in tutto', 4, 'con l\'originale'));
+          else if (st.op === 'spol') F.push(campo('cx', 'Centro X', 0), campo('cy', 'Centro Y', 0), campo('n', 'Elementi in tutto', 6, 'con l\'originale'), campo('ang', 'Angolo totale', 360, 'gradi'));
+          else if (st.op === 'offset') {
+            const chiuso = unica && unica.tipo !== 'poli' ? true : !!(unica && unica.chiuso);
+            F.push(campo('d', 'Distanza', 2, 'mm'));
+            F.push(el('div', { class: 'cad-mod-righe' }, (chiuso ? [['fuori', 'Fuori'], ['dentro', 'Dentro']] : [['sx', 'A sinistra'], ['dx', 'A destra']]).map(([k, t]) => chip(t, st.lato === k, () => { st.lato = k; ridisegnaForm(); }, 'cad-mod-lato-' + k))));
+            if (!(chiuso ? ['fuori', 'dentro'] : ['sx', 'dx']).includes(st.lato)) st.lato = chiuso ? 'fuori' : 'sx';
+          }
+          else if (st.op === 'raccordo' || st.op === 'smusso') {
+            F.push(campo('v', st.op === 'raccordo' ? 'Raggio del raccordo' : 'Lato dello smusso', st.op === 'raccordo' ? 3 : 2, 'mm, 0 = toglie'));
+            if (unica && unica.tipo === 'poli') F.push(chip(st.tutti ? 'Su tutti i vertici' : (selV !== null ? 'Sul vertice scelto (' + (selV + 1) + ')' : 'Tocca prima un punto del profilo'), st.tutti, () => { st.tutti = !st.tutti; ridisegnaForm(); }, 'cad-mod-tutti'));
+          }
+          else if (st.op === 'taglia' || st.op === 'angolo') {
+            F.push(el('div', { class: 'cad-mod-righe' }, [['inizio', 'Inizio'], ['fine', 'Fine']].map(([k, t]) => chip((st.op === 'angolo' ? 'Questo: ' : 'Estremo: ') + t, st.fine === k, () => { st.fine = k; ridisegnaForm(); }, 'cad-mod-fine-' + k))));
+            if (st.op === 'angolo') F.push(el('div', { class: 'cad-mod-righe' }, [['inizio', 'Inizio'], ['fine', 'Fine']].map(([k, t]) => chip('Altro: ' + t, st.fineB === k, () => { st.fineB = k; ridisegnaForm(); }, 'cad-mod-fineB-' + k))));
+            F.push(el('p', { class: 'aiuto', testo: st.op === 'taglia' ? 'Dopo Applica tocca l\'elemento che taglia: l\'estremo si ferma li (accorcia o allunga).' : 'Dopo Applica tocca l\'altro profilo aperto: i due estremi si incontrano nell\'angolo.' }));
+          }
+          else if (st.op === 'layer') F.push(campo('nome', 'Nome del layer', (unica && unica.layer) || '0', 'es. Sagoma, Fori'));
+          form.append(...F);
+        };
+        const applica = () => {
+          try {
+            errore('');
+            const op = st.op, bs = bersagli();
+            if (['sposta', 'ruota', 'scala', 'specchia'].includes(op)) {
+              let T;
+              if (op === 'sposta') T = { tipo: 'sposta', dx: val('dx'), dy: val('dy') };
+              else if (op === 'ruota') T = { tipo: 'ruota', cx: val('cx'), cy: val('cy'), ang: val('ang') };
+              else if (op === 'scala') T = { tipo: 'scala', cx: val('cx'), cy: val('cy'), k: val('k') };
+              else if (st.asse === 'V') T = { tipo: 'specchia', x1: val('a'), y1: 0, x2: val('a'), y2: 1 };
+              else if (st.asse === 'O') T = { tipo: 'specchia', x1: 0, y1: val('a'), x2: 1, y2: val('a') };
+              else { const a = pt('p1'), b = pt('p2'); T = { tipo: 'specchia', x1: a.x, y1: a.y, x2: b.x, y2: b.y }; }
+              const nuovi = bs.map(e => O.trasformaCAD(e, T)); const er = nuovi.find(n => n.errore); if (er) throw new Error(er.errore);
+              ricorda(); const ids = [];
+              nuovi.forEach((n, i) => { if (st.copia) ids.push(aggiungiE(n)); else { cambiaE(bs[i], n); ids.push(bs[i].id); } });
+              finito(ids); chiudiMod(); return;
+            }
+            if (op === 'slin' || op === 'spol') {
+              const ids = []; const nuovi = [];
+              for (const e of bs) { const r = op === 'slin' ? O.serieLineare(e, val('dx'), val('dy'), val('n')) : O.seriePolare(e, val('cx'), val('cy'), val('n'), val('ang')); if (r.errore) throw new Error(r.errore); nuovi.push(...r); }
+              ricorda(); nuovi.forEach(n => ids.push(aggiungiE(n))); finito(ids); chiudiMod(); return;
+            }
+            if (bs.length !== 1) throw new Error('Questa operazione si fa su un elemento alla volta.');
+            const e = bs[0];
+            if (op === 'offset') { const r = O.offsetCAD(e, val('d'), st.lato); if (r.errore) throw new Error(r.errore); ricorda(); const id = aggiungiE(r); finito([id]); chiudiMod(); return; }
+            if (op === 'raccordo' || op === 'smusso') {
+              let r = e;
+              if (e.tipo === 'poli') {
+                const v = val('v');
+                const idx = st.tutti ? e.punti.map((p, i) => i).filter(i => e.chiuso || (i > 0 && i < e.punti.length - 1)) : (selV !== null && selV < e.punti.length ? [selV] : []);
+                if (!idx.length) throw new Error('Tocca prima un punto del profilo (la maniglia), oppure scegli "Su tutti i vertici".');
+                for (const i of idx) { r = O.angoloCAD(r, i, op, v); if (r.errore) throw new Error('Vertice ' + (i + 1) + ': ' + r.errore); }
+              } else { r = O.angoloCAD(e, 0, op, val('v')); if (r.errore) throw new Error(r.errore); }
+              ricorda(); cambiaE(e, r); finito([e.id]); chiudiMod(); return;
+            }
+            if (op === 'taglia' || op === 'angolo') {
+              if (!(e.tipo === 'poli' && !e.chiuso)) throw new Error('Serve un profilo aperto (linea o polilinea).');
+              pick = op === 'taglia' ? { op, A: e.id, fine: st.fine } : { op, A: e.id, fine: st.fine, fineB: st.fineB };
+              S.strum = 'sel'; chiudiMod(); aggiorna(); A.avviso('Tocca l\'elemento ' + (op === 'taglia' ? 'che taglia' : 'da unire')); return;
+            }
+            if (op === 'layer') {
+              const nome = String(campi.nome.value || '0').trim().slice(0, 31) || '0';
+              ricorda(); bs.forEach(x => { x.layer = nome; }); finito(bs.map(x => x.id)); chiudiMod(); return;
+            }
+          } catch (er) { errore(er.message); }
+        };
+        OPS.forEach(([k, t]) => { const b = chip(t, false, () => { st.op = k; ridisegnaForm(); }, 'cad-op-' + k); b.dataset.op = k; ops.appendChild(b); });
+        box.append(testa, ops, form, msg, el('button', { class: 'pul cad-dg-ok', id: 'cad-mod-ok', type: 'button', testo: 'Applica', onclick: applica }));
+        ridisegnaForm();
+        cv.parentNode.parentNode.appendChild(box);
+      };
+      const bMod = el('button', { class: 'cad-b', id: 'cad-modifica', 'aria-label': 'Modifica: sposta, ruota, specchia, serie, parallela', html: icoSvg('<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 7l3 3"/>') + '<span>Modifica</span>', onclick: () => apriModifica() });
+      // layer: mostra/nascondi
+      const barraLayer = el('div', { class: 'cad-sub cad-layer', role: 'group', 'aria-label': 'Layer del disegno' });
+      area.insertBefore(barraLayer, area.children[1]);
+      const aggiornaLayer = () => {
+        barraLayer.innerHTML = '';
+        const nomi = [...new Set(S.entita.map(e => e.layer || '0'))];
+        if (nomi.length < 2 && !(S.nascosti || []).length) { barraLayer.hidden = true; return; }
+        S.nascosti = (S.nascosti || []).filter(n => nomi.includes(n));
+        nomi.forEach(n => { const nasc = S.nascosti.includes(n); barraLayer.appendChild(el('button', { class: 'chip' + (nasc ? '' : ' attiva'), 'data-layer': n, 'aria-pressed': String(!nasc), 'aria-label': 'Layer ' + n + (nasc ? ' nascosto' : ' visibile'), testo: (nasc ? '○ ' : '● ') + n, onclick: () => { S.nascosti = nasc ? S.nascosti.filter(x => x !== n) : S.nascosti.concat([n]); if (trovaE(sel) && nascosta(trovaE(sel))) { sel = null; selV = null; } multi = multi.filter(i => !nascosta(trovaE(i) || {})); A.salva(); aggiorna(); } })); });
+        barraLayer.hidden = false;
+      };
+      // DXF
+      const importaDXF = () => {
+        A.scegliTesto(testo => {
+          const r = O.leggiDXF(testo);
+          if (r.errore) { A.avviso(r.errore); return; }
+          ricorda();
+          const ids = r.entita.map(e => { if (!e.lav || !e.lav.length) e.lav = e.tipo === 'poli' ? [] : e.tipo === 'cerchio' ? [{ op: 'foro', passante: true }] : e.tipo === 'punto' ? [{ op: 'foro', passante: true, d: 6.8 }] : []; if (e.layer === '0') delete e.layer; return aggiungiE(e); });
+          S.strum = 'sel'; sel = null; multi = ids.length > 1 ? ids : []; A.salva(); aggiorna(); adatta(); disegna();
+          A.avviso(ids.length + ' elementi letti dal DXF' + (r.avvisi.length ? '. ' + r.avvisi.join(' ') : '') + '. Controlla le quote.');
+        }, '.dxf,.DXF,text/plain,application/dxf,image/vnd.dxf');
+      };
+      const esportaDXF = () => {
+        if (!S.entita.length) { A.avviso('Il disegno e vuoto.'); return; }
+        A.scarica('disegno.dxf', O.scriviDXF(vis()));
+      };
+      azioni.append(bUndo, bRedo, bDigita, bMod, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
 
       // ----- pannello: lavorazioni dell'entita scelta, dati del pezzo, crea -----
       const OP_TESTO = { contorno: ['Contorno', 'Taglia lungo la linea con G41/G42'], tasca: ['Tasca', 'Svuota l\'interno'], foro: ['Foro', 'Centrino, punta e smusso'], maschio: ['Maschio', 'Foro filettato'], alesato: ['Alesato', 'Foro con alesatore'], asola: ['Asola', 'Fresa a spirale lungo la linea'] };
@@ -645,6 +810,7 @@
         pannello.append(msg, el('div', { class: 'pulsanti' }, [
           el('button', { class: 'pul sec', id: 'cad-percorso', html: A.icona('modifica') + 'Mostra il percorso', onclick: () => calcola(false, msg) }),
           el('button', { class: 'pul', id: 'cad-crea', html: A.icona('codice') + 'Crea il programma', onclick: () => calcola(true, msg) })]));
+        pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'cad-dxf-imp', testo: 'Importa DXF', onclick: () => importaDXF() }), el('button', { class: 'pul sec', id: 'cad-dxf-esp', testo: 'Esporta DXF', onclick: () => esportaDXF() })]));
         pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', testo: 'Carica un disegno di prova', onclick: () => { ricorda(); S.entita = ESEMPIO(); S.prossimo = 10; sel = null; anteprima = null; adattato = false; A.salva(); aggiorna(); adatta(); disegna(); } })]));
       };
       /** Il pannello dell'entita scelta: dati, punti, lavorazioni. */
@@ -740,7 +906,7 @@
       const calcola = (crea, msg) => {
         msg.innerHTML = '';
         const I = A.imp();
-        const modello = { fz: num(S.fz), entita: JSON.parse(JSON.stringify(S.entita)).map(e => { e.lav = (e.lav || []).map(l => Object.assign({}, l, { prof: num(l.prof), d: num(l.d), smusso: num(l.smusso), passo: num(l.passo) })); return e; }) };
+        const modello = { fz: num(S.fz), entita: JSON.parse(JSON.stringify(vis())).map(e => { e.lav = (e.lav || []).map(l => Object.assign({}, l, { prof: num(l.prof), d: num(l.d), smusso: num(l.smusso), passo: num(l.passo) })); return e; }) };
         const p = O.pianificaCAD(modello, { mat: A.materiale(S.mat || 0), tab: A.tabellaUt ? A.tabellaUt() : [], nmax: I.nmaxFresa, zSic: I.zSic, zR: I.zR, refrig: I.refrig, g43: I.g43 });
         if (p.errore) { msg.appendChild(el('p', { class: 'errore', role: 'alert', testo: p.errore })); return; }
         const r = O.gcodeSequenza(p.fasi, { num: I.numProg, nome: 'DISEGNO', numerare: I.numerare });
@@ -767,7 +933,7 @@
         sub.hidden = !sub.childNodes.length;
       };
       const statoBarra = () => {
-        sottoBarra();
+        sottoBarra(); aggiornaLayer();
         barra.querySelectorAll('[data-strum]').forEach(b => b.classList.toggle('attiva', b.dataset.strum === S.strum));
         bUndo.disabled = !storia.length && !(nuova && nuova.punti.length); bRedo.disabled = !futuro.length;
         bFine.hidden = bChiudi.hidden = !(nuova && nuova.punti.length); bChiudi.disabled = !(nuova && nuova.punti.length > 2);
@@ -776,7 +942,7 @@
       };
       const aggiorna = () => { Gc = null; statoBarra(); pannelloAgg(); ridisegna(); };
       A.cadRidisegna = () => { adatta(); disegna(); };
-      A.cadStato = { S, vista, get sel() { return sel; }, set sel(v) { sel = v; }, aggiorna, adatta, disegna, nuovaE, X, Y, mondo: mx, calcola: () => { const t = el('div'); calcola(false, t); return t; } };
+      A.cadStato = { S, vista, get multi() { return multi; }, set multi(v) { multi = v; }, apriModifica, get sel() { return sel; }, set sel(v) { sel = v; }, aggiorna, adatta, disegna, nuovaE, X, Y, mondo: mx, calcola: () => { const t = el('div'); calcola(false, t); return t; } };
       aggiorna();
       requestAnimationFrame(() => { adatta(); disegna(); });
     }

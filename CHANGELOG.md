@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.38.0 - Fase 2b CAD: modifiche al disegno, layer e DXF
+- **Finestra**: nuovo strumento per scegliere piu elementi trascinando un rettangolo (da sinistra a destra = solo quelli tutti dentro; da destra a sinistra = anche quelli toccati). Un tocco aggiunge o toglie un elemento.
+- **Modifica** (pulsante in basso, o pressione lunga): sposta, ruota, scala, specchia (asse verticale, orizzontale o due punti), serie in fila, serie in cerchio, parallela (fuori/dentro o a sinistra/destra), raccordo e smusso su un vertice o su tutti, taglia/estendi, angolo vivo tra due profili aperti, layer. Si scrivono i numeri anche come espressioni (`50/2+3`); gli errori sono scritti in chiaro; si puo tenere l'originale (Copia).
+- **Layer**: un nome per gruppo di elementi (Sagoma, Fori...); una barra per mostrarli e nasconderli. Gli elementi nascosti non sono disegnati, non agganciano e non entrano nel programma.
+- **DXF**, scritto da noi senza librerie: esporta il disegno (rette, cerchi, punti, polilinee con archi, layer) e importa rette, archi, cerchi, punti e polilinee. Rette e archi con gli estremi uguali si uniscono in un profilo; un rettangolo sugli assi torna rettangolo; i pollici si convertono. Spline, testi e quote si saltano e il messaggio dice quanti. Controlla sempre le quote dopo l'importazione.
+- Prove: trasformazioni, serie, parallela, raccordi, taglia/estendi, finestra, DXF (scrittura e rilettura), interfaccia.
+
 ## 2.37.0 - Fase 2a CAD: Digita, archi, poligono, aggancio intelligente
 - **Digita**: tastierino per scrivere i punti con espressioni (`50/2+3`, `pi`, seno e coseno in gradi), assoluti (`50;30`), incrementali (`@10;5`) e polari (`@20<45`); anteprima in diretta e messaggi d'errore chiari. Per il rettangolo anche le misure `40x30`.
 - **Arco** in tre modi: tre punti, centro-inizio-fine, inizio-fine-raggio (arco piccolo o grande).

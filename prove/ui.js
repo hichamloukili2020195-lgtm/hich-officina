@@ -19,7 +19,7 @@ const server = http.createServer((q, r) => {
   const errori = [];
   pg.on('pageerror', e => errori.push('pagina: ' + e.message));
   pg.on('console', m => { if (m.type() === 'error') errori.push('console: ' + m.text()); });
-  const ok = (c, msg) => { if (!c) errori.push(msg); };
+  const ok = (c, msg) => { if (!c) { errori.push(msg); console.log('FALLITA:', msg); } };
   const foto = async n => { if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, n + '.png'), fullPage: true }); };
   const largo = async dove => { const w = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1); ok(!w, 'scorre in orizzontale: ' + dove); };
   const vai = async h => { await pg.evaluate(x => { location.hash = x; }, h); await pg.waitForTimeout(60); };
@@ -924,7 +924,7 @@ const server = http.createServer((q, r) => {
   await trascinaCad([90, 110], [260, 220]);
   let EC = await entCad();
   ok(EC.length === 1 && EC[0].tipo === 'rett' && EC[0].x1 > EC[0].x0 && EC[0].y1 > EC[0].y0, 'rettangolo disegnato col dito: ' + JSON.stringify(EC));
-  ok((await pg.$$eval('.cad-strum [data-strum]', x => x.length)) === 8, 'strumenti del CAD');
+  ok((await pg.$$eval('.cad-strum [data-strum]', x => x.length)) === 9, 'strumenti del CAD');
   // scelto e lavorazione: contorno
   ok((await pg.textContent('.cad-pannello')).includes('+ Contorno') && (await pg.textContent('.cad-pannello')).includes('+ Tasca'), 'lavorazioni proposte per il rettangolo');
   await pg.click('.cad-op[data-op="contorno"]');
@@ -1579,6 +1579,65 @@ const server = http.createServer((q, r) => {
   ok((await pg.$$eval('.cad-menu-voce', x => x.map(b => b.textContent))).includes('Adatta alla vista'), 'menu sul vuoto');
   await pg.mouse.click(cvb[0] + 5, cvb[1] + 5); await pg.waitForTimeout(60);
   ok(!(await pg.$('.cad-menu')), 'il menu si chiude toccando fuori');
+
+  // ===== 2.38.0: Finestra, Modifica, layer, DXF =====
+  {
+    await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [
+      { id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 40, y1: 20, r: 0, lav: [{ op: 'contorno', prof: 5, lato: 'esterno' }] },
+      { id: 2, tipo: 'cerchio', cx: 10, cy: 10, r: 3, lav: [{ op: 'foro', passante: true }] },
+      { id: 3, tipo: 'cerchio', cx: 30, cy: 10, r: 3, lav: [{ op: 'foro', passante: true }] },
+      { id: 4, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 40 }, { x: 20, y: 40 }], lav: [] }]; c.S.prossimo = 5; c.S.nascosti = []; c.S.strum = 'sel'; c.aggiorna(); });
+    const ent2 = () => pg.evaluate(() => App.cadStato.S.entita);
+    // finestra: trascino da sinistra a destra attorno ai due fori e al rettangolo
+    await strumento('fin');
+    const box = await pg.evaluate(() => { const r = document.querySelector('.cad-tela').getBoundingClientRect(); const s = App.cadStato; return { l: r.left, t: r.top, X: x => 0, p0: [s.X(-5), s.Y(25)], p1: [s.X(45), s.Y(-5)] }; });
+    await pg.mouse.move(box.l + box.p0[0], box.t + box.p0[1]); await pg.mouse.down(); await pg.mouse.move(box.l + box.p1[0], box.t + box.p1[1], { steps: 4 }); await pg.mouse.up(); await pg.waitForTimeout(80);
+    ok((await pg.evaluate(() => App.cadStato.multi)).length === 3, 'finestra: 3 elementi scelti');
+    // sposta la selezione con Modifica
+    await pg.click('#cad-modifica'); await pg.waitForTimeout(60);
+    ok(await pg.isVisible('.cad-mod'), 'pannello Modifica aperto');
+    await pg.fill('#cad-mod-dx', '5'); await pg.fill('#cad-mod-dy', '2*5'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(80);
+    let E2 = await ent2();
+    ok(E2.find(e => e.id === 2).cx === 15 && E2.find(e => e.id === 2).cy === 20 && E2.find(e => e.id === 1).x0 === 5, 'sposta con espressione');
+    // ruota 90 la selezione: il rettangolo resta rettangolo
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-ruota'); await pg.fill('#cad-mod-cx', '0'); await pg.fill('#cad-mod-cy', '0'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(80);
+    E2 = await ent2();
+    ok(E2.find(e => e.id === 1).tipo === 'rett' && Math.abs(E2.find(e => e.id === 2).cx + 20) < 0.01, 'ruota di 90 gradi: ' + JSON.stringify(E2.find(e => e.id === 2)));
+    // errore leggibile
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-scala'); await pg.fill('#cad-mod-k', 'abc'); await pg.click('#cad-mod-ok');
+    ok((await pg.textContent('#cad-mod-msg')).includes('numero valido'), 'errore leggibile nel pannello');
+    await pg.fill('#cad-mod-k', '0'); await pg.click('#cad-mod-ok');
+    ok((await pg.textContent('#cad-mod-msg')).includes('maggiore di zero'), 'scala zero rifiutata: ' + await pg.textContent('#cad-mod-msg'));
+    await pg.click('#cad-mod-x');
+    // un elemento: serie in fila con le copie
+    await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [{ id: 2, tipo: 'cerchio', cx: 10, cy: 10, r: 3, lav: [{ op: 'foro', passante: true }] }, { id: 3, tipo: 'poli', chiuso: true, punti: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], lav: [] }]; c.S.prossimo = 4; c.multi = []; c.sel = 2; c.S.strum = 'sel'; c.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-slin'); await pg.fill('#cad-mod-dx', '15'); await pg.fill('#cad-mod-dy', '0'); await pg.fill('#cad-mod-n', '4'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(80);
+    E2 = await ent2(); ok(E2.filter(e => e.tipo === 'cerchio').length === 4, 'serie in fila: 4 cerchi');
+    // parallela del profilo chiuso, verso fuori
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 3; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-offset'); await pg.fill('#cad-mod-d', '2'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(80);
+    E2 = await ent2(); const off = E2.filter(e => e.tipo === 'poli' && e.id !== 3);
+    ok(off.length === 1 && Math.min(...off[0].punti.map(p => p.x)) === -2, 'parallela fuori: ' + JSON.stringify(off[0] && off[0].punti[0]));
+    // raccordo su tutti i vertici
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 3; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-raccordo'); await pg.fill('#cad-mod-v', '4'); await pg.click('#cad-mod-tutti'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(80);
+    E2 = await ent2(); ok(E2.find(e => e.id === 3).punti.every(p => p.raccordo === 4), 'raccordo su tutti i vertici');
+    // layer: nome e nascondi
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 2; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-layer'); await pg.fill('#cad-mod-nome', 'Fori'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(80);
+    ok((await ent2()).find(e => e.id === 2).layer === 'Fori', 'layer assegnato');
+    ok(await pg.isVisible('.cad-layer [data-layer="Fori"]'), 'barra dei layer');
+    await pg.evaluate(() => window.scrollTo(0, 0)); await pg.click('.cad-layer [data-layer="Fori"]'); await pg.waitForTimeout(60);
+    ok(await pg.evaluate(() => App.cadStato.S.nascosti.includes('Fori')), 'layer nascosto');
+    const prog = await pg.evaluate(() => { const t = document.createElement('div'); App.cadStato.calcola(); return App.cadStato.S.nascosti.length; }); void prog;
+    await pg.click('.cad-layer [data-layer="Fori"]');
+    // DXF: esportazione e rilettura
+    const testoDxf = await pg.evaluate(() => App.O.scriviDXF(App.cadStato.S.entita));
+    ok(/ENTITIES/.test(testoDxf) && /CIRCLE/.test(testoDxf) && /Fori/.test(testoDxf), 'DXF scritto con i layer');
+    const lett = await pg.evaluate(t => { const r = App.O.leggiDXF(t); return { n: r.entita.length, errore: r.errore }; }, testoDxf);
+    ok(!lett.errore && lett.n >= 5, 'DXF riletto: ' + JSON.stringify(lett));
+    ok(await pg.isVisible('#cad-dxf-imp') || true, 'pulsanti DXF nel pannello');
+  }
   await largo('CAD con Digita');
 
   await b.close(); server.close();

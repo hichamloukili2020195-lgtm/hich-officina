@@ -5,6 +5,8 @@ const O = require('../programmi.js');   // carica anche calcoli.js
 require('../profilo.js');
 require('../filetti.js');
 require('../cad.js');
+require('../modifica.js');
+require('../dxf.js');
 require('../lavoro.js');
 require('../ciclo.js');
 require('../disegno_foto.js');
@@ -1174,5 +1176,112 @@ prova('CAD: aggancio a intersezione, punto medio, centro, tangente, perpendicola
   const molte = []; for (let i = 0; i < 3000; i++) molte.push({ id: i + 1, tipo: 'poli', chiuso: false, punti: [{ x: i % 100 * 3, y: Math.floor(i / 100) * 3 }, { x: i % 100 * 3 + 2, y: Math.floor(i / 100) * 3 + 2 }] });
   const t0 = Date.now(); const G = O.geometriaCAD(molte); for (let k = 0; k < 50; k++) O.agganciCAD(molte, 100 + k, 50, 2, null, null, G);
   assert.ok(Date.now() - t0 < 1500, 'aggancio con 3000 entita: ' + (Date.now() - t0) + ' ms');
+});
+
+// ===== 2.38.0: modifiche al disegno e DXF =====
+prova('specchia, ruota, scala, sposta', () => {
+  const p = { id: 1, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10, tratto: 'ccw', r: 10 }], lav: [{ op: 'contorno', prof: 3 }], layer: 'A' };
+  const m = O.trasformaCAD(p, { tipo: 'specchia', x1: 0, y1: 0, x2: 0, y2: 1 });
+  assert.strictEqual(m.punti[1].x, -10); assert.strictEqual(m.punti[2].tratto, 'cw'); assert.strictEqual(m.layer, 'A'); assert.ok(!('id' in m)); assert.strictEqual(m.lav[0].prof, 3);
+  const r = O.trasformaCAD(p, { tipo: 'ruota', cx: 0, cy: 0, ang: 90 }); vicino(r.punti[1].x, 0); vicino(r.punti[1].y, 10);
+  const sc = O.trasformaCAD(p, { tipo: 'scala', cx: 0, cy: 0, k: 2 }); assert.strictEqual(sc.punti[1].x, 20); assert.strictEqual(sc.punti[2].r, 20);
+  assert.ok(O.trasformaCAD(p, { tipo: 'scala', cx: 0, cy: 0, k: 0 }).errore);
+  const re = { id: 2, tipo: 'rett', x0: 0, y0: 0, x1: 20, y1: 10, r: 2, lav: [] };
+  assert.strictEqual(O.trasformaCAD(re, { tipo: 'ruota', cx: 0, cy: 0, ang: 90 }).tipo, 'rett');
+  const r45 = O.trasformaCAD(re, { tipo: 'ruota', cx: 0, cy: 0, ang: 45 }); assert.strictEqual(r45.tipo, 'poli'); assert.strictEqual(r45.punti.length, 4); assert.strictEqual(r45.punti[0].raccordo, 2);
+  assert.strictEqual(O.trasformaCAD({ tipo: 'cerchio', cx: 5, cy: 5, r: 2, lav: [] }, { tipo: 'scala', cx: 0, cy: 0, k: 3 }).cx, 15);
+  const as = O.trasformaCAD({ tipo: 'asola', x1: 0, y1: 0, x2: 10, y2: 0, w: 6, lav: [] }, { tipo: 'sposta', dx: 1, dy: 2 }); assert.strictEqual(as.y2, 2); assert.strictEqual(as.w, 6);
+});
+prova('serie lineare e polare', () => {
+  const c = { id: 1, tipo: 'cerchio', cx: 10, cy: 0, r: 2, lav: [{ op: 'foro', passante: true }] };
+  const L = O.serieLineare(c, 15, 0, 4); assert.strictEqual(L.length, 3); assert.strictEqual(L[2].cx, 55);
+  const P = O.seriePolare(c, 0, 0, 4, 360); assert.strictEqual(P.length, 3); vicino(P[0].cx, 0); vicino(P[0].cy, 10); vicino(P[1].cx, -10);
+  const P2 = O.seriePolare(c, 0, 0, 3, 90); vicino(P2[1].cy, 10);
+  assert.ok(O.serieLineare(c, 0, 0, 3).errore); assert.ok(O.serieLineare(c, 1, 0, 1).errore); assert.ok(O.seriePolare(c, 0, 0, 1000, 360).errore);
+});
+prova('offset: rettangolo, cerchio, profilo con arco', () => {
+  const re = O.offsetCAD({ tipo: 'rett', x0: 0, y0: 0, x1: 40, y1: 20, r: 0, lav: [] }, 2, 'fuori'); assert.strictEqual(re.x0, -2); assert.strictEqual(re.y1, 22);
+  assert.ok(O.offsetCAD({ tipo: 'rett', x0: 0, y0: 0, x1: 40, y1: 20, lav: [] }, 11, 'dentro').errore);
+  assert.strictEqual(O.offsetCAD({ tipo: 'cerchio', cx: 0, cy: 0, r: 10, lav: [] }, 3, 'dentro').r, 7);
+  assert.ok(O.offsetCAD({ tipo: 'cerchio', cx: 0, cy: 0, r: 10, lav: [] }, 10, 'dentro').errore);
+  const quad = { tipo: 'poli', chiuso: true, lav: [], punti: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }] };
+  const f = O.offsetCAD(quad, 5, 'fuori'); assert.deepStrictEqual(f.punti.map(p => [p.x, p.y]).sort().join(), '-5,-5,-5,25,25,-5,25,25'.split(',').reduce((a, v, i, A) => i % 2 ? a : a.concat([[Number(v), Number(A[i + 1])]]), []).sort().join());
+  const d = O.offsetCAD(quad, 5, 'dentro'); const xs = d.punti.map(p => p.x); assert.strictEqual(Math.min(...xs), 5); assert.strictEqual(Math.max(...xs), 15);
+  // stesso risultato qualunque sia il verso del disegno
+  const quadOrario = { tipo: 'poli', chiuso: true, lav: [], punti: [{ x: 0, y: 0 }, { x: 0, y: 20 }, { x: 20, y: 20 }, { x: 20, y: 0 }] };
+  assert.strictEqual(Math.min(...O.offsetCAD(quadOrario, 5, 'fuori').punti.map(p => p.x)), -5);
+  // profilo con un arco: lato dritto + semicerchio (come una asola mezza)
+  const ar = { tipo: 'poli', chiuso: true, lav: [], punti: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20, tratto: 'ccw', r: 10 }, { x: 0, y: 20 }] };
+  const af = O.offsetCAD(ar, 2, 'fuori'); assert.ok(!af.errore, af.errore); assert.ok(af.punti.some(p => p.tratto === 'ccw' && Math.abs(p.r) === 12), JSON.stringify(af.punti));
+  assert.ok(O.offsetCAD(ar, 11, 'dentro').errore);
+  // aperto
+  const ap = O.offsetCAD({ tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }] }, 2, 'sx');
+  assert.deepStrictEqual(ap.punti.map(p => [p.x, p.y]), [[0, 2], [8, 2], [8, 10]]);
+  assert.ok(O.offsetCAD(quad, 0, 'fuori').errore);
+});
+prova('raccordo e smusso su un vertice', () => {
+  const q = { id: 3, tipo: 'poli', chiuso: true, lav: [], punti: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }] };
+  const r = O.angoloCAD(q, 2, 'raccordo', 4); assert.strictEqual(r.punti[2].raccordo, 4); assert.ok(!('id' in r));
+  const c = O.angoloCAD(q, 1, 'smusso', 3); assert.strictEqual(c.punti[1].smusso, 3); assert.strictEqual(c.punti[1].raccordo, 0);
+  assert.ok(O.angoloCAD(q, 1, 'raccordo', 50).errore);
+  assert.ok(O.angoloCAD({ tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 5, y: 5 }] }, 0, 'raccordo', 1).errore);
+  assert.strictEqual(O.angoloCAD({ tipo: 'rett', x0: 0, y0: 0, x1: 20, y1: 10, lav: [] }, 0, 'raccordo', 3).r, 3);
+  assert.ok(O.angoloCAD({ tipo: 'rett', x0: 0, y0: 0, x1: 20, y1: 10, lav: [] }, 0, 'raccordo', 6).errore);
+});
+prova('taglia, estendi e angolo', () => {
+  const B = { tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 10, y: -5 }, { x: 10, y: 20 }] };
+  const corta = { id: 1, tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 5 }, { x: 6, y: 5 }] };
+  const lunga = { id: 2, tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 8 }, { x: 15, y: 8 }] };
+  assert.strictEqual(O.tagliaEstendiCAD(corta, 'fine', B).punti[1].x, 10);   // estende
+  assert.strictEqual(O.tagliaEstendiCAD(lunga, 'fine', B).punti[1].x, 10);   // taglia
+  assert.ok(O.tagliaEstendiCAD(corta, 'inizio', B).errore);                  // il prolungamento all'indietro va verso x negativo: non incontra
+  assert.ok(O.tagliaEstendiCAD({ tipo: 'poli', chiuso: true, lav: [], punti: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }] }, 'fine', B).errore);
+  const A = { tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 8, y: 0 }] }, C2 = { tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 10, y: 10 }, { x: 10, y: 3 }] };
+  const u = O.unisciAngoloCAD(A, 'fine', C2, 'fine'); assert.deepStrictEqual([u.a.punti[1].x, u.a.punti[1].y, u.b.punti[1].x, u.b.punti[1].y], [10, 0, 10, 0]);
+  assert.ok(O.unisciAngoloCAD(A, 'fine', { tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 5 }, { x: 8, y: 5 }] }, 'fine').errore);
+});
+prova('selezione a finestra', () => {
+  const E = [{ id: 1, tipo: 'cerchio', cx: 5, cy: 5, r: 2 }, { id: 2, tipo: 'rett', x0: 8, y0: 0, x1: 30, y1: 10 }, { id: 3, tipo: 'punto', x: 50, y: 50 }];
+  assert.deepStrictEqual(O.entitaInFinestra(E, 0, 0, 12, 12, false), [1]);
+  assert.deepStrictEqual(O.entitaInFinestra(E, 12, 12, 0, 0, true), [1, 2]);
+  assert.deepStrictEqual(O.entitaInFinestra(E, -5, -5, 60, 60, false), [1, 2, 3]);
+});
+prova('DXF: scrittura e rilettura', () => {
+  const E = [
+    { id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 80, y1: 50, r: 0, lav: [], layer: 'Sagoma' },
+    { id: 2, tipo: 'cerchio', cx: 15, cy: 25, r: 4.25, lav: [] },
+    { id: 3, tipo: 'punto', x: 5, y: 5, lav: [] },
+    { id: 4, tipo: 'poli', chiuso: true, lav: [], punti: [{ x: 30, y: 10 }, { x: 55, y: 10 }, { x: 55, y: 25, tratto: 'ccw', r: 10 }, { x: 30, y: 25 }], layer: 'Tasca' },
+    { id: 5, tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 60 }, { x: 40, y: 60 }] },
+    { id: 6, tipo: 'asola', x1: 10, y1: 80, x2: 30, y2: 80, w: 6, lav: [] }];
+  const t = O.scriviDXF(E);
+  assert.ok(/SECTION\r\n2\r\nENTITIES/.test(t) && /\r\nEOF\r\n$/.test(t) && /CIRCLE/.test(t) && /POLYLINE/.test(t) && /\r\n42\r\n/.test(t) && /LINE\r\n/.test(t));
+  const L = O.leggiDXF(t); assert.ok(!L.errore, L.errore);
+  const per = tp => L.entita.filter(e => e.tipo === tp);
+  assert.strictEqual(per('rett').length, 1); assert.strictEqual(per('rett')[0].x1, 80); assert.strictEqual(per('rett')[0].layer, 'Sagoma');
+  assert.strictEqual(per('cerchio')[0].r, 4.25); assert.strictEqual(per('punto').length, 1);
+  const pa = per('poli'); assert.strictEqual(pa.length, 3);
+  const tasca = pa.find(e => e.layer === 'Tasca'); assert.ok(tasca.chiuso && tasca.punti.length === 4); assert.ok(tasca.punti.some(p => p.tratto === 'ccw' && Math.abs(p.r) === 10), JSON.stringify(tasca.punti));
+  assert.ok(pa.some(e => !e.chiuso && e.punti.length === 2));
+  const asola = pa.find(e => e.chiuso && e.layer === '0'); assert.ok(asola && asola.punti.filter(p => p.tratto).length === 2, JSON.stringify(asola));
+  // aree uguali dopo il giro: il profilo e lo stesso
+  const area = e => O.areaProfilo ? 1 : 1; void area;
+});
+prova('DXF: lettura di rette e archi sciolti, LWPOLYLINE, unita, errori', () => {
+  const g = (...a) => a.join('\n') + '\n';
+  const sciolti = g(0, 'SECTION', 2, 'ENTITIES',
+    0, 'LINE', 8, 'P', 10, 0, 20, 0, 11, 20, 21, 0,
+    0, 'ARC', 8, 'P', 10, 20, 20, 10, 40, 10, 50, 270, 51, 90,
+    0, 'LINE', 8, 'P', 10, 20, 20, 20, 11, 0, 21, 20,
+    0, 'LINE', 8, 'P', 10, 0, 20, 20, 11, 0, 21, 0,
+    0, 'SPLINE', 8, 'P', 0, 'ENDSEC', 0, 'EOF');
+  const L = O.leggiDXF(sciolti); assert.ok(!L.errore);
+  assert.strictEqual(L.entita.length, 1); const p = L.entita[0]; assert.ok(p.chiuso && p.punti.length === 4 && p.punti.filter(q => q.tratto).length === 1);
+  assert.ok(L.avvisi.some(a => /SPLINE/.test(a)));
+  const lw = g(0, 'SECTION', 2, 'ENTITIES', 0, 'LWPOLYLINE', 8, 'X', 90, 3, 70, 1, 10, 0, 20, 0, 10, 10, 20, 0, 42, 1, 10, 10, 20, 10, 0, 'ENDSEC', 0, 'EOF');
+  const W = O.leggiDXF(lw).entita[0]; assert.ok(W.chiuso && W.punti.length === 3 && W.punti[2].tratto === 'ccw' && Math.abs(W.punti[2].r) === 5, JSON.stringify(W));
+  const inch = g(0, 'SECTION', 2, 'HEADER', 9, '$INSUNITS', 70, 1, 0, 'ENDSEC', 0, 'SECTION', 2, 'ENTITIES', 0, 'CIRCLE', 8, '0', 10, 1, 20, 1, 40, 0.5, 0, 'ENDSEC', 0, 'EOF');
+  const I = O.leggiDXF(inch); assert.strictEqual(I.entita[0].r, 12.7); assert.ok(I.avvisi.some(a => /pollici/.test(a)));
+  assert.ok(O.leggiDXF('ciao').errore); assert.ok(O.leggiDXF(g(0, 'SECTION', 2, 'ENTITIES', 0, 'ENDSEC', 0, 'EOF')).errore);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

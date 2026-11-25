@@ -683,3 +683,16 @@ body.cad-pieno .cad-digita,.cad.pieno .cad-digita{bottom:0}
 @media (max-height:560px){.cad-dg-k{min-height:42px;font-size:17px}.cad-dg-campo{font-size:20px;min-height:38px}}
 .cad-dg-az{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 4px}
 .cad-dg-az .chip[hidden]{display:none}
+/* 2.38.0: Modifica, layer, finestra */
+.cad-mod{max-height:70vh;overflow:auto}
+.cad-mod-ops{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 8px}
+.cad-mod-form{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.cad-mod-righe{display:flex;gap:6px;flex-wrap:wrap}
+.cad-mod-c{display:flex;flex-direction:column;gap:2px;font-size:14px}
+.cad-mod-c input{min-height:48px;font-size:18px;font-variant-numeric:tabular-nums;font-family:ui-monospace,Menlo,Consolas,monospace;padding:0 10px;border-radius:10px;border:1px solid var(--bordo,#445);background:var(--fondo,#111);color:var(--testo,#eee)}
+.cad-layer .chip{min-height:40px}
+.cad-mod{max-height:52vh}
+.cad-mod-ops{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.cad-mod .chip{min-height:40px;font-size:14px;padding:0 12px;white-space:nowrap;flex:0 0 auto}
+.cad-mod-c input{min-height:44px;font-size:17px}
+.cad-mod .pul{min-height:48px}
