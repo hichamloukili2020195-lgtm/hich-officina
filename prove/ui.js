@@ -1376,6 +1376,58 @@ const server = http.createServer((q, r) => {
   await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
   ok((await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave))).some(k => /^Smusso C1 tasca/.test(k)), 'fase di smusso della tasca');
 
+  // ===== 2.34.0: velocita reale, righe, confronto col disegno, lato B, profilo interno =====
+  await vai('lavoro'); await pg.waitForTimeout(100);
+  await pg.click('.lav-passi button[data-passo="0"]'); await pg.click('.lav-macchina[data-modo="tornio"]');
+  await pg.click('.lav-passi button[data-passo="1"]'); await pg.waitForTimeout(80);
+  await pg.evaluate(() => { const S = App.lavoroStato.S; S.tornio.grezzo = { dg: 40, lg: 90 }; S.tornio.tratti = [{ tipo: 'cil', d: 30, l: 20 }, { tipo: 'cil', d: 36, l: 15 }]; S.tornio.foroD = ''; S.tornio.golaFrontOn = false; S.tornio.metodo = 'passate'; S.tornio.troncatura = true; S.tornio.fase2 = { on: false, tratti: [] }; App.lavoroStato.tutto(); });
+  await pg.waitForTimeout(100);
+  await pg.click('#lav-fase2'); await pg.waitForTimeout(120);
+  ok((await pg.evaluate(() => App.lavoroStato.S.tornio.fase2.on)) && await pg.$('#lav-agg-b'), 'lato B acceso');
+  await pg.evaluate(() => { const F = App.lavoroStato.S.tornio.fase2; F.lTot = 60; F.tratti = [{ tipo: 'cil', d: 25, l: 15 }]; App.lavoroStato.tutto(); });
+  await pg.click('.chips[aria-label="Smusso sul pezzo che cade"] .chip:text-is("C1")'); await pg.waitForTimeout(80);
+  await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
+  ok((await pg.textContent('#schermo')).includes('Lato B (pezzo girato)') && (await pg.$$eval('.lav-latob .lav-fase', x => x.length)) >= 2, 'lavorazioni del lato B');
+  ok((await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave))).some(k => /^Smusso C1 e troncatura/.test(k)), 'smusso prima della troncatura');
+  await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
+  ok(await pg.$('#lav-simula-b') && await pg.$('#lav-programma-b'), 'pulsanti del lato B');
+  await pg.click('#lav-programma-b'); await pg.waitForTimeout(200);
+  ok((await pg.textContent('.listato')).includes('O0002') || (await pg.textContent('.listato')).includes('LATO B'), 'programma del lato B');
+  await pg.goBack(); await pg.waitForTimeout(200);
+  await pg.click('#lav-simula'); await pg.waitForTimeout(500);
+  ok(await pg.$('#sim-confronto'), 'confronto col disegno nella simulazione del lavoro');
+  ok((await pg.textContent('#schermo')).includes('Confronto col disegno'), 'riassunto del confronto');
+  // velocita reale e tempo
+  ok((await pg.$$eval('#f-vel option', x => x.map(o => o.value))).includes('r1'), 'velocita reale');
+  await pg.selectOption('#f-vel', 'r20'); await pg.click('[aria-label="Dall\'inizio"]'); await pg.click('[aria-label="Avvia"]'); await pg.waitForTimeout(600); await pg.click('[aria-label="Pausa"]').catch(() => {});
+  ok(/Tempo \d+:\d\d \/ \d+:\d\d/.test(await pg.textContent('.chiamata')), 'tempo che scorre: ' + await pg.textContent('.chiamata'));
+  // tocco su una riga del programma e riga dopo
+  const kPrima = await pg.inputValue('#f-passo');
+  await pg.click('.sim-righe div[data-r="20"]'); await pg.waitForTimeout(150);
+  const kRiga = await pg.inputValue('#f-passo');
+  ok(kRiga !== kPrima && (await pg.textContent('.chiamata')).includes('Riga'), 'tocco su una riga');
+  await pg.click('#sim-riga-dopo'); await pg.waitForTimeout(120);
+  ok(Number(await pg.inputValue('#f-passo')) > Number(kRiga), 'riga dopo');
+  await pg.click('#sim-riga-prima'); await pg.waitForTimeout(120);
+  ok(Number(await pg.inputValue('#f-passo')) <= Number(kRiga), 'riga prima');
+  if (dirFoto) { await pg.click('.schede button[data-id="zx"]').catch(() => {}); await pg.waitForTimeout(200); await pg.screenshot({ path: path.join(dirFoto, '38-confronto-sezione.png') }); }
+  // simulazione del lato B
+  await pg.goBack(); await pg.waitForTimeout(250);
+  await pg.click('#lav-simula-b'); await pg.waitForTimeout(500);
+  await erroreSchermo('simulazione del lato B');
+  ok((await pg.textContent('.chiamata')).length > 5, 'simulazione del lato B aperta');
+  // profilo interno a tratti
+  await vai('lavoro'); await pg.click('.lav-passi button[data-passo="1"]'); await pg.waitForTimeout(80);
+  await pg.evaluate(() => { const S = App.lavoroStato.S; S.tornio.fase2 = { on: false, tratti: [] }; S.tornio.tratti = [{ tipo: 'cil', d: 56, l: 40 }]; S.tornio.grezzo = { dg: 60, lg: 80 }; S.tornio.foroD = 20; S.tornio.foroTipo = 'foro'; S.tornio.interno = { di: 40, l: 10 }; App.lavoroStato.tutto(); });
+  await pg.waitForTimeout(100);
+  await pg.click('#lav-agg-int'); await pg.waitForTimeout(100);
+  ok((await pg.evaluate(() => App.lavoroStato.S.tornio.interno.altri.length)) === 1, 'tratto interno aggiunto');
+  await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
+  ok((await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave))).some(k => /^Profilo interno 2 tratti/.test(k)), 'fase del profilo interno');
+  // campi di morsa e mandrino in Controlla un programma
+  await vai('apri'); await pg.waitForTimeout(80);
+  ok(await pg.$('#f-spMorsa') && await pg.$('#f-dPorta') && await pg.$('#f-spMandrino'), 'campi di morsa, portautensile e mandrino');
+
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }
   console.log('OK interfaccia');

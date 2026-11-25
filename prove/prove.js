@@ -916,7 +916,7 @@ prova('materiale: fresa (asporto, indietro e avanti, urti, lunghezza tagliente, 
   m.vaiA(0); assert.strictEqual(m.altezza(10, 0), 0); m.vaiA(6); const a6 = m.altezza(10, 0); m.vaiA(m.N); assert.strictEqual(m.altezza(10, 0), -5); m.vaiA(6); assert.strictEqual(m.altezza(10, 0), a6);
   // lunghezza tagliente
   const lun = O.creaMateriale({ modo: 'fresa', S: r.segmenti, utensile: () => ({ d: 10, l: 3 }), grezzo: { lx: 60, ly: 60, lz: 10 } });
-  assert.ok(lun.collisioni.some(c => /parte tagliente e lunga 3/.test(c.testo)), JSON.stringify(lun.collisioni));
+  assert.ok(lun.collisioni.some(c => /portautensile della T1 \(Ø40, sporgenza 3 mm\) tocca il pezzo/.test(c.testo)), JSON.stringify(lun.collisioni));
   // senza grezzo: ipotizzato, urti solo come avviso, con la nota
   const ip = O.creaMateriale({ modo: 'fresa', S: r.segmenti, utensile: () => null });
   assert.strictEqual(ip.ipotizzato, true); assert.ok(ip.note.some(x => /Grezzo ipotizzato/.test(x))); assert.ok(ip.collisioni.every(c => c.livello === 'avviso')); assert.strictEqual(ip.utensili[1].ipotizzato, true);
@@ -942,7 +942,7 @@ prova('materiale: tornio (sfacciatura, tornitura, rapido nel grezzo, alesatura)'
   const rb = O.eseguiISO(b, { modo: 'tornio' });
   const mb = O.creaMateriale({ modo: 'tornio', S: rb.segmenti, grezzo: { d: 50, l: 40, s: 1 }, foro: () => 12 });
   const pb = (z, raggio) => mb.occ[Math.floor((z - mb.zBot) / mb.cella) * mb.nr + Math.floor(raggio / mb.cella)] === 1;
-  assert.ok(!pb(-10, 5) && pb(-10, 15) === false && pb(-10, 21) && !pb(-10, 9), 'foro prima a 12 poi alesato a 20');
+  assert.ok(!pb(-10, 5) && !pb(-10, 6.5) && pb(-10, 8) && pb(-10, 21), 'foro a 12 poi alesato a 14 dall\'interno (la parete resta)');
 });
 prova('three.js: in locale (non dal web), con la licenza, nel funzionamento senza rete e prima della vista 3D', () => {
   const fs = require('fs'), path = require('path'), r = p => path.join(__dirname, '..', p);
@@ -1039,5 +1039,80 @@ prova('fresa: smussi dei bordi, foro e lamatura a fresa quando manca l\'utensile
   // con la punta giusta in tabella il foro resta a punta
   const p2 = O.proponiLavoro(L, { mat: O.MATERIALI[0], tab: tab.concat([{ t: 6, tipo: 'puntaMD', d: 14 }]), nmax: 12000 });
   assert.ok(p2.fasi.some(f => /^Punta Ø14/.test(f.titolo)) && !p2.fasi.some(f => /^Foro Ø14 a fresa/.test(f.titolo)));
+});
+prova('simulazione: morsa, portautensile, mandrino con le griffe', () => {
+  const S = t => O.eseguiISO(t.join('\n'), { modo: 'fresa' }).segmenti;
+  let m = O.creaMateriale({ modo: 'fresa', S: S(['G21 G90', 'T1 M6', 'S1000 M3', 'G0 X10 Y-30', 'G0 Z5', 'G1 Z-12 F100', 'G1 Y10 F300', 'G0 Z50', 'M30']), utensile: () => ({ d: 10, l: 30 }), grezzo: { lx: 60, ly: 40, lz: 20 }, morsa: { sp: 8 } });
+  assert.strictEqual(m.ganasce.length, 2);
+  assert.ok(m.collisioni.some(c => /tocca la ganascia della morsa/.test(c.testo) && c.livello === 'errore'), JSON.stringify(m.collisioni));
+  m = O.creaMateriale({ modo: 'fresa', S: S(['G21 G90', 'T1 M6', 'S1000 M3', 'G0 X30 Y20', 'G0 Z5', 'G1 Z-18 F100', 'G1 X40 F300', 'G0 Z50', 'M30']), utensile: () => ({ d: 10, l: 15 }), grezzo: { lx: 60, ly: 40, lz: 20 }, porta: 40 });
+  assert.ok(m.collisioni.some(c => /portautensile della T1 \(Ø40, sporgenza 15 mm\) tocca il pezzo/.test(c.testo)));
+  m = O.creaMateriale({ modo: 'fresa', S: S(['G21 G90', 'T1 M6', 'S1000 M3', 'G0 X30 Y20', 'G0 Z5', 'G1 Z-5 F100', 'G1 X40 F300', 'G0 Z50', 'M30']), utensile: () => ({ d: 10, l: 30 }), grezzo: { lx: 60, ly: 40, lz: 20 }, morsa: { sp: 8, ipotizzata: true } });
+  assert.deepStrictEqual(m.collisioni, [], 'lavoro normale: nessun urto');
+  assert.ok(m.note.some(t => /Morsa ipotizzata/.test(t)));
+  const T = ['G21 G18 G99', 'T0101', 'G96 S180 M3', 'G0 X62 Z2', 'G0 X50', 'G1 Z-45 F.2', 'G1 X62', 'G0 X100 Z50', 'M30'].join('\n');
+  m = O.creaMateriale({ modo: 'tornio', S: O.eseguiISO(T, { modo: 'tornio' }).segmenti, grezzo: { d: 60, l: 70, s: 1 }, mandrino: { sp: 40 } });
+  assert.ok(m.mandrino && m.collisioni.some(c => /sporgenza/.test(c.testo)) && m.collisioni.some(c => /griffe del mandrino/.test(c.testo)));
+  m = O.creaMateriale({ modo: 'tornio', S: O.eseguiISO(T, { modo: 'tornio' }).segmenti, grezzo: { d: 60, l: 70, s: 1 }, mandrino: { sp: 55 } });
+  assert.deepStrictEqual(m.collisioni, [], 'con sporgenza giusta nessun urto');
+  // tempo per movimento: la somma e il tempo del programma
+  const e = O.eseguiISO(T, { modo: 'tornio' });
+  assert.ok(Math.abs(e.segmenti.reduce((q, s) => q + (s.dt || 0), 0) - e.tempo) < 1e-6);
+});
+prova('confronto col disegno: i modelli del lavoro guidato tornano uguali, un errore si vede', () => {
+  const mt = O.MATERIALI[0];
+  const tornio = (L, cambia) => {
+    const p = O.proponiLavoro(L, { mat: mt, tab: [], nmax: 3000 }), r = O.programmaLavoro(p, {}, { num: 1, nome: 'P' });
+    const righe = cambia ? cambia(r.righe) : r.righe, e = O.eseguiISO(righe.join('\n'), { modo: 'tornio' });
+    const uD = {}; p.fasi.forEach(f => { if (f.op === 'foratura') uD[f.c.t] = f.c.dpunta; });
+    const m = O.creaMateriale({ modo: 'tornio', S: e.segmenti, grezzo: { d: L.grezzo.dg, l: L.grezzo.lg, s: 1 }, foro: t => uD[t] || 8 });
+    assert.ok(O.preparaBersaglio(m, { tipo: 'tornio', punti: p.punti, fasi: p.fasi.map(f => ({ op: f.op, c: f.c })) }));
+    return O.confrontaMateriale(m);
+  };
+  ['perno', 'albero', 'boccola', 'disco'].forEach(id => {
+    const M = O.MODELLI_LAVORO.find(x => x.id === id), c = tornio(Object.assign({ modo: 'tornio' }, M.dati()));
+    assert.ok(c.resta < 30 && c.troppo < 30, id + ': resta ' + c.resta + ', troppo ' + c.troppo);
+  });
+  // un diametro fatto 1 mm piu grande lascia materiale
+  const albero = Object.assign({ modo: 'tornio' }, O.MODELLI_LAVORO.find(x => x.id === 'albero').dati());
+  const c = tornio(albero, R => R.map(l => l.replace(/^G1 G42 Z0\. F/, 'G1 G42 Z0. F')).map(l => /^G1 X/.test(l) && !/G4[12]/.test(l) ? l.replace(/X(\d+(?:\.\d+)?)/, (x, v) => 'X' + (Number(v) + 1)) : l));
+  assert.ok(c.resta > 100, 'diametri piu grandi: resta materiale (' + c.resta + ')');
+  // fresa
+  ['piastraTasca', 'piastraFori', 'staffa', 'flangia'].forEach(id => {
+    const M = O.MODELLI_LAVORO.find(x => x.id === id), L = Object.assign({ modo: 'fresa' }, M.dati()), g = L.grezzo;
+    const p = O.proponiLavoro(L, { mat: mt, tab: [], nmax: 12000, zSic: 50, zR: 2 }), r = O.programmaLavoro(p, {}, { num: 1, nome: 'P' });
+    const uD = {}, uT = {}; p.fasi.forEach(f => { if (f.c.t > 0 && Number(f.c.d) > 0) { uD[f.c.t] = Number(f.c.d); if (f.tipoUt) uT[f.c.t] = f.tipoUt; } });
+    const co = { centrino: 1, smussatore: 1, puntaMD: 0.6, puntaIns: 0.6 };
+    let S = O.eseguiISO(r.righe.join('\n'), { modo: 'fresa' }).segmenti; if (S.some(q => q.comp)) S = O.centroFresa(S, t => (uD[t] || 10) / 2);
+    const m = O.creaMateriale({ modo: 'fresa', S, utensile: t => uD[t] ? { d: uD[t], l: 0, cono: co[uT[t]] || 0 } : null, grezzo: { lx: g.lx, ly: g.ly, lz: g.lz } });
+    assert.ok(O.preparaBersaglio(m, { tipo: 'fresa', entita: p.entita, lz: g.lz }));
+    const cf = O.confrontaMateriale(m);
+    assert.ok(cf.resta < 30 && cf.troppo < 30, id + ': resta ' + cf.resta + ', troppo ' + cf.troppo);
+    assert.deepStrictEqual(m.collisioni.filter(q => q.livello === 'errore'), [], id);
+  });
+});
+prova('tornio: profilo interno a tratti, smusso prima della troncatura, lato B (pezzo girato)', () => {
+  const mt = O.MATERIALI[0], ctx = { mat: mt, tab: [], nmax: 3000 };
+  let p = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 60, lg: 80 }, tratti: [{ tipo: 'cil', d: 56, l: 40 }], foroD: 20, interno: { di: 40, l: 10, altri: [{ d: 32, l: 8 }, { tipo: 'cono', d: 26, l: 6 }] } }, ctx);
+  const fi = p.fasi.find(f => f.op === 'profiloInterno');
+  assert.ok(fi && fi.c.punti.length >= 5 && Math.abs(fi.c.punti[fi.c.punti.length - 1].z + 24) < 1e-9, 'profilo interno');
+  let r = O.programmaLavoro(p, {}, { num: 1, nome: 'P' });
+  assert.ok(!r.errore && r.righe.some(l => /G41/.test(l)), 'finitura interna con G41');
+  assert.deepStrictEqual(O.controllaISO(r.righe.join('\n'), { modo: 'tornio' }).segnalazioni.filter(q => q.livello !== 'nota'), []);
+  assert.ok(O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 60 }, tratti: [{ tipo: 'cil', d: 56, l: 40 }], foroD: 20, interno: { di: 30, l: 10, altri: [{ d: 34, l: 5 }] } }, ctx).errore.includes('gola interna'));
+  // smusso sul pezzo che cade
+  p = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 40, lg: 80 }, tratti: [{ tipo: 'cil', d: 30, l: 20 }, { tipo: 'cil', d: 36, l: 15 }], troncatura: true, troncaSmusso: 1 }, ctx);
+  r = O.programmaLavoro(p, {}, { num: 1, nome: 'P' });
+  const i = r.righe.indexOf('(SMUSSO 1 SUL PEZZO)');
+  assert.ok(i > 0 && r.righe.slice(i, i + 9).includes('G1 X34. Z-35.'), r.righe.slice(i, i + 9).join(' | '));
+  // lato B
+  p = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 40, lg: 90 }, tratti: [{ tipo: 'cil', d: 30, l: 20 }, { tipo: 'cil', d: 36, l: 15 }], troncatura: true, fase2: { on: true, lTot: 60, tratti: [{ tipo: 'cil', d: 25, l: 15 }] } }, ctx);
+  assert.ok(/Troncatura a 61/.test(p.fasi[p.fasi.length - 1].titolo), 'la troncatura lascia 1 mm per il lato B');
+  assert.ok(!p.fase2.errore && p.fase2.L1 === 61 && /^Sfacciatura a lunghezza 60 \(1 mm\)/.test(p.fase2.fasi[0].titolo) && p.fase2.fasi.every(f => /^B:/.test(f.chiave)));
+  r = O.programmaLavoro(p.fase2, {}, { num: 2, nome: 'LATO B' });
+  assert.ok(!r.errore && r.righe[1] === 'O0002 (LATO B)');
+  assert.deepStrictEqual(O.controllaISO(r.righe.join('\n'), { modo: 'tornio' }).segnalazioni.filter(q => q.livello !== 'nota'), []);
+  const sov = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 40, lg: 90 }, tratti: [{ tipo: 'cil', d: 30, l: 40 }], troncatura: true, fase2: { on: true, lTot: 50, tratti: [{ tipo: 'cil', d: 25, l: 15 }] } }, ctx);
+  assert.ok(/sono piu lunghi del pezzo finito/.test(sov.fase2.errore), sov.fase2.errore);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

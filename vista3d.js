@@ -66,7 +66,7 @@
     canvas.addEventListener('dblclick', () => { o.th = vista0.th; o.ph = vista0.ph; o.r = vista0.r; o.t.copy(vista0.t); disegna(); });
 
     // ----- il materiale -----
-    let ultK = -1, ricostruisci;
+    let ultK = -1, ricostruisci, statoConf = null, ultConf = null;
     const risorse = [];
     if (!tor) {
       const n = mat.nx * mat.ny;
@@ -76,13 +76,15 @@
       mesh.frustumCulled = false; scena.add(mesh); risorse.push(geo, mt);
       const tabella = []; for (let q = 0; q < 64; q++) { const c = A.coloreProfondita ? A.coloreProfondita(-(q / 63) * mat.lz, mat.lz) : [180, 190, 210]; const col = new T.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, T.SRGBColorSpace); tabella.push([col.r, col.g, col.b]); }
       const M = mesh.instanceMatrix.array, C = mesh.instanceColor.array, cs = mat.cella;
+      const lin = c => { const col = new T.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, T.SRGBColorSpace); return [col.r, col.g, col.b]; };
+      const colArancio = lin((A.COLORI_CONFRONTO || {}).ARANCIO || [255, 150, 40]), colRosso = lin((A.COLORI_CONFRONTO || {}).ROSSO || [230, 55, 60]);
       ricostruisci = () => {
         const { nx, ny, h, x0, y0, lz } = mat;
         for (let j = 0, k = 0; j < ny; j++) for (let i = 0; i < nx; i++, k++) {
           const v = Math.max(h[k], -lz), alt = v + lz + 0.02, p = k * 16;
           M[p] = cs; M[p + 1] = 0; M[p + 2] = 0; M[p + 3] = 0; M[p + 4] = 0; M[p + 5] = cs; M[p + 6] = 0; M[p + 7] = 0; M[p + 8] = 0; M[p + 9] = 0; M[p + 10] = alt; M[p + 11] = 0;
           M[p + 12] = x0 + (i + 0.5) * cs; M[p + 13] = y0 + (j + 0.5) * cs; M[p + 14] = (v - lz) / 2; M[p + 15] = 1;
-          const c = tabella[Math.max(0, Math.min(63, Math.round(-v / lz * 63)))], q = k * 3; C[q] = c[0]; C[q + 1] = c[1]; C[q + 2] = c[2];
+          const so = statoConf && statoConf[k], c = so === 1 ? colArancio : so === 2 ? colRosso : tabella[Math.max(0, Math.min(63, Math.round(-v / lz * 63)))], q = k * 3; C[q] = c[0]; C[q + 1] = c[1]; C[q + 2] = c[2];
         }
         mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
       };
@@ -125,17 +127,40 @@
     let utensile, geoU;
     if (tor) { geoU = new T.BoxGeometry(7, 4, 14); utensile = new T.Mesh(geoU, ambra); } else { geoU = new T.CylinderGeometry(1, 1, 1, 36); utensile = new T.Mesh(geoU, ambra); utensile.rotation.x = Math.PI / 2; }
     scena.add(utensile); risorse.push(geoU, ambra);
+    // attrezzi: ganasce della morsa, mandrino con tre griffe, portautensile
+    const acciaio = new T.MeshLambertMaterial({ color: 0x5c6b84 }), acciaio2 = new T.MeshLambertMaterial({ color: 0x8592a8 });
+    risorse.push(acciaio, acciaio2);
+    (mat.ganasce || []).forEach(q => {
+      const gb = new T.BoxGeometry(q.x1 - q.x0, q.y1 - q.y0, q.z1 - q.z0), me = new T.Mesh(gb, acciaio);
+      me.position.set((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, (q.z0 + q.z1) / 2); scena.add(me); risorse.push(gb);
+    });
+    if (tor && mat.mandrino) {
+      const { zM, R } = mat.mandrino;
+      const gc = new T.CylinderGeometry(R + 50, R + 50, 40, 48), corpo = new T.Mesh(gc, acciaio);
+      corpo.rotation.x = Math.PI / 2; corpo.position.set(0, 0, zM - 25 - 20); scena.add(corpo); risorse.push(gc);
+      [90, 210, 330].forEach(a => {
+        const gb = new T.BoxGeometry(25, 22, 25), gr = new T.Mesh(gb, acciaio2), ar = a * Math.PI / 180;
+        gr.position.set((R + 12.5) * Math.cos(ar), (R + 12.5) * Math.sin(ar), zM - 12.5); gr.rotation.z = ar; scena.add(gr); risorse.push(gb);
+      });
+    }
+    let porta = null;
+    if (!tor && mat.porta > 0) {
+      const gp = new T.CylinderGeometry(1, 1, 1, 32); porta = new T.Mesh(gp, new T.MeshLambertMaterial({ color: 0xa7b2c4, transparent: true, opacity: 0.85 }));
+      porta.rotation.x = Math.PI / 2; scena.add(porta); risorse.push(gp, porta.material);
+    }
 
     /** o2: {k, px:[x,y,z], raggio, lung}. Aggiorna il materiale, l'utensile e disegna. */
     function aggiorna(o2) {
       const W = canvas.clientWidth || 340, H = canvas.clientHeight || 300;
       if (canvas.width !== Math.round(W * renderer.getPixelRatio()) || canvas.height !== Math.round(H * renderer.getPixelRatio())) { renderer.setSize(W, H, false); cam.aspect = W / H; cam.updateProjectionMatrix(); }
-      if (o2.k !== ultK) { ricostruisci(); ultK = o2.k; }
+      statoConf = o2.stato || null;
+      if (o2.k !== ultK || !!statoConf !== ultConf) { ricostruisci(); ultK = o2.k; ultConf = !!statoConf; }
       const px = o2.px;
       if (tor) utensile.position.set(px[0] / 2 + 3.5, 0, px[2] + 7);
       else {
         const R = o2.raggio > 0 ? o2.raggio : 3, L = o2.lung > 0 ? Math.min(o2.lung, 60) : Math.max(25, 4 * R);
         utensile.scale.set(R, L, R); utensile.position.set(px[0], px[1], px[2] + L / 2);
+        if (porta) { porta.scale.set(mat.porta / 2, 35, mat.porta / 2); porta.position.set(px[0], px[1], px[2] + L + 17.5); }
       }
       disegna();
     }

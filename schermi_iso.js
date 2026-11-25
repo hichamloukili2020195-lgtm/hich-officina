@@ -159,6 +159,8 @@
       A.modulo(panIng, [{ id: 'glx', et: 'Grezzo X', u: 'mm', sub: 'angolo in basso a sinistra in X0 Y0' }, { id: 'gly', et: 'Grezzo Y', u: 'mm' }, { id: 'glz', et: 'Spessore del grezzo', u: 'mm', sub: 'Z0 e la faccia sopra' },
         { id: 'gtd', et: 'Tornio: diametro del grezzo', u: 'mm', sub: 'serve a vedere il materiale che si asporta' }, { id: 'gtl', et: 'Tornio: lunghezza del grezzo', u: 'mm', sub: 'dalla faccia davanti fino in fondo' },
         { id: 'gts', et: 'Tornio: sovrametallo davanti', u: 'mm', sub: 'quanto il grezzo sporge oltre Z0 (se vuoto: 1)' },
+        { id: 'spMorsa', et: 'Fresa: il pezzo esce dalla morsa di', u: 'mm', sub: 'altezza sopra le ganasce (vuoto = niente morsa)' }, { id: 'dPorta', et: 'Fresa: Ø del portautensile', u: 'mm', sub: 'urti con la sporgenza della tabella utensili (vuoto = 40)' },
+        { id: 'spMandrino', et: 'Tornio: sporgenza dal mandrino', u: 'mm', sub: 'quanto il grezzo esce dalle griffe (vuoto = niente mandrino)' },
         { id: 'staffe', et: 'Staffe: X1 Y1 X2 Y2 altezza, una per riga', tipo: 'area', mono: true, righe: 3, sub: 'altezza sopra Z0 della parte alta' },
         { id: 'raggioDef', et: 'Raggio fresa se non e in tabella', u: 'mm', sub: 'serve alla compensazione G41/G42 e agli urti' }], v, () => {});
       const analizza = () => {
@@ -286,9 +288,20 @@
       const b = (svg, et, fn) => el('button', { class: 'icona-pul', 'aria-label': et, html: '<svg viewBox="0 0 24 24" fill="currentColor">' + svg + '</svg>', onclick: fn });
       let k = N, gira = false, timer = null;
       const vel = el('select', { id: 'f-vel', 'aria-label': 'Velocita' });
-      [['1', 'x1'], ['4', 'x4'], ['16', 'x16'], ['64', 'x64'], ['256', 'x256'], ['1024', 'x1024'], ['4096', 'x4096']].forEach(([v, t]) => vel.appendChild(el('option', { value: v, testo: t })));
+      [['r1', 'Reale'], ['r5', 'Reale x5'], ['r20', 'Reale x20'], ['1', 'x1'], ['4', 'x4'], ['16', 'x16'], ['64', 'x64'], ['256', 'x256'], ['1024', 'x1024'], ['4096', 'x4096']].forEach(([v, t]) => vel.appendChild(el('option', { value: v, testo: t })));
+      // tempo: secondi alla fine di ogni movimento; fraz = parte del movimento k gia fatta (solo in tempo reale)
+      const tcum = new Float64Array(N + 1);
+      for (let i = 0; i < N; i++) tcum[i + 1] = tcum[i] + Math.max(0, (S[i].dt || 0) * 60);
+      let fraz = 0, tSim = 0;
+      const mmss = sec => { sec = Math.max(0, Math.round(sec)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
+      /** Il movimento attuale e la posizione dell'utensile (anche a meta di un movimento lungo). */
+      const posizione = () => {
+        if (fraz > 0 && k < N) { const s = S[k]; return { cur: s, px: [s.x0 + (s.x - s.x0) * fraz, s.y0 + (s.y - s.y0) * fraz, s.z0 + (s.z - s.z0) * fraz] }; }
+        const cur = k > 0 ? S[k - 1] : S[0];
+        return { cur, px: k > 0 ? [cur.x, cur.y, cur.z] : [cur.x0, cur.y0, cur.z0] };
+      };
       vel.value = sv.vel || '4';
-      vel.addEventListener('change', () => { sv.vel = vel.value; A.salva(); });
+      vel.addEventListener('change', () => { sv.vel = vel.value; A.salva(); tSim = tcum[k]; fraz = 0; });
       const bPlay = b('<path d="M8 5v14l11-7z"/>', 'Avvia', () => (gira ? ferma() : avvia()));
       const comandi = el('div', { style: 'display:flex;align-items:center;justify-content:space-between;gap:4px;margin:6px 0' }, [
         b('<path d="M6 6h2v12H6zM9.5 12l8.5 6V6z"/>', 'Dall\'inizio', () => { ferma(); vai(0); }),
@@ -314,7 +327,9 @@
         rin.addEventListener('change', () => { sv.raggio = rin.value; r.segmentiCentro = null; A.salva(); A.ridisegna(); });
         m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (sv.centro ? ' attiva' : ''), testo: sv.centro ? 'Centro fresa: si' : 'Centro fresa (G41/G42)', onclick: () => { sv.centro = !sv.centro; A.salva(); A.ridisegna(); } }), el('span', { class: 'leggenda', style: 'margin:0 4px;align-self:center', testo: 'raggio' }), rin]));
       }
-      if (mat && !mat.vuoto && mat.tipo !== 'troppo') m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (conMat() ? ' attiva' : ''), testo: conMat() ? 'Materiale: si' : 'Materiale: no', onclick: () => { sv.materiale = !conMat(); A.salva(); A.ridisegna(); } })]));
+      const conConf = () => !!(conMat() && mat.bersaglio && sv.confronto !== false);
+      if (mat && !mat.vuoto && mat.tipo !== 'troppo') m.appendChild(el('div', { class: 'chips' }, [el('button', { class: 'chip' + (conMat() ? ' attiva' : ''), testo: conMat() ? 'Materiale: si' : 'Materiale: no', onclick: () => { sv.materiale = !conMat(); A.salva(); A.ridisegna(); } }),
+        mat.bersaglio && conMat() ? el('button', { class: 'chip' + (conConf() ? ' attiva' : ''), id: 'sim-confronto', testo: conConf() ? 'Confronto col disegno: si' : 'Confronto col disegno: no', onclick: () => { sv.confronto = !conConf(); A.salva(); A.ridisegna(); } }) : null].filter(Boolean)));
       m.appendChild(el('div', { class: 'sim-griglia' }, [el('div', { class: 'sim-sinistra' }, [schede, telaBox, cursore, comandi, stato, commento]), pannello]));
       let rigaVista = -1;
       const aggiornaPannello = (cur, px, riga) => {
@@ -345,6 +360,11 @@
         if (r.avvisi.length) sotto.appendChild(A.info(esc(r.avvisi.join(' · ')), 'avviso'));
       } else {
         if (mat && mat.note && mat.note.length) sotto.appendChild(A.info(mat.note.map(esc).join('<br>'), 'avviso'));
+        if (mat && mat.confronto) {
+          const c = mat.confronto, mm3 = v => fmt(v, v < 10 ? 1 : 0);
+          sotto.appendChild(A.info(c.resta || c.troppo ? '<b>Confronto col disegno (a fine programma)</b>: ' + (c.resta ? '<span style="color:#ff9628">resta materiale</span> circa ' + mm3(c.volResta) + ' mm³' : '') + (c.resta && c.troppo ? ', ' : '') + (c.troppo ? '<span style="color:#e6373c">tagliato troppo</span> circa ' + mm3(c.volTroppo) + ' mm³' : '') + '. Guarda le zone colorate' + (mat.tipo === 'tornio' ? ' nella Sezione' : '') + '. Spigoli, smussi e filetti non si confrontano (tolleranza 0,2 mm).'
+            : '<b>Confronto col disegno</b>: il pezzo simulato corrisponde al disegno (tolleranza 0,2 mm; spigoli, smussi e filetti non si confrontano).', c.resta || c.troppo ? 'avviso' : ''));
+        }
         mostraAnalisi(sotto, r, P.testo, P.titolo);
       }
       // proiezione
@@ -403,7 +423,7 @@
         aggiornaPannello(cur, px, riga);
         stato.textContent = 'Riga ' + (riga + 1) + ':  ' + (r.righe[riga] || '').trim() + '\n' +
           (modo === 'tornio' ? 'X' + fmt(px[0], 3) + '  Z' + fmt(px[2], 3) : 'X' + fmt(px[0], 3) + '  Y' + fmt(px[1], 3) + '  Z' + fmt(px[2], 3)) +
-          '   T' + (cur.t || 0) + '  F' + fmt(cur.f, 3) + '   ' + k + ' / ' + N;
+          '   T' + (cur.t || 0) + '  F' + fmt(cur.f, 3) + '   ' + k + ' / ' + N + '\nTempo ' + mmss(fraz > 0 ? tSim : tcum[k]) + ' / ' + mmss(tcum[N]);
         commento.textContent = commentoDi(k > 0 ? k - 1 : 0, riga);
       };
       const disegna = () => {
@@ -412,10 +432,11 @@
         cv.style.display = tre ? 'none' : '';
         if (v3) { v3.canvas.style.display = tre ? '' : 'none'; v3.hint.style.display = tre ? '' : 'none'; }
         if (tre) {
-          const c3 = k > 0 ? S[k - 1] : S[0], p3 = k > 0 ? [c3.x, c3.y, c3.z] : [c3.x0, c3.y0, c3.z0];
+          const { cur: c3, px: p3 } = posizione();
           mat.vaiA(k);
           const d3 = modo === 'tornio' ? null : A.datiUtensile(r, P.ingombri, c3.t);
-          v3.aggiorna({ k, px: p3, raggio: d3 ? d3.d / 2 : 0, lung: d3 ? d3.l : 0 });
+          const cf3 = conConf() && mat.tipo === 'fresa' ? O.confrontaMateriale(mat) : null;
+          v3.aggiorna({ k, px: p3, raggio: d3 ? d3.d / 2 : 0, lung: d3 ? d3.l : 0, stato: cf3 && cf3.stato });
           aggiornaTesto(c3, p3);
           return;
         }
@@ -435,7 +456,7 @@
         }
         const ten = colore('--tenue');
         const cur0 = k > 0 ? S[k - 1] : S[0];
-        if (conMat()) { mat.vaiA(k); A.disegnaMateriale(g, { mat, vista: sv.vista, P2, cur: { y: k > 0 ? cur0.y : cur0.y0 } }); }
+        if (conMat()) { mat.vaiA(k); const cf = conConf() ? O.confrontaMateriale(mat) : null; A.disegnaMateriale(g, { mat, vista: sv.vista, P2, cur: { y: k > 0 ? cur0.y : cur0.y0 }, stato: cf && cf.stato }); A.disegnaAttrezzi(g, { mat, vista: sv.vista, P2 }); }
         g.drawImage(T.base.c, 0, 0, W, H);
         // quello fatto fin qui: si aggiunge solo il pezzo nuovo (se si torna indietro si rifa da capo)
         if (k < T.kFatto) { T.fatto.g.clearRect(0, 0, W, H); T.kFatto = 0; }
@@ -449,22 +470,43 @@
         for (let i = Math.max(0, k - 200); i < k; i++) { const s = S[i]; if (!s.rapido) continue; const a = P2(s.x0, s.y0, s.z0), c = P2(s.x, s.y, s.z); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); }
         g.strokeStyle = ten; g.stroke(); g.setLineDash([]);
         // utensile
-        const cur = k > 0 ? S[k - 1] : S[0];
-        const px = k > 0 ? [cur.x, cur.y, cur.z] : [cur.x0, cur.y0, cur.z0];
+        const { cur, px } = posizione();
         const p = P2(...px);
         const du = modo === 'tornio' ? null : A.datiUtensile(r, P.ingombri, cur.t);
-        A.disegnaUtensile(g, { modo, vista: sv.vista, P2, sc: T.sc, px, raggio: du ? du.d / 2 : 0, lung: du ? du.l : 0, colore });
+        A.disegnaUtensile(g, { modo, vista: sv.vista, P2, sc: T.sc, px, raggio: du ? du.d / 2 : 0, lung: du ? du.l : 0, porta: conMat() && mat.porta ? mat.porta : 0, colore });
         g.fillStyle = colore('--avviso'); g.strokeStyle = colore('--avviso'); g.lineWidth = 3;
         g.beginPath(); g.arc(p[0], p[1], 5, 0, Math.PI * 2); g.fill();
         if (modo !== 'tornio' && sv.vista !== 'xy' && !(du && du.d > 0)) { g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0], p[1] - 34); g.stroke(); }
         aggiornaTesto(cur, px);
       };
-      const vai = i => { k = i; cursore.value = String(i); disegna(); };
+      const vai = (i, fr) => { k = i; fraz = fr || 0; if (!fr) tSim = tcum[k]; cursore.value = String(i); disegna(); };
       const passo = () => {
-        const n = Number(vel.value) || 4;
         if (k >= N) { ferma(); return; }
+        if (/^r/.test(vel.value)) {
+          // tempo reale: avanza il tempo di 40 ms per il moltiplicatore e trova il movimento a quel tempo
+          tSim += 0.04 * (Number(vel.value.slice(1)) || 1);
+          let j = k;
+          while (j < N && tcum[j + 1] <= tSim) j++;
+          if (j >= N) { vai(N); return; }
+          const d = tcum[j + 1] - tcum[j];
+          vai(j, d > 0 ? Math.min(0.999, (tSim - tcum[j]) / d) : 0);
+          return;
+        }
+        const n = Number(vel.value) || 4;
         vai(Math.min(N, k + n));
       };
+      // righe: tocco su una riga = la simulazione va alla fine di quella riga; riga prima e dopo
+      const fineRiga = q => { let j = -1; for (let i = 0; i < N; i++) { if (S[i].riga === q) j = i; else if (j >= 0 && S[i].riga > q) break; } return j; };
+      righe.addEventListener('click', e => {
+        const d = e.target.closest('[data-r]'); if (!d) return;
+        const q = Number(d.dataset.r);
+        let j = fineRiga(q);
+        if (j < 0) { const i = Array.from(S).findIndex(s => s.riga > q); j = i < 0 ? N - 1 : i - 1; }
+        ferma(); vai(Math.max(0, j + 1));
+      });
+      const rigaDopo = () => { ferma(); if (k >= N) return; const q = S[k].riga; let j = k; while (j + 1 < N && S[j + 1].riga === q) j++; vai(j + 1); };
+      const rigaPrima = () => { ferma(); if (k <= 0) return; const q = S[k - 1].riga; let j = k - 1; while (j > 0 && S[j - 1].riga === q) j--; vai(j); };
+      comandi.after(el('div', { class: 'chips sim-righe-pul' }, [el('button', { class: 'chip', id: 'sim-riga-prima', testo: '◀ Riga prima', onclick: rigaPrima }), el('button', { class: 'chip', id: 'sim-riga-dopo', testo: 'Riga dopo ▶', onclick: rigaDopo }), el('span', { class: 'leggenda', style: 'align-self:center', testo: 'oppure tocca una riga del programma' })]));
       const avvia = () => { if (k >= N) k = 0; gira = true; bPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>'; bPlay.setAttribute('aria-label', 'Pausa'); timer = setInterval(passo, 40); };
       const ferma = () => { gira = false; clearInterval(timer); bPlay.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'; bPlay.setAttribute('aria-label', 'Avvia'); };
       cursore.addEventListener('input', () => { ferma(); vai(Number(cursore.value)); });

@@ -2,6 +2,16 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.34.0 - Simulazione con morsa e mandrino, confronto col disegno, lato B, profili interni
+- **Simulazione in tempo reale**: velocita "Reale", "Reale x5", "Reale x20" con il tempo che scorre (anche a meta di un movimento lungo). Tocca una riga del programma e la simulazione va li; "Riga prima" e "Riga dopo".
+- **Morsa, mandrino e portautensile**: le ganasce della morsa (fresa), il mandrino con tre griffe (tornio) e il portautensile si vedono in 2D e in 3D. Urti segnalati: fresa contro le ganasce, portautensile contro le ganasce o il pezzo (con la sporgenza della tabella utensili), utensile contro le griffe, lavori oltre la sporgenza dal mandrino. In "Controlla un programma" si scrivono sporgenza dalla morsa, Ø del portautensile e sporgenza dal mandrino; nel lavoro guidato sono ipotizzate.
+- **Confronto col disegno** (simulazione dal lavoro guidato): in arancione il materiale che resta, in rosso quello tagliato troppo, con il riassunto in mm³. Spigoli, smussi e filetti non si confrontano (tolleranza 0,2 mm).
+- **Tornio, profilo interno completo**: dopo il primo tratto interno se ne aggiungono altri (cilindri o coni) verso il fondo; sgrossatura a passate e finitura con G41.
+- **Tornio, smusso sul pezzo che cade** prima della troncatura (C0,5, C1, C2).
+- **Tornio, lato B (pezzo girato)**: lunghezza finita e tratti del secondo lato; la troncatura lascia 1 mm, il programma del lato B (numero dopo) fa la sfacciatura a lunghezza e il profilo, con la sua simulazione.
+- Simulazione del materiale piu precisa: niente materiale tolto sotto la quota programmata, gole e troncatura dal lato giusto della lama, bareno riconosciuto dentro il foro, punte e centrini a cono, sfacciatura oltre il centro.
+- Il controllo della fresa "oltre la lunghezza tagliente" ora si chiama per quello che e: la misura L della tabella utensili e la sporgenza, e il controllo e il portautensile che tocca il pezzo.
+
 ## 2.33.0 - Tutti i filetti al tornio, cicli fissi, nuove lavorazioni
 - **Filetti al tornio di tutte le famiglie**, esterni e interni: metrici grossi e fini, UNC, UNF, UNEF, gas G, gas R/Rc conico, NPT conico, Whitworth BSW e BSF, trapezio Tr, ACME, Pg. Nel tratto (e nel filetto interno) c'e "Altro filetto": diametro e passo si mettono da soli. Profondita e angolo dell'inserto (60°, 55°, 30°, 29°, 80°) cambiano con la famiglia; i conici crescono 1:16.
 - **Correzione**: con il filetto interno la barenatura andava al diametro del filetto (toglieva tutto il materiale da filettare); ora si ferma al nocciolo.

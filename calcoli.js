@@ -707,6 +707,46 @@
         va(null, zSic, true);
       }
       avvisi.push(passate + ' passate interne. Controlla che il bareno entri nel preforo e che lo stelo non tocchi.');
+    } else if (op === 'profiloInterno') {
+      // profilo interno a tratti (dall'imbocco verso il fondo, diametri che non crescono): passate e finitura con G41
+      const { dp, ap, sx = 0, sz = 0 } = c;
+      if (!pos(dp) || !pos(ap)) return err('Foro di partenza e profondita di passata mancanti.');
+      if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
+      if (!Officina.trattiTornio) return err('Profili non disponibili.');
+      const g = Officina.trattiTornio(c.punti || []);
+      if (g.errore) return err(g.errore);
+      const poli = Officina.polilineaProfilo(g.tratti, 0.3);
+      avvioG96();
+      const dentro = Math.max(dp - 1, 0);
+      va(dentro, zSic, true, refrig.trim());
+      const rMax = Math.max(...poli.map(q => q.b));
+      let x = dp, passate = 0;
+      while (x < 2 * rMax - sx - 1e-9 && passate < 500) {
+        const xPrec = x;
+        x = Math.min(x + 2 * ap, 2 * rMax - sx);
+        // fin dove il profilo (meno il sovrametallo) e almeno largo come la passata
+        const rp = x / 2 + sx / 2;
+        let zF = poli[poli.length - 1].a;
+        for (let i = 1; i < poli.length; i++) { const a = poli[i - 1], b = poli[i]; if (b.b < rp - 1e-9) { zF = Math.abs(b.b - a.b) > 1e-9 ? a.a + (b.a - a.a) * (rp - a.b) / (b.b - a.b) : a.a; break; } }
+        zF = Math.min(zF + sz, -0.01);
+        va(x, null, true);
+        va(null, zF, false, 'F' + gc(c.f));
+        va(x - Math.min(1, x - xPrec), null, false);
+        va(null, zSic, true);
+        va(dentro, null, true);
+        passate++;
+      }
+      if (c.finitura) {
+        const ff = pos(c.ff) ? c.ff : c.f / 2, p0 = g.tratti[0].p;
+        R.push('(FINITURA)');
+        va(p0.b * 2, zSic, true);
+        va(null, p0.a, false, 'F' + gc(ff));
+        R[R.length - 1] = R[R.length - 1].replace(/^G1/, 'G1 G41');
+        g.tratti.forEach(t => tratto(t));
+        va(dentro, null, false);
+        R.push('G40'); va(null, zSic, true);
+      }
+      avvisi.push(passate + ' passate interne e finitura del profilo con G41. Controlla che il bareno entri nel foro e che lo stelo non tocchi il fondo.');
     } else if (op === 'foratura') {
       const { dpunta, prof, q } = c;
       if (!pos(dpunta) || !pos(prof)) return err('Diametro della punta e profondita mancanti.');
@@ -869,6 +909,19 @@
       const fine = dfin > 0 ? dfin : -1;
       let x = dg + 1, k = 0;
       va(x, null, true);
+      // smusso sul pezzo che cade: prima una gola poco profonda, poi lo spigolo destro della lama fa lo smusso
+      const cS = pos(c.smusso) ? c.smusso : 0, dS = pos(c.dSmusso) ? c.dSmusso : dg;
+      if (cS > 0) {
+        R.push('(SMUSSO ' + tx(cS) + ' SUL PEZZO)');
+        va(dS - 2 * cS - 1, null, false, 'F' + gc(c.f));
+        va(x, null, true);
+        va(null, zt + cS, true);
+        va(dS + 0.2, null, true);
+        va(dS - 2 * cS, zt, false);
+        va(x, null, true);
+        va(null, zt, true);
+        avvisi.push('Smusso ' + tx(cS) + 'x45° sul pezzo prima di troncare (con lo spigolo destro della lama).');
+      }
       const tronca = () => {
         while (x > fine + 1e-9 && k++ < 1000) {
           const xn = Math.max(x - 2 * q, fine);

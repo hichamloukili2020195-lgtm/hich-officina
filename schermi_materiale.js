@@ -8,12 +8,14 @@
   function datiUtensile(r, v, t) {
     v = v || {};
     const tab = A.tabellaUt ? A.tabellaUt() : [];
+    const coni = { centrino: 1, smussatore: 1, puntaMD: 0.6, puntaIns: 0.6 };   // cono della punta: altezza per mm di raggio
+    if (v.utensiliD && Number(v.utensiliD[t]) > 0) { const u0 = tab.find(x => Number(x.t) === Number(t)); return { d: Number(v.utensiliD[t]), l: u0 ? num(u0.l) : 0, cono: coni[(v.utensiliTipo || {})[t]] || 0 }; }   // dal lavoro guidato: il diametro e quello della fase
     const u = tab.find(x => Number(x.t) === Number(t) && Number(x.d) > 0);
-    if (u) return { d: Number(u.d), l: num(u.l) };
+    if (u) return { d: Number(u.d), l: num(u.l), cono: coni[u.tipo] || 0 };
     if (num(v.raggioDef) > 0) return { d: 2 * num(v.raggioDef), l: 0 };
     const ut = (r.utensili || []).find(x => x.t === t);
-    const d = O.diametroDaCommento(ut && ut.commento);
-    return d > 0 ? { d, l: 0 } : null;
+    const d = O.diametroDaCommento(ut && ut.commento), cm = String((ut && ut.commento) || '').toUpperCase();
+    return d > 0 ? { d, l: 0, cono: /CENTR|SMUSS|SVAS/.test(cm) ? 1 : /PUNTA/.test(cm) ? 0.6 : 0 } : null;
   }
   A.datiUtensile = datiUtensile;
 
@@ -21,7 +23,7 @@
   function modelloMateriale(r, testo, v) {
     v = v || {};
     const tab = A.tabellaUt ? A.tabellaUt() : [];
-    const chiave = [testo, v.glx, v.gly, v.glz, v.gtd, v.gtl, v.gts, v.raggioDef, JSON.stringify(tab)].join('|');
+    const chiave = [testo, v.glx, v.gly, v.glz, v.gtd, v.gtl, v.gts, v.raggioDef, v.spMorsa, v.morsaIpotizzata, v.dPorta, v.spMandrino, JSON.stringify(v.utensiliD || {}), JSON.stringify(v.utensiliTipo || {}), v.bersaglio ? 'B' : '', JSON.stringify(tab)].join('|');
     const memo = A.param.matMemo;
     let mat;
     if (memo && memo.chiave === chiave) mat = memo.mat;
@@ -34,8 +36,15 @@
         S = r.segmentiCentro;
       }
       mat = O.creaMateriale({ modo: tor ? 'tornio' : 'fresa', S, utensile, foro: t => { const u = utensile(t); return u ? u.d : 8; },
+        morsa: { sp: num(v.spMorsa), ipotizzata: !!v.morsaIpotizzata }, porta: num(v.dPorta), mandrino: { sp: num(v.spMandrino) },
         grezzo: tor ? { d: num(v.gtd), l: num(v.gtl), s: v.gts === '' || v.gts === undefined || v.gts === null ? undefined : O.num(v.gts) } : { lx: num(v.glx), ly: num(v.gly), lz: num(v.glz) } });
       if (mat.utensili) Object.keys(mat.utensili).forEach(t => { if (mat.utensili[t].ipotizzato) mat.note.push('T' + t + ': il diametro non si sa, uso ' + A.fmt(mat.utensili[t].d, 0) + ' mm. Scrivilo nella tabella utensili o nel commento (es. FRESA D10).'); });
+      if (v.bersaglio && O.preparaBersaglio(mat, v.bersaglio)) {
+        mat.vaiA(mat.N);
+        const c = O.confrontaMateriale(mat);
+        // poche celle sparse sono i bordi della griglia, non errori del programma
+        mat.confronto = { resta: c.resta >= 30 ? c.resta : 0, troppo: c.troppo >= 30 ? c.troppo : 0, volResta: c.volResta, volTroppo: c.volTroppo };
+      }
       A.param.matMemo = { chiave, mat };
     }
     if (mat.collisioni) {
@@ -50,6 +59,8 @@
   // ----- disegno del materiale -----
   const lega = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const ACCIAIO = [176, 190, 212], BLU = [62, 108, 200], FONDO = [26, 44, 84];
+  const ARANCIO = [255, 150, 40], ROSSO = [230, 55, 60];   // confronto: resta materiale / tagliato troppo
+  A.COLORI_CONFRONTO = { ARANCIO, ROSSO };
   const rgb = c => 'rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ')';
   const colorePer = (h, lz) => {
     const d = Math.max(0, Math.min(1, -h / (lz || 1)));
@@ -64,9 +75,13 @@
     if (!mat || mat.vuoto || mat.tipo === 'troppo') return;
     if (mat.tipo === 'tornio') {
       const cv = tela(mat, mat.nz, mat.nr), cx = cv.getContext('2d'), im = cx.createImageData(mat.nz, mat.nr), d = im.data;
+      const st = c.stato;
       for (let a = 0; a < mat.nz; a++) for (let b = 0; b < mat.nr; b++) {
-        if (!mat.occ[a * mat.nr + b]) continue;
-        const p = ((mat.nr - 1 - b) * mat.nz + a) * 4, f = 0.78 + 0.22 * (b / mat.nr);   // piu scuro vicino all'asse
+        const k = a * mat.nr + b, p = ((mat.nr - 1 - b) * mat.nz + a) * 4;
+        if (st && st[k] === 2) { d[p] = ROSSO[0]; d[p + 1] = ROSSO[1]; d[p + 2] = ROSSO[2]; d[p + 3] = 235; continue; }
+        if (!mat.occ[k]) continue;
+        if (st && st[k] === 1) { d[p] = ARANCIO[0]; d[p + 1] = ARANCIO[1]; d[p + 2] = ARANCIO[2]; d[p + 3] = 245; continue; }
+        const f = 0.78 + 0.22 * (b / mat.nr);   // piu scuro vicino all'asse
         d[p] = ACCIAIO[0] * f; d[p + 1] = ACCIAIO[1] * f; d[p + 2] = ACCIAIO[2] * f; d[p + 3] = 235;
       }
       cx.putImageData(im, 0, 0);
@@ -80,7 +95,7 @@
       const cv = tela(mat, nx, ny), cx = cv.getContext('2d'), im = cx.createImageData(nx, ny), d = im.data;
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
         const k = j * nx + i, v = h[k];
-        let col = colorePer(v, lz);
+        let col = c.stato && c.stato[k] === 1 ? ARANCIO : c.stato && c.stato[k] === 2 ? ROSSO : colorePer(v, lz);
         const dx = (i + 1 < nx ? h[k + 1] : v) - (i > 0 ? h[k - 1] : v), dy = (j + 1 < ny ? h[k + nx] : v) - (j > 0 ? h[k - nx] : v);
         const luce = 1 + Math.max(-0.25, Math.min(0.25, (dx - dy) * 0.08));
         const p = ((ny - 1 - j) * nx + i) * 4;
@@ -123,6 +138,26 @@
   }
   A.disegnaMateriale = disegnaMateriale;
 
+  /** Morsa (ganasce) e mandrino (griffe) nelle viste 2D. */
+  function disegnaAttrezzi(g, c) {
+    const mat = c.mat, P2 = c.P2;
+    if (!mat) return;
+    g.save(); g.fillStyle = 'rgba(120,135,160,0.55)'; g.strokeStyle = 'rgba(200,210,225,0.8)'; g.lineWidth = 1.2;
+    const rett = (a, b) => { const x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]), w = Math.abs(b[0] - a[0]), h = Math.abs(b[1] - a[1]); g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); };
+    if (mat.tipo === 'tornio' && mat.mandrino) {
+      const { zM, R } = mat.mandrino;
+      rett(P2(2 * R, 0, zM), P2(2 * (R + 25), 0, zM - 25));                 // griffa
+      g.fillStyle = 'rgba(90,100,120,0.6)'; rett(P2(0, 0, zM - 25), P2(2 * (R + 50), 0, zM - 65));   // corpo del mandrino
+    } else if (mat.ganasce && mat.ganasce.length) {
+      mat.ganasce.forEach(q => {
+        if (c.vista === 'xy') rett(P2(q.x0, q.y1, 0), P2(q.x1, q.y0, 0));
+        else if (c.vista === 'xz') rett(P2(q.x0, 0, q.z1), P2(q.x1, 0, Math.max(q.z0, -mat.lz - 15)));
+      });
+    }
+    g.restore();
+  }
+  A.disegnaAttrezzi = disegnaAttrezzi;
+
   // ----- l'utensile con le sue misure -----
   /** c: {modo, vista, P2, sc, px:[x,y,z], raggio (mm), lung (mm) }. */
   function disegnaUtensile(g, c) {
@@ -146,6 +181,7 @@
       const a = P2(px[0] - R, px[1], px[2]), b = P2(px[0] + R, px[1], px[2] + L);
       g.globalAlpha = 0.45; g.fillRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(4, Math.abs(b[0] - a[0])), Math.abs(b[1] - a[1]));
       g.globalAlpha = 1; g.lineWidth = 2; g.strokeRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(4, Math.abs(b[0] - a[0])), Math.abs(b[1] - a[1]));
+      if (c.porta > 0) { const ha = P2(px[0] - c.porta / 2, px[1], px[2] + L), hb = P2(px[0] + c.porta / 2, px[1], px[2] + L + 35); g.fillStyle = 'rgba(150,160,180,0.5)'; g.strokeStyle = 'rgba(210,220,235,0.8)'; g.lineWidth = 1.2; g.fillRect(Math.min(ha[0], hb[0]), Math.min(ha[1], hb[1]), Math.abs(hb[0] - ha[0]), Math.abs(hb[1] - ha[1])); g.strokeRect(Math.min(ha[0], hb[0]), Math.min(ha[1], hb[1]), Math.abs(hb[0] - ha[0]), Math.abs(hb[1] - ha[1])); }
     } else {
       const ell = z => { const o = []; for (let q = 0; q < 28; q++) { const t = q / 28 * Math.PI * 2; o.push(P2(px[0] + R * Math.cos(t), px[1] + R * Math.sin(t), z)); } return o; };
       const giu = ell(px[2]), su = ell(px[2] + L);

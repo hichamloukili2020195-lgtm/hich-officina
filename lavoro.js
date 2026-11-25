@@ -116,7 +116,10 @@
       const pM = tipoF === 'maschio' ? (pos(num(L.foroPasso)) ? num(L.foroPasso) : O.passoGrosso(dN) || 1.5) : 0;
       const dPunta = !pos(dN) ? NaN : tipoF === 'maschio' ? r3(O.filetto(dN, pM).preforo) : tipoF === 'alesato' ? r3(dN - (dN <= 10 ? 0.2 : 0.3)) : dN;
       const profF = pos(num(L.foroP)) ? num(L.foroP) : 2 * dN;
-      const a = O.pianificaAlbero({ dg, lg: Math.max(num(g.lg) || 0, pr.lunghezza + 5), smusso: 0, tratti: [{ d: dg, l: pr.lunghezza }], foro: pos(dN) ? { d: dPunta, prof: profF + (tipoF === 'maschio' ? 2 * pM : 0) } : null, troncatura: !!L.troncatura }, ctx);
+      // con il lato B la troncatura lascia la lunghezza finita piu 1 mm da sfacciare dopo
+      const conB = !!(L.fase2 && L.fase2.on && pos(num(L.fase2.lTot)) && num(L.fase2.lTot) > pr.lunghezza);
+      const lTaglio = conB ? num(L.fase2.lTot) + 1 : pr.lunghezza;
+      const a = O.pianificaAlbero({ dg, lg: Math.max(num(g.lg) || 0, lTaglio + 5), smusso: 0, tratti: [{ d: dg, l: lTaglio }], foro: pos(dN) ? { d: dPunta, prof: profF + (tipoF === 'maschio' ? 2 * pM : 0) } : null, troncatura: !!L.troncatura }, ctx);
       const extra = a.errore ? [] : a.fasi.filter(f => f.op !== 'profilo');
       const prima = extra.filter(f => f.op === 'sfacciatura' || f.op === 'foratura'), dopo = extra.filter(f => f.op === 'troncatura');
       // barenatura interna e filetto interno: dopo il foro in asse (la barenatura) e dopo il filetto esterno (il filetto)
@@ -133,7 +136,22 @@
         const FI = pos(num(I.fil)) ? O.datiFiletto({ fam: I.filFam, nome: I.filNome, d: di, p: num(I.fil) }) : null;
         const dBar = FI ? r3(FI.conico ? FI.d1 - li / 16 : FI.d1) : di;
         if (FI && dBar <= dpF) return { errore: 'Il foro in asse (Ø' + dpF + ') e piu grande del nocciolo del filetto interno (Ø' + dBar + '): fai un foro piu piccolo.' };
-        internaF.push({ op: 'interna', titolo: 'Barenatura interna Ø' + dBar + ' T' + tB, c: Object.assign({}, base, { t: tB, dp: dpF, di: dBar, dg, l: li, ap: 1, sx: FI ? 0 : 0.3, sz: 0.1, finitura: true, ff: r3(Math.max(0.05, (mt.lf || 0.2) * 0.3)), smusso: FI ? 0 : 0.5, vc: r3((mt.lvc || 100) * 0.7), f: r3(Math.max(0.05, (mt.lf || 0.2) * 0.6)) }) });
+        // altri tratti interni dopo il primo (cilindri o coni, sempre piu stretti verso il fondo): profilo interno completo
+        const altri = (I.altri || []).filter(t => t && pos(num(t.d)) && pos(num(t.l)));
+        if (altri.length) {
+          const P = [{ x: dBar, z: 0, smusso: FI ? 0 : 0.5 }];
+          let z = 0, d = dBar;
+          P.push({ x: dBar, z: r3(-li) }); z = -li;
+          for (let k = 0; k < altri.length; k++) {
+            const t = altri[k], dt = num(t.d);
+            if (dt > d + 1e-9) return { errore: 'Tratto interno ' + (k + 2) + ' (Ø' + dt + ') piu largo di quello prima: un allargamento verso il fondo si fa con la gola interna.' };
+            if (dt <= dpF) return { errore: 'Tratto interno ' + (k + 2) + ' (Ø' + dt + '): deve essere piu grande del foro in asse (Ø' + dpF + ').' };
+            if (t.tipo !== 'cono' && Math.abs(dt - d) > 1e-9) P.push({ x: dt, z });
+            z = r3(z - num(t.l)); P.push({ x: dt, z }); d = dt;
+          }
+          P.push({ x: dpF, z });
+          internaF.push({ op: 'profiloInterno', titolo: 'Profilo interno ' + (altri.length + 1) + ' tratti T' + tB, c: Object.assign({}, base, { t: tB, dp: dpF, dg, punti: P, ap: 1, sx: 0.3, sz: 0.1, finitura: true, ff: r3(Math.max(0.05, (mt.lf || 0.2) * 0.3)), vc: r3((mt.lvc || 100) * 0.7), f: r3(Math.max(0.05, (mt.lf || 0.2) * 0.6)) }) });
+        } else internaF.push({ op: 'interna', titolo: 'Barenatura interna Ø' + dBar + ' T' + tB, c: Object.assign({}, base, { t: tB, dp: dpF, di: dBar, dg, l: li, ap: 1, sx: FI ? 0 : 0.3, sz: 0.1, finitura: true, ff: r3(Math.max(0.05, (mt.lf || 0.2) * 0.3)), smusso: FI ? 0 : 0.5, vc: r3((mt.lvc || 100) * 0.7), f: r3(Math.max(0.05, (mt.lf || 0.2) * 0.6)) }) });
         if (FI) {
           const tF = O.trovaT(tab, ['bareno', 'inserto'], 0, 8, nt), pF = FI.p;
           const giri = Math.min(base.nmax, Math.max(100, Math.round(1000 * (mt.lvc || 100) * 0.4 / (Math.PI * di) / 10) * 10));
@@ -161,7 +179,7 @@
       // gola interna (a una distanza dalla faccia) e gola di scarico in fondo al filetto interno
       const golaI = [];
       if (internaF.length) {
-        const dBar = internaF[0].c.di, tGI = O.trovaT(tab, ['bareno', 'inserto'], 0, 9, nt);
+        const dBar = internaF[0].c.di || internaF[0].c.punti[0].x, tGI = O.trovaT(tab, ['bareno', 'inserto'], 0, 9, nt);
         const golaInt = (zDist, b, dF, titolo) => golaI.push({ op: 'golaInterna', titolo: titolo + ' T' + tGI, c: Object.assign({}, base, { t: tGI, dg, dp: dBar, dfondo: r3(dF), zg: r3(-zDist), b, w: Math.min(3, b), vc: r3((mt.lvc || 100) * 0.5), f: r3(Math.max(0.03, (mt.lf || 0.2) * 0.25)) }) });
         const G = I.gola || {};
         if (I.golaOn && pos(num(G.z)) && pos(num(G.b)) && pos(num(G.d))) {
@@ -182,7 +200,7 @@
       if (L.golaFrontOn && pos(num(GF.dInt)) && pos(num(GF.dEst)) && pos(num(GF.prof))) {
         const dFaccia = pr.punti[1] ? pr.punti[1].x : dg;
         if (num(GF.dEst) > dFaccia - 1) return { errore: 'La gola frontale (Ø' + num(GF.dEst) + ') esce dalla faccia (Ø' + dFaccia + ').' };
-        if (pos(dN) && num(GF.dInt) < (internaF.length ? internaF[0].c.di : dPunta) + 1) return { errore: 'La gola frontale tocca il foro in asse: allarga il diametro interno della gola.' };
+        if (pos(dN) && num(GF.dInt) < (internaF.length ? (internaF[0].c.di || internaF[0].c.punti[0].x) : dPunta) + 1) return { errore: 'La gola frontale tocca il foro in asse: allarga il diametro interno della gola.' };
         const tGF = O.trovaT(tab, ['inserto'], 0, 10, nt);
         golaF.push({ op: 'golaFrontale', titolo: 'Gola frontale Ø' + num(GF.dInt) + '-' + num(GF.dEst) + ' T' + tGF, c: Object.assign({}, base, { t: tGF, dg, dInt: num(GF.dInt), dEst: num(GF.dEst), prof: num(GF.prof), w: Math.min(3, (num(GF.dEst) - num(GF.dInt)) / 2), q: 2, vc: r3((mt.lvc || 100) * 0.5), f: r3(Math.max(0.03, (mt.lf || 0.2) * 0.25)) }) });
       }
@@ -192,8 +210,31 @@
       // il filetto interno va dopo i filetti e le gole esterne, prima della troncatura
       const fasi = dopoForo.concat(p.fasi.slice(0, 1), golaF, p.fasi.slice(1), filettoI, dopo);
       const note = (p.note || []).concat(a.errore ? [] : (a.note || []).filter(t => !/^Utensili non trovati/.test(t)));
+      const ft = fasi.find(f => f.op === 'troncatura');
+      if (ft && pos(num(L.troncaSmusso))) { ft.c.smusso = num(L.troncaSmusso); const ul = (L.tratti || []).filter(t => t && pos(num(t.d))).pop(); ft.c.dSmusso = ul ? num(ul.d) : dg; ft.titolo = ft.titolo.replace(/^Troncatura/, 'Smusso C' + num(L.troncaSmusso) + ' e troncatura'); }
+      // seconda fase: il pezzo tagliato si gira; origine Z0 sulla faccia nuova, sfacciatura a lunghezza e profilo del lato B
+      let fase2 = null;
+      const F2 = L.fase2 || {};
+      if (F2.on) {
+        const L1 = ft ? r3(-ft.c.zt) : num(g.lg), lTot = num(F2.lTot);
+        const lenB = (F2.tratti || []).filter(t => t && pos(num(t.d)) && pos(num(t.l))).reduce((q, t) => q + num(t.l), 0);
+        if (!pos(lTot)) fase2 = { errore: 'Lato B: scrivi la lunghezza finita del pezzo.' };
+        else if (!pos(L1)) fase2 = { errore: 'Lato B: serve la troncatura o la lunghezza del grezzo.' };
+        else if (lTot >= L1) fase2 = { errore: 'Lato B: il pezzo tagliato e lungo ' + L1 + ' mm, la lunghezza finita (' + lTot + ') deve essere piu corta.' };
+        else if (pr.lunghezza + lenB > lTot + 1e-6) fase2 = { errore: 'Lato B: i tratti del lato A (' + r3(pr.lunghezza) + ' mm) e del lato B (' + r3(lenB) + ' mm) sono piu lunghi del pezzo finito (' + lTot + ' mm).' };
+        else if (!lenB) fase2 = { errore: 'Lato B: aggiungi almeno un tratto (diametro e lunghezza).' };
+        else {
+          const p2 = proponiLavoro({ modo: 'tornio', grezzo: { dg, lg: L1 }, tratti: F2.tratti, smussoTesta: F2.smussoTesta }, ctx);
+          if (p2.errore) fase2 = { errore: 'Lato B: ' + p2.errore };
+          else {
+            const sv = r3(L1 - lTot);
+            p2.fasi.forEach(f => { f.chiave = 'B:' + f.chiave; if (f.op === 'sfacciatura') { f.c.s = sv; f.titolo = f.titolo.replace(/^Sfacciatura/, 'Sfacciatura a lunghezza ' + lTot + ' (' + sv + ' mm)'); } });
+            fase2 = { fasi: p2.fasi, note: ['Lato B: gira il pezzo, serralo sul lato A gia finito (griffe morbide), Z0 sulla faccia grezza meno ' + sv + ' mm.'].concat(p2.note || []), misure: p2.misure || [], punti: p2.punti, modo: 'tornio', L1, lTot, lenB };
+          }
+        }
+      }
       if (ctx.metodo) fasi.forEach(f => { if (f.c) f.c.metodo = ctx.metodo; });
-      return { fasi: fasi.map((f, i) => Object.assign(f, { chiave: chiaveFase(f, i) })), note, misure: p.misure || [], punti: pr.punti, modo: 'tornio' };
+      return { fasi: fasi.map((f, i) => Object.assign(f, { chiave: chiaveFase(f, i) })), note, misure: p.misure || [], punti: pr.punti, modo: 'tornio', fase2 };
     }
     const lx = num(g.lx), ly = num(g.ly), lz = num(g.lz);
     if (!(pos(lx) && pos(ly) && pos(lz))) return { errore: 'Scrivi le misure del pezzo (lunghezza, larghezza, spessore).' };

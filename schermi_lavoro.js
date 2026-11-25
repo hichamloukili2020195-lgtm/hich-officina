@@ -308,6 +308,12 @@
             const I = T.interno;
             corpo.append(el('div', { class: 'lav-et', testo: 'Barenatura interna (vuoto = solo il foro)' }), el('div', { class: 'lav-campi' }, [A.campoNum(I, 'di', 'Ø finito del foro', 'mm', agg2), A.campoNum(I, 'l', 'Profondita', 'mm', agg2)]));
             if (num(I.di) > 0) {
+              // altri tratti interni dopo il primo, verso il fondo (sempre piu stretti): profilo interno completo
+              I.altri = I.altri || [];
+              I.altri.forEach((t, k) => corpo.appendChild(el('div', { class: 'lav-punto' }, [el('span', { class: 'n', testo: 'I' + (k + 2) }), A.campoNum(t, 'd', t.tipo === 'cono' ? 'Ø alla fine' : 'Ø', 'mm', agg2), A.campoNum(t, 'l', 'Lunghezza', 'mm', agg2),
+                el('button', { class: 'chip' + (t.tipo === 'cono' ? ' attiva' : ''), testo: t.tipo === 'cono' ? 'Cono' : 'Cilindro', onclick: () => { t.tipo = t.tipo === 'cono' ? 'cil' : 'cono'; A.salva(); tutto(); } }),
+                el('button', { class: 'icona-pul', 'aria-label': 'Togli il tratto interno ' + (k + 2), html: svg(IC.x), onclick: () => { I.altri.splice(k, 1); A.salva(); tutto(); } })])));
+              corpo.append(el('button', { class: 'pul sec', id: 'lav-agg-int', html: svg(IC.piu) + 'Tratto interno piu in fondo', onclick: () => { const u = I.altri[I.altri.length - 1]; const dPrec = u ? num(u.d) : num(I.di); I.altri.push({ tipo: 'cil', d: Math.max(num(T.foroD) + 2, dPrec - 6), l: 8 }); A.salva(); tutto(); } }));
               corpo.append(el('div', { class: 'lav-et', testo: 'Filetto interno' }), chips([['', 'No'], [O.passoGrosso(num(I.di)) || 1.5, 'M' + fmt(num(I.di)) + 'x' + fmt(O.passoGrosso(num(I.di)) || 1.5)]], I.filFam ? '' : (I.fil || ''), v => { delete I.filFam; delete I.filNome; if (v) I.fil = v; else delete I.fil; A.salva(); tutto(); }, 'Filetto interno'),
                 sceltaFiletto(I, 'lav-altro-fil-int', F => { I.di = F.d; I.fil = F.p; I.filFam = F.fam; I.filNome = F.nome; A.salva(); tutto(); }));
               if (num(I.fil) > 0) corpo.append(interruttore('Gola di scarico in fondo al filetto', I.scarico !== false, v => { I.scarico = v; A.salva(); tutto(); }, 'lav-scarico-int'));
@@ -319,6 +325,20 @@
         corpo.append(interruttore('Gola frontale sulla faccia', !!T.golaFrontOn, v => { T.golaFrontOn = v; const d0 = num((T.tratti[0] || {}).d) || 30; T.golaFront = T.golaFront || { dInt: r1(d0 * 0.5), dEst: r1(d0 * 0.75), prof: 2 }; A.salva(); tutto(); }, 'lav-gola-front'));
         if (T.golaFrontOn) { T.golaFront = T.golaFront || {}; corpo.append(el('div', { class: 'lav-campi' }, [A.campoNum(T.golaFront, 'dInt', 'Ø interno', 'mm', agg2), A.campoNum(T.golaFront, 'dEst', 'Ø esterno', 'mm', agg2), A.campoNum(T.golaFront, 'prof', 'Profondita', 'mm', agg2)])); }
         corpo.append( interruttore('Troncatura alla fine', !!T.troncatura, v => { T.troncatura = v; A.salva(); tutto(); }, 'lav-tronca'));
+        if (T.troncatura) corpo.append(el('div', { class: 'lav-et', testo: 'Smusso sul pezzo che cade' }), chips([['', 'No'], [0.5, 'C0,5'], [1, 'C1'], [2, 'C2']], T.troncaSmusso || '', v => { if (v) T.troncaSmusso = v; else delete T.troncaSmusso; A.salva(); tutto(); }, 'Smusso sul pezzo che cade'));
+        // seconda fase: pezzo girato (lato B)
+        corpo.appendChild(el('div', { class: 'sez', testo: 'Lato B (pezzo girato)' }));
+        T.fase2 = T.fase2 || { on: false, tratti: [] };
+        const F2 = T.fase2;
+        corpo.append(interruttore('Seconda fase: giro il pezzo e lavoro l\'altro lato', !!F2.on, v => { F2.on = v; if (v && !(num(F2.lTot) > 0)) { const lA = (T.tratti || []).reduce((q, t) => q + (num(t.l) || 0), 0); F2.lTot = Math.round(lA + 15); } if (v && !F2.tratti.length) F2.tratti.push({ tipo: 'cil', d: Math.max(5, (num((T.tratti[0] || {}).d) || 20)), l: 10 }); if (v) T.troncatura = true; A.salva(); tutto(); }, 'lav-fase2'));
+        if (F2.on) {
+          corpo.append(el('p', { class: 'leggenda', testo: 'Dopo la troncatura il pezzo si gira e si serra sul lato A. Il lato B parte dalla faccia nuova (Z0), i tratti vanno verso il lato A.' }),
+            el('div', { class: 'lav-campi' }, [A.campoNum(F2, 'lTot', 'Lunghezza finita del pezzo', 'mm', agg2)]));
+          F2.tratti.forEach((t, k) => corpo.appendChild(el('div', { class: 'lav-punto' }, [el('span', { class: 'n', testo: 'B' + (k + 1) }), A.campoNum(t, 'd', 'Ø', 'mm', agg2), A.campoNum(t, 'l', 'Lunghezza', 'mm', agg2),
+            el('button', { class: 'icona-pul', 'aria-label': 'Togli il tratto B' + (k + 1), html: svg(IC.x), disabled: F2.tratti.length <= 1, onclick: () => { F2.tratti.splice(k, 1); A.salva(); tutto(); } })])));
+          corpo.append(el('button', { class: 'pul sec', id: 'lav-agg-b', html: svg(IC.piu) + 'Tratto del lato B', onclick: () => { const u = F2.tratti[F2.tratti.length - 1]; F2.tratti.push({ tipo: 'cil', d: u ? num(u.d) + 6 : 20, l: 10 }); A.salva(); tutto(); } }),
+            el('div', { class: 'lav-et', testo: 'Smusso sulla testa del lato B' }), chips([['', 'Vivo'], ['C0.5', 'C0,5'], ['C1', 'C1'], ['C2', 'C2']], F2.smussoTesta === undefined ? 'C0.5' : F2.smussoTesta, v => { F2.smussoTesta = v; A.salva(); tutto(); }, 'Smusso di testa lato B'));
+        }
       };
       const passoFormaFresa = () => {
         const F = L();
@@ -400,8 +420,16 @@
           rias.append(el('div', { class: 'lav-kpi' }, [el('div', {}, [el('b', { testo: isFinite(r.tempo) ? fmt(r.tempo, 1) : '—' }), el('small', { testo: 'minuti stimati' })]), el('div', {}, [el('b', { testo: String(r.utensili.length) }), el('small', { testo: 'utensili' })]), el('div', {}, [el('b', { testo: String(r.fasi.length) }), el('small', { testo: 'lavorazioni' })])]));
         };
         riassunto();
+        listaLatoB();
       };
 
+      const listaLatoB = () => {
+        if (!prop || !prop.fase2) return;
+        corpo.appendChild(el('div', { class: 'sez', testo: 'Lato B (pezzo girato)' }));
+        if (prop.fase2.errore) { corpo.appendChild(el('p', { class: 'errore', role: 'alert', testo: prop.fase2.errore })); return; }
+        corpo.appendChild(el('div', { class: 'lav-latob' }, prop.fase2.fasi.map((f, i) => el('div', { class: 'lav-fase', 'data-chiave': f.chiave }, [el('div', { class: 'lav-fase-testa' }, [el('span', { class: 'num', testo: 'B' + (i + 1) }), el('span', { class: 't' }, [el('b', { testo: String(f.titolo).replace(/ T\d+$/, '') }), el('small', { testo: 'T' + f.c.t + ' · Vc ' + fmt(f.c.vc, 0) + ' · f ' + fmt(f.c.f, 3) })])])]))));
+        prop.fase2.note.forEach(t => corpo.appendChild(A.info(A.esc(t))));
+      };
       // ----- passo 4: programma -----
       const passoProgramma = () => {
         if (!prop) prop = calcolaProposta();
@@ -411,12 +439,41 @@
         corpo.append(el('div', { class: 'lav-kpi' }, [el('div', {}, [el('b', { testo: isFinite(r.tempo) ? fmt(r.tempo, 1) : '—' }), el('small', { testo: 'minuti stimati' })]), el('div', {}, [el('b', { testo: String(r.righe.length) }), el('small', { testo: 'righe' })]), el('div', {}, [el('b', { testo: String(r.utensili.length) }), el('small', { testo: 'utensili' })])]));
         const apri = dove => {
           A.param.listato = { righe: r.righe, iso: r.righe.slice(), nome: (r.righe[1] || 'O0001').split(' ')[0], tipo: S.modo, avvisi: prop.note.concat(r.avvisi) };
-          if (dove === 'simula') A.param.sim = { testo: r.righe.join('\n'), modo: S.modo, nome: A.param.listato.nome };
+          if (dove === 'simula') {
+            // la simulazione sa il grezzo vero, la morsa o il mandrino, i diametri degli utensili e la forma voluta (per il confronto)
+            const Lw = L(), sp = (Lw.scelte && Lw.scelte.spente) || {}, on = prop.fasi.filter(f => !sp[f.chiave]), g = Lw.grezzo || {};
+            const uD = {};
+            const uT = {};
+            on.forEach(f => { const d = f.op === 'foratura' ? Number(f.c.dpunta) : Number(f.c.d); if (Number(f.c.t) > 0 && d > 0 && (S.modo === 'fresa' || f.op === 'foratura')) { uD[f.c.t] = d; if (f.tipoUt) uT[f.c.t] = f.tipoUt; } });
+            let ing;
+            if (S.modo === 'tornio') {
+              const lung = prop.punti && prop.punti.length ? -Math.min(...prop.punti.map(q => Number(q.z))) : 0, lg = num(g.lg) > 0 ? num(g.lg) : lung + 40;
+              ing = { gtd: g.dg, gtl: lg, gts: 1, spMandrino: Math.max(lung + 5, Math.min(lg - 10, lung + 15)), utensiliD: uD, bersaglio: { tipo: 'tornio', punti: prop.punti, fasi: on.map(f => ({ op: f.op, c: f.c })) } };
+            } else ing = { glx: g.lx, gly: g.ly, glz: g.lz, spMorsa: num(g.lz) > 6 ? num(g.lz) - 3 : '', morsaIpotizzata: true, utensiliD: uD, utensiliTipo: uT, bersaglio: { tipo: 'fresa', entita: prop.entita, lz: num(g.lz) } };
+            A.param.sim = { testo: r.righe.join('\n'), modo: S.modo, nome: A.param.listato.nome, ingombri: ing };
+          }
           A.vai(dove);
         };
         corpo.append(el('div', { class: 'lav-azioni' }, [
           el('button', { class: 'pul grande', id: 'lav-simula', html: svg('<path d="M7 4l12 8-12 8z"/>') + 'Simula', onclick: () => apri('simula') }),
           el('button', { class: 'pul sec grande', id: 'lav-programma', html: A.icona('codice') + 'Programma ISO', onclick: () => apri('listato') })]));
+        // lato B: un programma a parte (numero dopo), con la sua simulazione
+        if (prop.fase2 && !prop.fase2.errore) {
+          const F2 = prop.fase2;
+          const apriB = dove => {
+            const r2 = O.programmaLavoro(F2, L().scelte, { num: (Number(A.imp().numProg) || 1) + 1, nome: 'LATO B', numerare: A.imp().numerare });
+            if (r2.errore) { A.avviso(r2.errore); return; }
+            A.param.listato = { righe: r2.righe, iso: r2.righe.slice(), nome: (r2.righe[1] || 'O0002').split(' ')[0], tipo: 'tornio', avvisi: F2.note.concat(r2.avvisi) };
+            if (dove === 'simula') {
+              const g = L().grezzo || {};
+              A.param.sim = { testo: r2.righe.join('\n'), modo: 'tornio', nome: A.param.listato.nome, ingombri: { gtd: g.dg, gtl: F2.L1, gts: r1(F2.L1 - F2.lTot), spMandrino: Math.min(F2.L1 - 3, F2.lenB + 10), bersaglio: { tipo: 'tornio', punti: F2.punti, fasi: F2.fasi.map(f => ({ op: f.op, c: f.c })) } } };
+            }
+            A.vai(dove);
+          };
+          corpo.append(el('div', { class: 'sez', testo: 'Lato B (pezzo girato): programma a parte' }), el('div', { class: 'lav-azioni' }, [
+            el('button', { class: 'pul grande', id: 'lav-simula-b', html: svg('<path d="M7 4l12 8-12 8z"/>') + 'Simula lato B', onclick: () => apriB('simula') }),
+            el('button', { class: 'pul sec grande', id: 'lav-programma-b', html: A.icona('codice') + 'Programma lato B', onclick: () => apriB('listato') })]));
+        }
         // costo del pezzo
         const K = L().costo = L().costo || { pezzi: 1, materiale: '' };
         const ris = el('div', { class: 'lav-costo', id: 'lav-costo' });

@@ -165,7 +165,8 @@
       if (!rapido && segmenti.length > 1) { segna('x', st.x, true); segna('y', st.y, true); segna('z', st.z, true); }
       let fmm = st.f;
       if (!rapido && st.perGiro) fmm = st.f * giriAttuali((st.x + x) / 2);
-      tempo += rapido ? l / RAPIDO : (fmm > 0 ? l / fmm : 0);
+      const dtSeg = rapido ? l / RAPIDO : (fmm > 0 ? l / fmm : 0);
+      tempo += dtSeg; s.dt = dtSeg;   // minuti del movimento (per la simulazione in tempo reale)
       if (!rapido && !(st.f > 0)) avvisa('movimento di lavoro senza avanzamento F', riga, 'errore');
       if (!rapido && !st.mandrino && !st.mandrinoAvvisato && opz.controlloMandrino !== false) { avvisa('taglio con il mandrino fermo: manca M3 o M4 (o la S)', riga, 'errore'); st.mandrinoAvvisato = true; }
       if (rapido && !tornio && z < -1e-6 && st.z < -1e-6 && Math.hypot(x - st.x, y - st.y) > 1e-6) avvisa('rapido in X Y sotto Z0: possibile urto con il pezzo', riga, 'errore');
