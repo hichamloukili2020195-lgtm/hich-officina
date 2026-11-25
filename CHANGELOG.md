@@ -2,6 +2,18 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.40.0 - Fase 2d CAD: vincoli veri
+- **Vincoli** (Modifica > Vincoli): restano legati al disegno e si riapplicano da soli quando cambi qualcosa.
+  - Su un segmento di profilo (quello che arriva al punto scelto): orizzontale, verticale, lunghezza fissa (numero o formula con i parametri), parallelo, perpendicolare o stessa lunghezza rispetto a un altro profilo (tocca il suo segmento).
+  - Su un punto: bloccato, oppure coincidente con un punto di un altro profilo. Su un arco: raggio fisso.
+  - Rettangolo: larghezza e altezza da formula; cerchio: diametro; asola: larghezza.
+- **Parametri vivi**: se cambi `L` nel pannello, i profili con vincoli di lunghezza `L` si ridisegnano. Un risolutore (minimi quadrati, scritto da noi) sposta i punti il meno possibile; gli ultimi punti di un profilo si muovono prima dei primi.
+- **Trascinando un punto** i vincoli restano veri (un lato orizzontale resta orizzontale). Se i vincoli sono in conflitto il movimento si annulla e il messaggio dice perche; lo stesso quando aggiungi un vincolo impossibile.
+- Segni sul disegno (H, V, L, parallelo, perpendicolare...) e elenco dei vincoli con il cestino per toglierli.
+- Le copie (serie, specchia, ruota, scala, parallela) non portano i vincoli che non valgono piu; spostando soltanto, restano.
+- Non fatto: vincoli di tangenza e di simmetria; le coordinate scritte a mano nel pannello dell'elemento non riapplicano i vincoli finche non muovi o cambi qualcosa.
+- Prove: risolutore (rettangolo storto, triangolo, conflitto, parallelo, perpendicolare, punto trascinato, tempo con 60 punti), interfaccia.
+
 ## 2.39.0 - Fase 2c CAD: parametri, quote, punti toccando, PDF, PNG e QR
 - **Punti toccando il disegno**: in Modifica, accanto ai campi dei punti c'e "Tocca": centro di rotazione e scala, asse di simmetria, centro della serie, spostamento da punto a punto. Il pannello si nasconde, tocchi il punto (con l'aggancio) e torna con i numeri scritti.
 - **Parametri**: dai un nome a una misura (L = 80, h = L/2) nel pannello; vale in ogni campo numerico, nel tastierino Digita (con i tasti dei nomi) e in Modifica. Il nome non puo contenere la x.

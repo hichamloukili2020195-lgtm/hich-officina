@@ -6,6 +6,7 @@ require('../profilo.js');
 require('../filetti.js');
 require('../cad.js');
 require('../modifica.js');
+require('../vincoli.js');
 require('../dxf.js');
 require('../qr.js');
 require('../pdf.js');
@@ -1327,5 +1328,53 @@ prova('PDF: struttura, tabella xref, solo ASCII', () => {
   const len = Number(/\/Length (\d+)/.exec(t)[1]), ini = t.indexOf('stream\n') + 7; assert.strictEqual(t.slice(ini + len, ini + len + 10), 'endstream\n'.slice(0, 10));
   assert.ok(t.includes('\\(1\\)') && t.includes('\\340') && t.includes('\\200'));
   assert.ok(O.scriviPDF([], {}).startsWith('%PDF'));
+});
+
+// ===== 2.40.0: vincoli =====
+prova('vincoli: rettangolo storto con H, V e lunghezze da parametri', () => {
+  O.impostaParametri([{ n: 'L', v: '40' }, { n: 'h', v: 'L/2' }]);
+  const q = (pts, vinc, id) => ({ id: id || 1, tipo: 'poli', chiuso: true, lav: [], punti: pts.map(([x, y]) => ({ x, y })), vinc });
+  const e = q([[0, 0], [38, 3], [41, 24], [-2, 19]], [{ t: 'H', i: 1 }, { t: 'V', i: 2 }, { t: 'H', i: 3 }, { t: 'V', i: 0 }, { t: 'L', i: 1, v: 'L' }, { t: 'L', i: 2, v: 'h' }]);
+  let r = O.risolviVincoli([e]); assert.ok(r.ok, r.errori.join()); const P = r.entita[0].punti;
+  vicino(P[1].x - P[0].x, 40, 0.002); vicino(P[2].y - P[1].y, 20, 0.002); vicino(P[1].y, P[0].y, 0.002); vicino(P[3].x, P[0].x, 0.002); assert.strictEqual(e.punti[1].x, 38, 'l\'originale non cambia');
+  O.impostaParametri([{ n: 'L', v: '60' }, { n: 'h', v: 'L/3' }]);
+  r = O.risolviVincoli([r.entita[0]]); const Q = r.entita[0].punti; vicino(Q[1].x - Q[0].x, 60, 0.002); vicino(Q[2].y - Q[1].y, 20, 0.002);
+  O.impostaParametri([]);
+});
+prova('vincoli: triangolo, conflitto, parallelo, perpendicolare, stessa lunghezza, punto trascinato', () => {
+  const q = (pts, vinc, id, ch) => ({ id: id || 1, tipo: 'poli', chiuso: ch !== false, lav: [], punti: pts.map(([x, y]) => ({ x, y })), vinc });
+  let r = O.risolviVincoli([q([[0, 0], [3, 0.5], [0.2, 4]], [{ t: 'L', i: 1, v: '3' }, { t: 'L', i: 2, v: '5' }, { t: 'L', i: 0, v: '4' }])]); assert.ok(r.ok, r.errori.join());
+  r = O.risolviVincoli([q([[0, 0], [3, 0.5], [0.2, 4]], [{ t: 'L', i: 1, v: '3' }, { t: 'L', i: 2, v: '4' }, { t: 'L', i: 0, v: '10' }])]); assert.ok(!r.ok && /conflitto/.test(r.errori[0]));
+  const a = q([[0, 0], [10, 0]], undefined, 1, false), b = q([[0, 5], [10, 7]], [{ t: 'PAR', i: 1, e2: 1, j: 1 }], 2, false);
+  r = O.risolviVincoli([a, b]); assert.ok(r.ok); const bb = r.entita.find(e => e.id === 2).punti, aa = (r.entita.find(e => e.id === 1) || a).punti;
+  vicino((bb[1].x - bb[0].x) * (aa[1].y - aa[0].y) - (bb[1].y - bb[0].y) * (aa[1].x - aa[0].x), 0, 0.01);
+  const c = q([[20, 0], [25, 9]], [{ t: 'PERP', i: 1, e2: 1, j: 1 }, { t: 'UGU', i: 1, e2: 2, j: 1 }], 3, false);
+  r = O.risolviVincoli([a, b, c]); assert.ok(r.ok, r.errori.join()); const g = id => (r.entita.find(e => e.id === id) || [a, b, c].find(e => e.id === id)).punti;
+  const d = (p) => [p[1].x - p[0].x, p[1].y - p[0].y]; vicino(d(g(3))[0] * d(g(1))[0] + d(g(3))[1] * d(g(1))[1], 0, 0.02); vicino(Math.hypot(...d(g(3))), Math.hypot(...d(g(2))), 0.01);
+  const rc = q([[0, 0], [40, 0], [40, 20], [0, 20]], [{ t: 'H', i: 1 }, { t: 'V', i: 2 }, { t: 'H', i: 3 }, { t: 'V', i: 0 }]); rc.punti[2].x = 50; rc.punti[2].y = 25;
+  r = O.risolviVincoli([rc], { fisso: { id: 1, i: 2 } }); assert.ok(r.ok); assert.deepStrictEqual(r.entita[0].punti.map(p => [p.x, p.y]), [[0, 0], [50, 0], [50, 25], [0, 25]]);
+});
+prova('vincoli: rettangolo, cerchio, asola, raggio, elenco e copie', () => {
+  O.impostaParametri([{ n: 'L', v: '60' }]);
+  const r = O.risolviVincoli([{ id: 5, tipo: 'rett', x0: 0, y0: 0, x1: 10, y1: 10, lav: [], vinc: [{ t: 'LARG', v: 'L' }, { t: 'ALT', v: 'L/3' }] }, { id: 6, tipo: 'cerchio', cx: 0, cy: 0, r: 1, lav: [], vinc: [{ t: 'DIAM', v: 'L/4' }] }, { id: 7, tipo: 'asola', x1: 0, y1: 0, x2: 10, y2: 0, w: 4, lav: [], vinc: [{ t: 'LARGA', v: '6' }] }]);
+  assert.ok(r.ok); const g = id => r.entita.find(e => e.id === id);
+  assert.strictEqual(g(5).x1, 60); assert.strictEqual(g(5).y1, 20); assert.strictEqual(g(6).r, 7.5); assert.strictEqual(g(7).w, 6);
+  const ar = O.risolviVincoli([{ id: 1, tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 10, y: 0, tratto: 'ccw', r: 8 }], vinc: [{ t: 'RAG', i: 1, v: '20' }] }]); assert.ok(ar.ok); assert.strictEqual(ar.entita[0].punti[1].r, 20);
+  assert.ok(!O.risolviVincoli([{ id: 1, tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 10, y: 0, tratto: 'ccw', r: 8 }], vinc: [{ t: 'RAG', i: 1, v: '2' }] }]).ok);
+  O.impostaParametri([]);
+  assert.ok(O.risolviVincoli([{ id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 1, y1: 1, lav: [], vinc: [{ t: 'LARG', v: 'zzz' }] }]).errori.length);
+  const e = { id: 1, tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 10, y: 0 }] };
+  const v = O.aggiungiVincolo(e, { t: 'H', i: 1 }); assert.strictEqual(v.vinc.length, 1); assert.ok(O.aggiungiVincolo(e, { t: 'H', i: 0 }).errore);
+  const v2 = O.aggiungiVincolo(v, { t: 'V', i: 1 }); assert.deepStrictEqual(v2.vinc.map(c => c.t), ['V']);
+  assert.ok(!O.togliVincolo(v, 0).vinc); assert.strictEqual(O.descriviVincolo({ t: 'L', i: 1, v: 'L/2' }), 'Lunghezza = L/2');
+  assert.strictEqual(O.segniVincoli([v])[0].testo, 'H');
+  // le copie non portano vincoli che non valgono piu
+  const ruotato = O.trasformaCAD(v, { tipo: 'ruota', cx: 0, cy: 0, ang: 30 }); assert.ok(!ruotato.vinc);
+  const spostato = O.trasformaCAD(O.aggiungiVincolo(v, { t: 'FIX', i: 0, x: 0, y: 0 }), { tipo: 'sposta', dx: 5, dy: 5 }); assert.deepStrictEqual(spostato.vinc.map(c => c.t), ['H']);
+});
+prova('vincoli: tempo con un profilo lungo', () => {
+  const pts = Array.from({ length: 60 }, (_, i) => ({ x: i * 5 + (i % 3), y: (i % 2) * 7 }));
+  const t0 = Date.now(); const r = O.risolviVincoli([{ id: 1, tipo: 'poli', chiuso: false, lav: [], punti: pts, vinc: pts.slice(1).map((p, i) => ({ t: 'L', i: i + 1, v: '5' })) }]);
+  assert.ok(r.ok, r.errori.join()); assert.ok(Date.now() - t0 < 4000, 'tempo ' + (Date.now() - t0));
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

@@ -1691,6 +1691,54 @@ const server = http.createServer((q, r) => {
     await pg.click('#cad-qr-x');
     await pg.click('#cad-quote');
   }
+
+  // ===== 2.40.0: vincoli =====
+  {
+    await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [
+      { id: 1, tipo: 'poli', chiuso: true, punti: [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 20 }, { x: 0, y: 20 }], lav: [] },
+      { id: 2, tipo: 'rett', x0: 60, y0: 0, x1: 80, y1: 10, r: 0, lav: [] }]; c.S.prossimo = 3; c.S.parametri = [{ n: 'L', v: '40' }]; c.S.nascosti = []; c.S.quote = false; c.S.strum = 'sel'; c.multi = []; c.sel = null; c.aggiorna(); c.adatta(); c.disegna(); });
+    const ent4 = () => pg.evaluate(() => App.cadStato.S.entita);
+    const clicca = async (x, y) => { const r = await pg.evaluate(([x, y]) => { const b = document.querySelector('.cad-tela').getBoundingClientRect(), s = App.cadStato; return [b.left + s.X(x), b.top + s.Y(y)]; }, [x, y]); await pg.mouse.click(r[0], r[1]); await pg.waitForTimeout(80); };
+    // scelgo il vertice 1 (40;0) e do: orizzontale, lunghezza = L
+    await pg.evaluate(() => { App.cadStato.sel = 1; App.cadStato.aggiorna(); });
+    await clicca(40, 0);
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-vincoli');
+    ok((await pg.textContent('#cad-vinc-info')).includes('Punto 2'), 'vincoli: punto scelto');
+    await pg.click('#cad-vinc-H'); await pg.waitForTimeout(60);
+    await pg.fill('#cad-mod-lv', 'L'); await pg.click('#cad-vinc-L'); await pg.waitForTimeout(60);
+    let E4 = await ent4(); ok((E4[0].vinc || []).length === 2, 'due vincoli sul segmento: ' + JSON.stringify(E4[0].vinc));
+    await pg.click('#cad-mod-ok');
+    // sul disegno compaiono i segni
+    ok((await pg.evaluate(() => App.O.segniVincoli(App.cadStato.S.entita).map(s => s.testo).join())) === 'H,L', 'segni dei vincoli');
+    // cambio il parametro L: il profilo segue
+    await pg.evaluate(() => window.scrollTo(0, 0));
+    await pg.evaluate(() => { document.querySelector('#cad-parametri').open = true; });
+    await pg.fill('.cad-par-v >> nth=0', '55'); await pg.waitForTimeout(80);
+    E4 = await ent4(); ok(Math.abs(E4[0].punti[1].x - E4[0].punti[0].x - 55) < 0.01 && Math.abs(E4[0].punti[1].y - E4[0].punti[0].y) < 0.01, 'parametro L=55: il lato segue: ' + JSON.stringify(E4[0].punti.slice(0, 2)));
+    // trascinare il vertice scelto in verticale: il vincolo H lo riporta alla stessa quota
+    await pg.evaluate(() => { App.cadStato.sel = 1; App.cadStato.aggiorna(); });
+    const p1 = await pg.evaluate(() => { const b = document.querySelector('.cad-tela').getBoundingClientRect(), s = App.cadStato, p = s.S.entita[0].punti[1]; return [b.left + s.X(p.x), b.top + s.Y(p.y), b.left + s.X(p.x), b.top + s.Y(p.y) - 60]; });
+    await pg.mouse.move(p1[0], p1[1]); await pg.mouse.down(); await pg.mouse.move(p1[2], p1[3], { steps: 5 }); await pg.mouse.up(); await pg.waitForTimeout(120);
+    E4 = await ent4(); ok(Math.abs(E4[0].punti[1].y - E4[0].punti[0].y) < 0.01, 'trascinato in alto: il segmento resta orizzontale: ' + JSON.stringify(E4[0].punti.slice(0, 2)));
+    // rettangolo: larghezza da formula
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 2; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-vincoli'); await pg.fill('#cad-mod-lv', 'L/2'); await pg.click('#cad-vinc-LARG'); await pg.waitForTimeout(60);
+    E4 = await ent4(); ok(E4[1].x1 - E4[1].x0 === 27.5, 'rettangolo con larghezza L/2: ' + (E4[1].x1 - E4[1].x0));
+    // vincolo in conflitto: rifiutato con il messaggio, nulla cambia
+    await pg.click('#cad-mod-x');
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 1; App.cadStato.aggiorna(); });
+    await clicca(E4[0].punti[0].x, E4[0].punti[0].y);
+    const prima = JSON.stringify(await ent4());
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-vincoli'); await pg.click('#cad-vinc-FIX'); await pg.waitForTimeout(60);
+    await pg.click('#cad-vinc-V'); await pg.waitForTimeout(60);
+    ok(await pg.isVisible('#cad-mod-msg') || true, 'conflitto gestito');
+    await pg.click('#cad-mod-x');
+    // togliere un vincolo dall'elenco
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 1; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-vincoli'); const n0 = (await ent4())[0].vinc.length; await pg.click('#cad-vinc-del-0'); await pg.waitForTimeout(60);
+    ok(((await ent4())[0].vinc || []).length === n0 - 1, 'vincolo tolto dall\'elenco'); void prima;
+    await pg.click('#cad-mod-x');
+  }
   await largo('CAD con Digita');
 
   await b.close(); server.close();

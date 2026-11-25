@@ -700,3 +700,4 @@ body.cad-pieno .cad-digita,.cad.pieno .cad-digita{bottom:0}
 .cad-par-riga{display:flex;gap:6px;align-items:center;margin:6px 0}
 .cad-par-riga input{min-height:48px;font-size:17px;font-family:ui-monospace,Menlo,Consolas,monospace;padding:0 10px;border-radius:10px;border:1px solid var(--bordo,#445);background:var(--fondo,#111);color:var(--testo,#eee);min-width:0}
 .cad-par-n{flex:0 0 28%}.cad-par-v{flex:1}
+.cad-vinc-riga{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px;border-bottom:1px solid var(--bordo,#334)}

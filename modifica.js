@@ -33,6 +33,8 @@
     const f = mappa(T), k = T.tipo === 'scala' ? T.k : 1, spec = T.tipo === 'specchia';
     let n = copia(e); delete n.id;
     const P = p => { const q = f(num(p.x), num(p.y)); return [r3(q[0]), r3(q[1])]; };
+    // i vincoli valgono ancora solo se l'elemento si sposta soltanto (e senza punti bloccati o legati ad altri elementi)
+    if (n.vinc) { n.vinc = T.tipo === 'sposta' ? n.vinc.filter(c => c.t !== 'FIX' && c.t !== 'COI' && c.e2 === undefined) : []; if (!n.vinc.length) delete n.vinc; }
     if (e.tipo === 'poli') {
       n.punti = (e.punti || []).map(p => {
         const q = P(p), o = Object.assign({}, p, { x: q[0], y: q[1] });

@@ -182,6 +182,11 @@
             const w = g.measureText(d.testo).width + 6; g.globalAlpha = 0.85; g.fillStyle = col('--pannello'); g.fillRect(px - w / 2, py - 11, w, 14); g.globalAlpha = 1; g.fillStyle = col('--accento'); g.fillText(d.testo, px, py);
           });
         }
+        // segni dei vincoli
+        if (S.mostraVinc !== false) {
+          g.font = '700 11px ui-monospace,Menlo,Consolas,monospace'; g.textAlign = 'center';
+          O.segniVincoli(vis()).forEach(d => { const px = X(d.x), py = Y(d.y), w = g.measureText(d.testo).width + 8; g.fillStyle = col('--avviso'); g.globalAlpha = 0.9; g.fillRect(px - w / 2, py - 8, w, 16); g.globalAlpha = 1; g.fillStyle = '#111'; g.fillText(d.testo, px, py + 4); });
+        }
         // etichette delle lavorazioni
         g.font = '700 11px system-ui'; g.textAlign = 'left';
         S.entita.forEach((e, k) => {
@@ -328,7 +333,7 @@
         const [px, py] = pos(e);
         if (pickPunto) { const cb = pickPunto; pickPunto = null; const w = mondo(e); gesto = null; mirino = null; cb(w); disegna(); return; }
         const strum = S.strum;
-        if (pick && strum === 'sel') { const t = trova(px, py); const pk = pick; pick = null; if (t && t.e.id !== pk.A) eseguiPick(pk, t.e); else A.avviso('Operazione annullata: non hai toccato un altro elemento.'); gesto = null; disegna(); return; }
+        if (pick && strum === 'sel') { const t = trova(px, py); const pk = pick; pick = null; if (t && t.e.id !== pk.A) eseguiPick(pk, t.e, mx(px), my(py)); else A.avviso('Operazione annullata: non hai toccato un altro elemento.'); gesto = null; disegna(); return; }
         if (strum === 'fin') { gesto = { tipo: 'finestra', px, py, px2: px, py2: py, mosso: false }; disegna(); return; }
         if (strum === 'sel') {
           const t = trova(px, py);
@@ -421,7 +426,15 @@
           disegna(); return;
         }
         if (g.tipo === 'sposta') {
-          if (g.mosso) { storia.push(g.prima); futuro.length = 0; A.salva(); pannelloAgg(); }
+          if (g.mosso) {
+            const eV = g.h && trovaE(g.id) && trovaE(g.id).tipo === 'poli' ? trovaE(g.id) : null;
+            if (eV || S.entita.some(x => x.vinc && x.vinc.length)) {
+              const r = provaVincoli(eV ? { fisso: { id: g.id, i: g.h.i } } : undefined);
+              if (!r.ok) { S.entita = JSON.parse(g.prima); anteprima = null; A.avviso('Movimento annullato: ' + r.errori.join(' ')); aggiorna(); disegna(); return; }
+              applicaRis(r);
+            }
+            storia.push(g.prima); futuro.length = 0; A.salva(); pannelloAgg();
+          }
           else { sel = g.e.id; if (g.h) selV = g.h.i; pannelloAgg(); }
           disegna(); return;
         }
@@ -643,12 +656,37 @@
       const chiudiMod = () => { if (modBox) { modBox.remove(); modBox = null; } };
       const bersagli = () => (multi.length ? multi : sel ? [sel] : []).map(trovaE).filter(Boolean);
       const centroSel = () => { const b = O.limitiCAD(bersagli()); return b ? { x: R3((b.x0 + b.x1) / 2), y: R3((b.y0 + b.y1) / 2) } : { x: 0, y: 0 }; };
-      const OPS = [['sposta', 'Sposta'], ['ruota', 'Ruota'], ['scala', 'Scala'], ['specchia', 'Specchia'], ['slin', 'Serie in fila'], ['spol', 'Serie in cerchio'], ['offset', 'Parallela'], ['raccordo', 'Raccordo'], ['smusso', 'Smusso'], ['taglia', 'Taglia / estendi'], ['angolo', 'Angolo vivo'], ['quota', 'Quota segmento'], ['layer', 'Layer']];
+      const OPS = [['sposta', 'Sposta'], ['ruota', 'Ruota'], ['scala', 'Scala'], ['specchia', 'Specchia'], ['slin', 'Serie in fila'], ['spol', 'Serie in cerchio'], ['offset', 'Parallela'], ['raccordo', 'Raccordo'], ['smusso', 'Smusso'], ['taglia', 'Taglia / estendi'], ['angolo', 'Angolo vivo'], ['quota', 'Quota segmento'], ['vincoli', 'Vincoli'], ['layer', 'Layer']];
       const cambiaE = (vecchio, nuovo) => { nuovo.id = vecchio.id; const i = S.entita.findIndex(x => x.id === vecchio.id); S.entita[i] = nuovo; };
       const aggiungiE = n => { n.id = S.prossimo++; S.entita.push(n); return n.id; };
-      const finito = ids => { multi = ids && ids.length > 1 ? ids : []; sel = ids && ids.length === 1 ? ids[0] : (ids && ids.length ? null : sel); selV = null; anteprima = null; A.salva(); aggiorna(); };
-      const eseguiPick = (pk, B) => {
+      const finito = ids => { const rv = provaVincoli(); if (rv.ok) applicaRis(rv); else A.avviso('Vincoli non rispettati: ' + rv.errori.join(' ')); multi = ids && ids.length > 1 ? ids : []; sel = ids && ids.length === 1 ? ids[0] : (ids && ids.length ? null : sel); selV = null; anteprima = null; A.salva(); aggiorna(); };
+      const provaVincoli = opz => {
+        S.entita.forEach(e => { if (e.vinc) { const k = e.vinc.filter(c => c.e2 === undefined || trovaE(c.e2)); if (k.length !== e.vinc.length) { e.vinc = k; if (!k.length) delete e.vinc; } } });
+        if (!S.entita.some(e => e.vinc && e.vinc.length)) return { ok: true, entita: [], errori: [], scarto: 0 };
+        return O.risolviVincoli(S.entita, opz);
+      };
+      const applicaRis = r => { r.entita.forEach(n => { const i = S.entita.findIndex(x => x.id === n.id); if (i >= 0) S.entita[i] = n; }); anteprima = null; Gc = null; };
+      const vicinoSeg = (B, x, y) => {   // il segmento (indice del vertice di arrivo) piu vicino al punto, e il vertice piu vicino
+        let bs = null, bd = Infinity, bv = 0, bvd = Infinity;
+        (B.punti || []).forEach((p, i) => {
+          const dv = Math.hypot(num(p.x) - x, num(p.y) - y); if (dv < bvd) { bvd = dv; bv = i; }
+          const a = i > 0 ? i - 1 : (B.chiuso ? B.punti.length - 1 : -1); if (a < 0) return;
+          const q = B.punti[a], dx = num(p.x) - num(q.x), dy = num(p.y) - num(q.y), l2 = dx * dx + dy * dy, u = l2 ? Math.max(0, Math.min(1, ((x - num(q.x)) * dx + (y - num(q.y)) * dy) / l2)) : 0;
+          const d = Math.hypot(x - num(q.x) - u * dx, y - num(q.y) - u * dy); if (d < bd) { bd = d; bs = i; }
+        });
+        return { seg: bs, vert: bv };
+      };
+      const eseguiPick = (pk, B, x, y) => {
         const Ae = trovaE(pk.A); if (!Ae) return;
+        if (pk.op === 'vinc2') {
+          if (B.tipo !== 'poli') { A.avviso('Tocca un profilo.'); apriModifica('vincoli'); return; }
+          const v = vicinoSeg(B, x, y), c = pk.t === 'COI' ? { t: 'COI', i: pk.i, e2: B.id, j: v.vert } : { t: pk.t, i: pk.i, e2: B.id, j: v.seg };
+          if (c.j === null) { A.avviso('Quel profilo non ha segmenti.'); apriModifica('vincoli'); return; }
+          const nuovoE = O.aggiungiVincolo(Ae, c); if (nuovoE.errore) { A.avviso(nuovoE.errore); apriModifica('vincoli'); return; }
+          const prima = JSON.stringify(S.entita); ricorda(); cambiaE(Ae, nuovoE);
+          const r = provaVincoli(); if (!r.ok) { S.entita = JSON.parse(prima); storia.pop(); A.avviso(r.errori.join(' ')); aggiorna(); apriModifica('vincoli'); return; }
+          applicaRis(r); A.salva(); sel = Ae.id; aggiorna(); apriModifica('vincoli'); return;
+        }
         if (pk.op === 'taglia') {
           const r = O.tagliaEstendiCAD(Ae, pk.fine, B); if (r.errore) { A.avviso(r.errore); return; }
           ricorda(); cambiaE(Ae, r); finito([Ae.id]); A.avviso('Fatto: estremo portato sul taglio'); return;
@@ -667,7 +705,7 @@
         const form = el('div', { class: 'cad-mod-form' }), msg = el('p', { class: 'errore', id: 'cad-mod-msg', role: 'alert', hidden: true });
         let campi = {}; const memo = {};
         const c = centroSel();
-        const unica = B.length === 1 ? B[0] : null;
+        let unica = B.length === 1 ? B[0] : null;
         const chip = (t, on, fn, id) => el('button', { class: 'chip' + (on ? ' attiva' : ''), type: 'button', id, testo: t, onclick: fn });
         const campo = (id, et, v, aiuto) => { const i = el('input', { type: 'text', inputmode: 'text', id: 'cad-mod-' + id, value: String(memo[st.op + id] !== undefined ? memo[st.op + id] : v), oninput: () => { memo[st.op + id] = i.value; }, autocomplete: 'off', 'aria-label': et }); campi[id] = i; return el('label', { class: 'cad-mod-c' }, [el('span', { testo: et + (aiuto ? ' (' + aiuto + ')' : '') }), i]); };
         const val = id => { const v = O.espressione(campi[id].value); if (!isFinite(v)) throw new Error('Scrivi un numero valido in "' + campi[id].getAttribute('aria-label') + '" (puoi usare anche 50/2+3).'); return v; };
@@ -678,6 +716,7 @@
         const toccaDaA = id => tocca('Tocca: da punto a punto', id, a => { box.style.display = 'none'; pickPunto = w => { box.style.display = ''; scrivi('dx', w.x - a.x); scrivi('dy', w.y - a.y); }; A.avviso('Ora tocca il punto di arrivo'); });
         const toccaCentro = id => tocca('Tocca il centro', id, w => { scrivi('cx', w.x); scrivi('cy', w.y); });
         const ridisegnaForm = () => {
+          if (B.length === 1) unica = trovaE(B[0].id) || B[0];
           form.innerHTML = ''; campi = {}; errore('');
           ops.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.op === st.op));
           const F = [];
@@ -718,8 +757,42 @@
             F.push(el('div', { class: 'cad-mod-righe' }, [['', 'Direzione libera'], ['H', 'Orizzontale'], ['V', 'Verticale']].map(([k, t]) => chip(t, st.orienta === k, () => { st.orienta = k; ridisegnaForm(); }, 'cad-mod-or-' + (k || 'no')))));
             F.push(chip(st.segue ? 'Il resto del profilo segue' : 'Si sposta solo il vertice', st.segue, () => { st.segue = !st.segue; ridisegnaForm(); }, 'cad-mod-segue'));
           }
+          else if (st.op === 'vincoli') {
+            if (!unica) F.push(el('p', { class: 'aiuto', testo: 'I vincoli si danno a un elemento alla volta.' }));
+            else {
+              const e = unica, i = selV, N = O.NOMI_VINCOLI;
+              const prova = nuovo => { const r0 = O.aggiungiVincolo(trovaE(e.id) || e, nuovo); if (r0.errore) { errore(r0.errore); return; } const prima = JSON.stringify(S.entita); ricorda(); cambiaE(trovaE(e.id) || e, r0); const r = provaVincoli(); if (!r.ok) { S.entita = JSON.parse(prima); storia.pop(); errore(r.errori.join(' ')); return; } applicaRis(r); A.salva(); sel = e.id; aggiorna(); ridisegnaForm(); };
+              (e.vinc || []).forEach((c, k) => F.push(el('div', { class: 'cad-vinc-riga' }, [el('span', { testo: O.descriviVincolo(c) + (c.i !== undefined ? '  (punto ' + (c.i + 1) + ')' : '') }), el('button', { class: 'icona-pul', type: 'button', id: 'cad-vinc-del-' + k, 'aria-label': 'Togli il vincolo ' + N[c.t], html: A.icona('cestino'), onclick: () => { ricorda(); cambiaE(e, O.togliVincolo(e, k)); A.salva(); aggiorna(); ridisegnaForm(); } })])));
+              if (!(e.vinc || []).length) F.push(el('p', { class: 'aiuto', testo: 'Nessun vincolo. ' + (e.tipo === 'poli' ? 'Tocca un punto del profilo e scegli cosa vincolare al segmento che ci arriva.' : '') }));
+              if (e.tipo === 'poli') {
+                if (i === null || i >= e.punti.length) F.push(el('p', { class: 'aiuto', id: 'cad-vinc-info', testo: 'Tocca prima un punto (la maniglia) del profilo.' }));
+                else {
+                  const a0 = i > 0 ? i - 1 : (e.chiuso ? e.punti.length - 1 : -1), P1 = e.punti[i], arco = P1.tratto === 'cw' || P1.tratto === 'ccw';
+                  F.push(el('p', { class: 'aiuto', id: 'cad-vinc-info', testo: 'Punto ' + (i + 1) + (a0 >= 0 ? ': segmento ' + (a0 + 1) + '-' + (i + 1) + ', lunghezza ' + R3(Math.hypot(P1.x - e.punti[a0].x, P1.y - e.punti[a0].y)) + ' mm' : '') }));
+                  const riga = [];
+                  if (a0 >= 0) riga.push(chip('Orizzontale', false, () => prova({ t: 'H', i }), 'cad-vinc-H'), chip('Verticale', false, () => prova({ t: 'V', i }), 'cad-vinc-V'));
+                  riga.push(chip('Blocca il punto', false, () => prova({ t: 'FIX', i, x: R3(num(P1.x)), y: R3(num(P1.y)) }), 'cad-vinc-FIX'));
+                  if (arco) riga.push(chip('Raggio fisso', false, () => prova({ t: 'RAG', i, v: String(R3(Math.abs(num(P1.r)))) }), 'cad-vinc-RAG'));
+                  F.push(el('div', { class: 'cad-mod-righe' }, riga));
+                  if (a0 >= 0) {
+                    F.push(campo('lv', 'Lunghezza fissa', R3(Math.hypot(P1.x - e.punti[a0].x, P1.y - e.punti[a0].y)), 'mm o formula, es. L/2'));
+                    F.push(chip('Fissa la lunghezza', false, () => { const t = campi.lv.value.trim(); if (!isFinite(O.espressione(t))) { errore('Scrivi un numero o una formula valida.'); return; } prova({ t: 'L', i, v: t }); }, 'cad-vinc-L'));
+                    F.push(el('p', { class: 'aiuto', testo: 'Con un altro profilo (tocca poi il suo segmento):' }));
+                    F.push(el('div', { class: 'cad-mod-righe' }, [['PAR', 'Parallelo a'], ['PERP', 'Perpendicolare a'], ['UGU', 'Stessa lunghezza di']].map(([k, t]) => chip(t + '...', false, () => { pick = { op: 'vinc2', A: e.id, t: k, i }; S.strum = 'sel'; chiudiMod(); aggiorna(); A.avviso('Tocca il segmento dell\'altro profilo'); }, 'cad-vinc2-' + k))));
+                  }
+                  F.push(chip('Punto coincidente con...', false, () => { pick = { op: 'vinc2', A: e.id, t: 'COI', i }; S.strum = 'sel'; chiudiMod(); aggiorna(); A.avviso('Tocca un punto dell\'altro profilo'); }, 'cad-vinc2-COI'));
+                }
+              } else if (e.tipo === 'rett') {
+                F.push(campo('lv', 'Larghezza', R3(Math.abs(num(e.x1) - num(e.x0))), 'mm o formula'), chip('Fissa la larghezza', false, () => { if (!isFinite(O.espressione(campi.lv.value))) { errore('Scrivi un numero o una formula valida.'); return; } prova({ t: 'LARG', v: campi.lv.value.trim() }); }, 'cad-vinc-LARG'));
+                F.push(campo('lh', 'Altezza', R3(Math.abs(num(e.y1) - num(e.y0))), 'mm o formula'), chip('Fissa l\'altezza', false, () => { if (!isFinite(O.espressione(campi.lh.value))) { errore('Scrivi un numero o una formula valida.'); return; } prova({ t: 'ALT', v: campi.lh.value.trim() }); }, 'cad-vinc-ALT'));
+              } else if (e.tipo === 'cerchio') F.push(campo('lv', 'Diametro', R3(2 * num(e.r)), 'mm o formula'), chip('Fissa il diametro', false, () => { if (!isFinite(O.espressione(campi.lv.value))) { errore('Scrivi un numero o una formula valida.'); return; } prova({ t: 'DIAM', v: campi.lv.value.trim() }); }, 'cad-vinc-DIAM'));
+              else if (e.tipo === 'asola') F.push(campo('lv', 'Larghezza', R3(num(e.w)), 'mm o formula'), chip('Fissa la larghezza', false, () => { if (!isFinite(O.espressione(campi.lv.value))) { errore('Scrivi un numero o una formula valida.'); return; } prova({ t: 'LARGA', v: campi.lv.value.trim() }); }, 'cad-vinc-LARGA'));
+              else F.push(el('p', { class: 'aiuto', testo: 'Questo elemento non ha vincoli.' }));
+            }
+          }
           else if (st.op === 'layer') F.push(campo('nome', 'Nome del layer', (unica && unica.layer) || '0', 'es. Sagoma, Fori'));
           form.append(...F);
+          const okb = box.querySelector('#cad-mod-ok'); if (okb) okb.textContent = st.op === 'vincoli' ? 'Fatto' : 'Applica';
         };
         const applica = () => {
           try {
@@ -761,6 +834,7 @@
               pick = op === 'taglia' ? { op, A: e.id, fine: st.fine } : { op, A: e.id, fine: st.fine, fineB: st.fineB };
               S.strum = 'sel'; chiudiMod(); aggiorna(); A.avviso('Tocca l\'elemento ' + (op === 'taglia' ? 'che taglia' : 'da unire')); return;
             }
+            if (op === 'vincoli') { chiudiMod(); return; }
             if (op === 'quota') {
               if (e.tipo !== 'poli' || selV === null) throw new Error('Scegli un profilo e tocca un suo punto (la maniglia): si cambia il segmento che ci arriva.');
               const o = { segue: st.segue };
@@ -873,7 +947,7 @@
           S.parametri.forEach((q, i) => {
             const n = el('input', { type: 'text', value: q.n || '', 'aria-label': 'Nome del parametro ' + (i + 1), placeholder: 'nome', autocomplete: 'off', class: 'cad-par-n' });
             const v = el('input', { type: 'text', value: q.v || '', 'aria-label': 'Valore del parametro ' + (i + 1), placeholder: 'valore o formula', autocomplete: 'off', class: 'cad-par-v' });
-            const agg = () => { q.n = n.value; q.v = v.value; const r = O.impostaParametri(S.parametri); msg.hidden = !r.errori.length; msg.textContent = r.errori.join(' '); A.salva(); };
+            const agg = () => { q.n = n.value; q.v = v.value; const r = O.impostaParametri(S.parametri); msg.hidden = !r.errori.length; msg.textContent = r.errori.join(' '); const rv = provaVincoli(); if (rv.ok && rv.entita.length) { storia.push(JSON.stringify(S.entita)); futuro.length = 0; applicaRis(rv); ridisegna(); } else if (!rv.ok) { msg.hidden = false; msg.textContent = (msg.textContent + ' Vincoli: ' + rv.errori.join(' ')).trim(); } A.salva(); };
             n.addEventListener('input', agg); v.addEventListener('input', agg);
             box.insertBefore(el('div', { class: 'cad-par-riga' }, [n, v, el('button', { class: 'icona-pul', type: 'button', 'aria-label': 'Togli il parametro ' + (i + 1), html: A.icona('cestino'), onclick: () => { S.parametri.splice(i, 1); agg(); riempi(); } })]), msg);
           });
