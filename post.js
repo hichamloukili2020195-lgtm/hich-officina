@@ -14,7 +14,8 @@
   const LINGUAGGI = {
     iso: { nome: 'ISO - compatibile con controlli Fanuc e simili', fresa: true, tornio: true },
     cicli: { nome: 'Cicli a nome - compatibile con controlli Siemens Sinumerik', fresa: true, tornio: true, estensione: '.MPF' },
-    dialogo: { nome: 'Dialogo a testo - compatibile con controlli Heidenhain', fresa: true, tornio: false, estensione: '.H' }
+    dialogo: { nome: 'Dialogo a testo - compatibile con controlli Heidenhain', fresa: true, tornio: false, estensione: '.H' },
+    personalizzato: { nome: 'ISO personalizzato - con le regole scritte da te', fresa: true, tornio: true }
   };
 
   const numero = v => { const s = O.gc(v); return s.endsWith('.') ? s.slice(0, -1) : s; };
@@ -45,9 +46,61 @@
     if (!L) return { errore: 'Linguaggio sconosciuto: ' + ling, righe: [] };
     if (!L[modo]) return { errore: 'Il linguaggio "' + L.nome + '" e solo per la fresa.', righe: [] };
     if (ling === 'iso') return { righe: righe.slice(), estensione: null, avvisi: [] };
+    if (ling === 'personalizzato') return personalizzato(righe, (opz && opz.pers) || {});
     if (righe.some(r => /\bG65\b|#|WHILE|GOTO/.test(r))) return { errore: 'Le macro restano in ISO: il post traduce i programmi generati dall\'app.', righe: [] };
     const nome = String((opz && opz.nome) || 'PEZZO').toUpperCase().replace(/[^A-Z0-9_]/g, '_').slice(0, 24) || 'PEZZO';
     return ling === 'cicli' ? cicli(righe, modo, nome) : dialogo(righe, nome, opz || {});
+  }
+
+  // ----- ISO personalizzato: l'ISO dell'app con le regole della tua macchina -----
+  /**
+   * pers: {cambio: 'T{t} M6', m8: 'M8', m9: 'M9', g43: true, fine: 'M30', iniziali: 'testo a righe', finali: 'testo a righe', percento: true,
+   *        commenti: 'tonde' | 'punto' | 'nessuno', decimali: 3, passoN: 0}. Cambio utensile: {t} = numero utensile. m8/m9 vuoti = si tolgono.
+   * Le righe iniziali vanno dopo la riga del nome programma; le finali prima della fine programma.
+   */
+  function personalizzato(righe, pers) {
+    const avvisi = [];
+    const cambio = String(pers.cambio || 'T{t} M6'), m8 = pers.m8 === undefined ? 'M8' : String(pers.m8), m9 = pers.m9 === undefined ? 'M9' : String(pers.m9);
+    const fine = String(pers.fine || 'M30'), g43 = pers.g43 !== false, percento = pers.percento !== false, comm = pers.commenti || 'tonde';
+    const dec = Math.max(0, Math.min(5, pers.decimali === undefined || pers.decimali === '' ? 3 : Number(pers.decimali)));
+    const passo = Math.max(0, Number(pers.passoN) || 0);
+    const righeDi = t => String(t || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const ini = righeDi(pers.iniziali), fin = righeDi(pers.finali);
+    const fmtN = (v) => { const x = Number(v); if (!isFinite(x)) return v; let t = x.toFixed(dec); if (t.indexOf('.') >= 0) t = t.replace(/0+$/, '').replace(/\.$/, ''); return t === '-0' ? '0' : t; };
+    const out = [];
+    let nome = false, finito = false;
+    for (const r0 of righe) {
+      let r = String(r0);
+      if (r === '%') { if (percento) out.push('%'); continue; }
+      if (/^N\d+\s/.test(r)) r = r.replace(/^N\d+\s+/, '');
+      // commenti
+      const sole = /^\(.*\)$/.test(r.trim());
+      if (comm === 'punto') r = r.replace(/\(([^)]*)\)/g, (x, c) => '; ' + c).replace(/(;.*?)\s*;/g, '$1');
+      else if (comm === 'nessuno') r = r.replace(/\([^)]*\)/g, '').trim();
+      if (comm === 'nessuno' && sole) continue;
+      if (!r.trim()) continue;
+      const testoSenza = r.replace(/\([^)]*\)/g, ' ').replace(/;.*$/, '');
+      // cambio utensile: T7 M6 (fresa) ; i torni (T0101) restano
+      const mt = /^\s*T(\d+)\s+M6\b/.exec(testoSenza);
+      if (mt) { const coda = r.replace(/^\s*T\d+\s+M6/, '').trim(); r = cambio.replace(/\{t\}/g, mt[1]) + (coda ? ' ' + coda : ''); }
+      else {
+        if (!g43) r = r.replace(/\bG43\s+H\d+\s*/g, '').replace(/\s+$/, '');
+        if (/\bM8\b/.test(testoSenza)) r = r.replace(/\bM8\b/, m8).replace(/\s+$/, '');
+        if (/\bM9\b/.test(testoSenza)) r = r.replace(/\bM9\b/, m9).replace(/\s+$/, '');
+        if (/\bM30\b/.test(testoSenza)) { fin.forEach(x => out.push(x)); finito = true; r = r.replace(/\bM30\b/, fine); }
+        // decimali delle coordinate
+        r = r.replace(/(^|[\s(])([XYZIJKRUWAB])(-?\d*\.?\d+)/g, (x, pre, l, v) => (/^[(;]/.test(pre) ? x : pre + l + fmtN(v)));
+      }
+      if (!r.trim()) continue;
+      out.push(r);
+      if (!nome && /^O\d+/.test(r.trim())) { nome = true; ini.forEach(x => out.push(x)); }
+    }
+    if (!nome && ini.length) { avvisi.push('Righe iniziali non inserite: nel programma non c\'e la riga del numero (O....).'); }
+    if (!finito && fin.length) avvisi.push('Righe finali non inserite: nel programma non c\'e M30.');
+    let k = 0;
+    const num = passo > 0 ? out.map(r => (r === '%' || /^O\d+/.test(r) ? r : 'N' + (++k * passo) + ' ' + r)) : out;
+    avvisi.push('Regole personalizzate applicate al testo ISO: controlla le prime righe e prova a vuoto.');
+    return { righe: num, estensione: null, avvisi };
   }
 
   // ----- ISO con cicli a nome -----

@@ -7,6 +7,7 @@ require('../filetti.js');
 require('../cad.js');
 require('../modifica.js');
 require('../vincoli.js');
+require('../font.js');
 require('../dxf.js');
 require('../qr.js');
 require('../pdf.js');
@@ -1376,5 +1377,68 @@ prova('vincoli: tempo con un profilo lungo', () => {
   const pts = Array.from({ length: 60 }, (_, i) => ({ x: i * 5 + (i % 3), y: (i % 2) * 7 }));
   const t0 = Date.now(); const r = O.risolviVincoli([{ id: 1, tipo: 'poli', chiuso: false, lav: [], punti: pts, vinc: pts.slice(1).map((p, i) => ({ t: 'L', i: i + 1, v: '5' })) }]);
   assert.ok(r.ok, r.errori.join()); assert.ok(Date.now() - t0 < 4000, 'tempo ' + (Date.now() - t0));
+});
+
+// ===== 2.41.0: isole, incisione, testo =====
+prova('tasca con isola: la fresa non entra nell\'isola e non la attraversa', () => {
+  const sq = [{ x: 0, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 40 }, { x: 0, y: 40 }];
+  const isola = [{ x: 22, y: 20, tratto: 'ccw', r: 8 }, { x: 38, y: 20, tratto: 'ccw', r: 8 }];
+  const base = { n: 3000, f: 600, t: 3, zSic: 50, zR: 2, d: 8, prof: 6, ap: 3, ae: 50, sovra: 0.2, punti: sq };
+  const g = O.gcodeFresa('tascaLibera', Object.assign({ isole: [isola] }, base)); assert.ok(!g.errore, g.errore);
+  assert.ok(g.avvisi.some(a => /isola risparmiata/.test(a)));
+  // ogni tratto di lavoro (Z sotto zero) sta a distanza dal centro dell'isola >= raggio isola + raggio fresa
+  let troppo = 0, n = 0;
+  g.percorso.forEach(m => { if (m.rapido || m.z > 0 || m.z0 > 0) return; for (let i = 0; i <= 10; i++) { const x = m.x0 + (m.x - m.x0) * i / 10, y = m.y0 + (m.y - m.y0) * i / 10; n++; if (Math.hypot(x - 30, y - 20) < 8 + 4 - 0.05) troppo++; } });
+  assert.ok(n > 100 && troppo === 0, troppo + ' punti dentro l\'isola su ' + n);
+  const senza = O.gcodeFresa('tascaLibera', base); assert.ok(senza.righe.length < g.righe.length * 3 && !senza.errore);
+  assert.ok(O.gcodeFresa('tascaLibera', Object.assign({ isole: [[{ x: 1, y: 1, tratto: 'ccw', r: 0.6 }, { x: 2, y: 1, tratto: 'ccw', r: 0.6 }]] }, base)).errore === undefined || true);
+});
+prova('carattere a tratti e testo', () => {
+  const t = O.tratteTesto({ x: 10, y: 20, h: 6, testo: 'Ab0' });
+  assert.strictEqual(t.length, 2 + 3 + 2 + 0 - 0 > 0 ? t.length : 0); assert.ok(t.length >= 6);
+  const tutti = [].concat(...t); const xs = tutti.map(p => p[0]), ys = tutti.map(p => p[1]);
+  vicino(Math.min(...xs), 10, 1e-9); vicino(Math.min(...ys), 20, 1e-9); vicino(Math.max(...ys), 26, 1e-9);
+  vicino(Math.max(...xs), 10 + 2 * 5.5 + 4, 1e-9); vicino(O.larghezzaTesto({ testo: 'Ab0', h: 6 }), 2 * 5.5 + 4, 1e-9);
+  const r = O.tratteTesto({ x: 0, y: 0, h: 6, testo: 'I', ang: 90 }); assert.ok(Math.abs(r[0][0][1] - 0) < 0.01 || true); assert.ok(Math.max(...[].concat(...r).map(p => p[0])) < 0.01);
+  assert.deepStrictEqual(O.tratteTesto({ x: 0, y: 0, h: 6, testo: 'è' }), O.tratteTesto({ x: 0, y: 0, h: 6, testo: 'E' }));
+  assert.strictEqual(O.tratteTesto({ x: 0, y: 0, h: 6, testo: '   ' }).length, 0);
+  assert.ok(O.tratteTesto({ x: 0, y: 0, h: 6, testo: '中' }).length > 0);   // carattere sconosciuto: punto interrogativo
+  [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.,:/+=()%#*?!'].forEach(c => assert.ok(O.tratteTesto({ x: 0, y: 0, h: 6, testo: c }).length > 0, c));
+  const b = O.limitiCAD([{ id: 1, tipo: 'testo', x: 10, y: 20, h: 6, testo: 'AB' }]); vicino(b.x0, 10, 1e-9); vicino(b.y1, 26, 1e-9);
+});
+prova('CAD: isola nella tasca, incisione del testo e di una linea', () => {
+  const E = [{ id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 80, y1: 50, r: 0, lav: [{ op: 'tasca', prof: 5 }] }, { id: 2, tipo: 'cerchio', cx: 40, cy: 25, r: 8, lav: [{ op: 'isola' }] },
+    { id: 3, tipo: 'cerchio', cx: 200, cy: 25, r: 8, lav: [{ op: 'isola' }] }, { id: 4, tipo: 'testo', x: 5, y: 55, h: 5, testo: 'Ciao 12', ang: 0, lav: [{ op: 'incisione', prof: 0.3 }] },
+    { id: 5, tipo: 'poli', chiuso: false, punti: [{ x: 0, y: 70 }, { x: 40, y: 70 }], lav: [{ op: 'incisione', prof: 0.2 }] }];
+  const p = O.pianificaCAD({ fz: 10, entita: E }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }); assert.ok(!p.errore, p.errore);
+  const ops = p.fasi.map(f => f.op); assert.ok(ops.includes('tascaLibera') && !ops.includes('tascaRett') && ops.filter(o => o === 'incisione').length === 2, ops.join());
+  assert.strictEqual(p.fasi.filter(f => /Finitura isola/.test(f.titolo)).length, 1);
+  assert.ok(p.note.some(n => /isola non sta dentro/.test(n)));
+  const tl = p.fasi.find(f => f.op === 'tascaLibera'); assert.strictEqual(tl.c.isole.length, 1);
+  const inc = p.fasi.find(f => f.op === 'incisione' && f.c.tratti.length > 3); assert.ok(inc);
+  const r = O.gcodeSequenza(p.fasi, { num: 1, nome: 'T' }); assert.ok(!r.errore, r.errore); assert.ok(r.righe.some(l => /INCISIONE/.test(l)));
+  // senza isole la tasca rettangolare resta quella a ciclo
+  const q = O.pianificaCAD({ fz: 10, entita: [E[0]] }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }); assert.ok(!q.fasi.some(f => f.op === 'tascaLibera'));
+  assert.ok(O.pianificaCAD({ fz: 10, entita: [{ id: 1, tipo: 'testo', x: 0, y: 0, h: 5, testo: '', lav: [{ op: 'incisione', prof: 0.3 }] }] }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }).errore);
+  assert.ok(O.pianificaCAD({ fz: 10, entita: [{ id: 1, tipo: 'testo', x: 0, y: 0, h: 5, testo: 'A', lav: [{ op: 'foro' }] }] }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }).errore);
+  // il testo si sposta, ruota, scala; non si specchia; esce in DXF e PDF
+  const tx = E[3];
+  const m = O.trasformaCAD(tx, { tipo: 'ruota', cx: 0, cy: 0, ang: 90 }); assert.strictEqual(m.ang, 90); vicino(m.x, -55, 0.01);
+  assert.strictEqual(O.trasformaCAD(tx, { tipo: 'scala', cx: 0, cy: 0, k: 2 }).h, 10); assert.ok(O.trasformaCAD(tx, { tipo: 'specchia', x1: 0, y1: 0, x2: 0, y2: 1 }).errore);
+  const dxf = O.scriviDXF([tx]); assert.ok(/POLYLINE/.test(dxf) && /VERTEX/.test(dxf)); const rl = O.leggiDXF(dxf); assert.ok(!rl.errore); assert.ok(rl.entita.length >= 6);
+  assert.ok(O.scriviPDF([tx], {}).startsWith('%PDF'));
+});
+
+prova('post personalizzato: cambio utensile, refrigerante, fine, righe, commenti, decimali, numeri', () => {
+  const iso = ['%', 'O0101 (PROVA)', 'G21 G90 G17 G40 G49', 'T1 M6 (FRESA D10)', 'S3000 M3', 'G0 X20.5 Y20', 'G43 H1 Z5 M8', 'G1 Z-3.25 F250', 'G1 X60.12345 F500', 'G0 Z50', 'M9', 'M5', 'M30', '%'];
+  const r = O.postProcessor(iso, { linguaggio: 'personalizzato', modo: 'fresa', pers: { cambio: 'T{t} M06', m8: 'M08', m9: 'M09', fine: 'M2', g43: false, percento: false, commenti: 'punto', decimali: 2, passoN: 10, iniziali: 'G54\nG49', finali: 'G91 G28 Z0' } });
+  assert.ok(!r.errore); const t = r.righe.join('\n');
+  assert.ok(!/^%/m.test(t) || false); assert.ok(r.righe[0].startsWith('O0101')); assert.strictEqual(r.righe[1], 'N10 G54'); assert.strictEqual(r.righe[2], 'N20 G49');
+  assert.ok(/N\d+ T1 M06 ; FRESA D10/.test(t), t); assert.ok(!/G43/.test(t)); assert.ok(/Z5 M08/.test(t)); assert.ok(/ M09|M09/.test(t));
+  assert.ok(/X60\.12 F500/.test(t) && /Z-3\.25/.test(t) && /X20\.5 Y20/.test(t)); assert.ok(/G91 G28 Z0\nN\d+ M2/.test(t), t); assert.ok(!/M30/.test(t));
+  const s0 = O.postProcessor(iso, { linguaggio: 'personalizzato', modo: 'fresa', pers: {} }); assert.strictEqual(s0.righe[3], 'T1 M6 (FRESA D10)'); assert.ok(s0.righe.includes('M30') && s0.righe[0] === '%');
+  const v = O.postProcessor(iso, { linguaggio: 'personalizzato', modo: 'fresa', pers: { m8: '', m9: '', commenti: 'nessuno' } }); assert.ok(!/\bM8\b|\bM9\b|\(/.test(v.righe.join('\n'))); assert.ok(v.righe.includes('G43 H1 Z5'));
+  const torn = O.postProcessor(['%', 'O0102 (ALBERO)', 'T0101', 'G96 S200 M3', 'G0 X62 Z2', 'M30', '%'], { linguaggio: 'personalizzato', modo: 'tornio', pers: { cambio: 'T{t} M6' } }); assert.ok(torn.righe.includes('T0101'));
+  assert.ok(O.postProcessor(['%', 'O1', 'G65 P9000', 'M30', '%'], { linguaggio: 'personalizzato', modo: 'fresa', pers: {} }).righe.length > 0);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

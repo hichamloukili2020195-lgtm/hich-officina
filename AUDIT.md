@@ -66,7 +66,7 @@ Legenda: **C** = c'e, **P** = c'e in parte, **M** = manca.
 |---|---|
 | Procedura guidata Grezzo, Utensile, Lavorazione, Parametri, Simulazione, G-code | C (4 passi, utensili proposti dalla tabella) |
 | Spianatura, contornatura con compensazione, tasca, foratura G81/G83/G84, spirale | C |
-| Tasca con isole, incisione di testo | M |
+| Tasca con isole, incisione di testo | C (2.41.0) |
 | Tornio: G71/G70, G72, G74, G75, G76, gole, filetti, sfacciatura, compensazione inserto | C |
 | Simulazione animata con rimozione materiale, collisioni, rapidi evidenziati | C (tempo reale, urti con morsa/mandrino/portautensile, confronto col disegno) |
 | Post-processor: Fanuc, Haas, Siemens, Heidenhain, Mazak, personalizzato | P (ISO "compatibile Fanuc e simili", cicli a nome Siemens, dialogo Heidenhain; mancano Haas, Mazak e il profilo personalizzabile) |

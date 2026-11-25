@@ -108,7 +108,7 @@
 
   // ----- impostazioni -----
   const IMPOSTAZIONI_SERIE = {
-    tema: 'scuro', vibra: true, guanti: false, sfondo: true, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false,
+    tema: 'scuro', vibra: true, guanti: false, sfondo: true, tastierino: true, contrasto: false, promemoriaCopia: true, ftpChiedi: true, nmaxFresa: 24000, nmaxTornio: 3000, zSic: 50, zR: 2, refrig: true, g43: true, numerare: false, ppCambio: 'T{t} M6', ppM8: 'M8', ppM9: 'M9', ppFine: 'M30', ppG43: true, ppPercento: true, ppCommenti: 'tonde', ppDec: 3, ppPasso: 0, ppIni: '', ppFin: '',
     codLimite: 'G50', codFiletto: 'G32', xCambio: '', zCambio: 50, fineZ: '', numProg: 1, costoOra: 60,
     postFresa: 'iso', postTornio: 'iso', ftpHost: '', ftpPorta: 21, ftpUtente: '', ftpPassword: '', ftpCartella: '', nomeFtp: 'O0001.nc'
   };
@@ -457,9 +457,10 @@
   // ----- schermate -----
   const App = {
     migra, hash, chiedi, conferma, SCHEMA,
+    persPost: i => ({ cambio: i.ppCambio, m8: i.ppM8, m9: i.ppM9, fine: i.ppFine, g43: i.ppG43 !== false, percento: i.ppPercento !== false, commenti: i.ppCommenti, decimali: i.ppDec, passoN: i.ppPasso, iniziali: i.ppIni, finali: i.ppFin }),
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, scaricaBin, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.40.0'
+    schermi: {}, param: {}, VERSIONE: '2.41.0'
   };
   window.App = App;
 

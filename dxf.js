@@ -45,6 +45,15 @@
       const L = pulisciLayer(e.layer);
       if (e.tipo === 'punto') { g(0, 'POINT'); g(8, L); g(10, f4(num(e.x))); g(20, f4(num(e.y))); g(30, 0); return; }
       if (e.tipo === 'cerchio') { g(0, 'CIRCLE'); g(8, L); g(10, f4(num(e.cx))); g(20, f4(num(e.cy))); g(30, 0); g(40, f4(num(e.r))); return; }
+      if (e.tipo === 'testo') {
+        (O.tratteTesto ? O.tratteTesto(e) : []).forEach(tr => {
+          if (tr.length === 2) { g(0, 'LINE'); g(8, L); g(10, f4(tr[0][0])); g(20, f4(tr[0][1])); g(30, 0); g(11, f4(tr[1][0])); g(21, f4(tr[1][1])); g(31, 0); return; }
+          g(0, 'POLYLINE'); g(8, L); g(66, 1); g(10, 0); g(20, 0); g(30, 0); g(70, 0);
+          tr.forEach(p => { g(0, 'VERTEX'); g(8, L); g(10, f4(p[0])); g(20, f4(p[1])); g(30, 0); });
+          g(0, 'SEQEND'); g(8, L);
+        });
+        return;
+      }
       const q = vertici(e);
       if (!q) return;
       if (!q.chiuso && q.v.length === 2 && !q.v[0].b) { g(0, 'LINE'); g(8, L); g(10, f4(q.v[0].x)); g(20, f4(q.v[0].y)); g(30, 0); g(11, f4(q.v[1].x)); g(21, f4(q.v[1].y)); g(31, 0); return; }

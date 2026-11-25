@@ -124,6 +124,7 @@
       const STATO = {
         iso: { fa: 'G0-G3, G17-G19, G40-G43, G54, G65, G73, G80-G89, G32/G33, G50, G71/G70/G74/G75/G76 (tornio), M3-M9, M30, macro con variabili', non: 'cicli fissi del tornio G72, G73, G90, G92, G94; tastatura G31 solo simulata', prova: 'Letto e simulato dall\'app; non provato su una macchina' },
         cicli: { fa: 'T D M6, G17 G90 G71 G40, G96 con LIMS, G33 K, MCALL CYCLE81-85 con parametri, commenti con ;', non: 'macro, cicli fissi del tornio (G71...), profili in programma', prova: 'Tradotto in modo meccanico, mai provato su un controllo vero: i parametri dei cicli vanno controllati sul manuale della macchina' },
+        personalizzato: { fa: 'il testo ISO dell\'app con le tue regole: cambio utensile, refrigerante, fine programma, righe iniziali e finali, commenti, decimali, numeri di riga (si scrivono in Impostazioni)', non: 'non cambia i cicli e non traduce in altri linguaggi', prova: 'Dipende dalle regole che scrivi tu: provalo a vuoto la prima volta' },
         dialogo: { fa: 'BEGIN PGM, BLK FORM, TOOL CALL, L X Y Z R0 F, CYCL DEF 200 (foratura), 201 (alesatura), 207 (maschiatura rigida), M99', non: 'tornio, G41/G42 (RL/RR), archi, macro, profili con raccordi', prova: 'Tradotto in modo meccanico, mai provato su un controllo vero: nomi dei cicli e riga finale da verificare' }
       };
       const b2 = { n: 3000, f: 600, t: 3, zSic: 50, zR: 2 };
@@ -344,6 +345,13 @@
       blocco('Linguaggio della macchina (post-processor)', [
         { id: 'postFresa', et: 'Fresa', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].fresa).map(k => [k, O.LINGUAGGI[k].nome]) },
         { id: 'postTornio', et: 'Tornio', tipo: 'scelta', scelte: Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k].tornio).map(k => [k, O.LINGUAGGI[k].nome]) }]);
+      blocco('ISO personalizzato (se scegli questo linguaggio)', [
+        { id: 'ppCambio', et: 'Cambio utensile', sub: '{t} = numero utensile, es. T{t} M6', tipo: 'testo' }, { id: 'ppM8', et: 'Refrigerante acceso', sub: 'vuoto = niente', tipo: 'testo' },
+        { id: 'ppM9', et: 'Refrigerante spento', sub: 'vuoto = niente', tipo: 'testo' }, { id: 'ppFine', et: 'Fine programma', sub: 'es. M30 oppure M2', tipo: 'testo' },
+        { id: 'ppG43', et: 'Tieni la correzione G43 H', tipo: 'spunta' }, { id: 'ppPercento', et: 'Tieni i simboli % a inizio e fine', tipo: 'spunta' },
+        { id: 'ppCommenti', et: 'Commenti', tipo: 'scelta', scelte: [['tonde', 'Tra parentesi ( )'], ['punto', 'Dopo il punto e virgola ;'], ['nessuno', 'Senza commenti']] },
+        { id: 'ppDec', et: 'Decimali delle coordinate', v: 3 }, { id: 'ppPasso', et: 'Numeri di riga N ogni', sub: '0 = senza', v: 0 },
+        { id: 'ppIni', et: 'Righe dopo il numero programma', sub: 'una per riga, es. G21 G90 G17 G40 G49', tipo: 'testo' }, { id: 'ppFin', et: 'Righe prima della fine', sub: 'una per riga, es. G91 G28 Z0', tipo: 'testo' }]);
       m.appendChild(A.info('Il programma nasce in ISO e si traduce nel linguaggio scelto; nel listato si puo cambiare al volo. Provalo sempre a vuoto la prima volta.'));
       blocco('Macchina in rete (FTP)', [{ id: 'ftpHost', et: 'Indirizzo della macchina', sub: 'es. 192.168.1.50', tipo: 'testo' }, { id: 'ftpPorta', et: 'Porta', v: 21 },
         { id: 'ftpUtente', et: 'Utente', tipo: 'testo' }, { id: 'ftpChiedi', et: 'Chiedi la password a ogni invio (consigliato)', tipo: 'spunta' },

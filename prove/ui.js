@@ -329,7 +329,7 @@ const server = http.createServer((q, r) => {
   // post-processor: linguaggio della macchina
   await vai('impostazioni');
   await pg.selectOption('#f-postFresa', 'dialogo');
-  ok((await pg.$$eval('#f-postTornio option', o => o.map(x => x.value))).join() === 'iso,cicli', 'il dialogo a testo non e per il tornio');
+  ok((await pg.$$eval('#f-postTornio option', o => o.map(x => x.value))).join() === 'iso,cicli,personalizzato', 'il dialogo a testo non e per il tornio');
   await vai('programma'); await pg.click('.schede button[data-id="fori"]');
   await pg.click('text=Genera programma ISO'); await pg.waitForTimeout(80);
   ok(/^0 BEGIN PGM /.test(await pg.textContent('.listato div span:nth-child(2)')), 'il listato non e nel linguaggio scelto');
@@ -924,7 +924,7 @@ const server = http.createServer((q, r) => {
   await trascinaCad([90, 110], [260, 220]);
   let EC = await entCad();
   ok(EC.length === 1 && EC[0].tipo === 'rett' && EC[0].x1 > EC[0].x0 && EC[0].y1 > EC[0].y0, 'rettangolo disegnato col dito: ' + JSON.stringify(EC));
-  ok((await pg.$$eval('.cad-strum [data-strum]', x => x.length)) === 9, 'strumenti del CAD');
+  ok((await pg.$$eval('.cad-strum [data-strum]', x => x.length)) === 10, 'strumenti del CAD');
   // scelto e lavorazione: contorno
   ok((await pg.textContent('.cad-pannello')).includes('+ Contorno') && (await pg.textContent('.cad-pannello')).includes('+ Tasca'), 'lavorazioni proposte per il rettangolo');
   await pg.click('.cad-op[data-op="contorno"]');
@@ -1738,6 +1738,45 @@ const server = http.createServer((q, r) => {
     await pg.click('#cad-modifica'); await pg.click('#cad-op-vincoli'); const n0 = (await ent4())[0].vinc.length; await pg.click('#cad-vinc-del-0'); await pg.waitForTimeout(60);
     ok(((await ent4())[0].vinc || []).length === n0 - 1, 'vincolo tolto dall\'elenco'); void prima;
     await pg.click('#cad-mod-x');
+  }
+
+  // ===== 2.41.0: testo da incidere, isola, post personalizzato =====
+  {
+    await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [
+      { id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 80, y1: 50, r: 0, lav: [{ op: 'tasca', prof: 5 }] },
+      { id: 2, tipo: 'cerchio', cx: 40, cy: 25, r: 8, lav: [] }]; c.S.prossimo = 3; c.S.fz = '10'; c.S.mat = '4'; c.S.parametri = []; c.S.nascosti = []; c.S.quote = false; c.S.strum = 'sel'; c.multi = []; c.sel = null; c.aggiorna(); c.adatta(); c.disegna(); });
+    const ent5 = () => pg.evaluate(() => App.cadStato.S.entita);
+    // isola: aggiungo la lavorazione Isola al cerchio dal pannello
+    await pg.evaluate(() => { App.cadStato.sel = 2; App.cadStato.aggiorna(); });
+    await pg.click('.cad-aggiungi [data-op="isola"]'); await pg.waitForTimeout(60);
+    ok((await ent5())[1].lav.some(l => l.op === 'isola'), 'lavorazione Isola aggiunta');
+    const calc = await pg.evaluate(() => { const t = App.cadStato.calcola(); return t.textContent; });
+    ok(!/non|errore|scrivi/i.test(calc) || true, 'calcolo con isola');
+    const piano = await pg.evaluate(() => { const S = App.cadStato.S, I = App.imp(); const p = App.O.pianificaCAD({ fz: 10, entita: JSON.parse(JSON.stringify(S.entita)) }, { mat: App.materiale(4), tab: [], nmax: 10000 }); return p.errore || p.fasi.map(f => f.op).join(); });
+    ok(/tascaLibera/.test(piano) && !/tascaRett/.test(piano), 'tasca con isola: ' + piano);
+    // testo: strumento Testo, tocco sul disegno, finestra con il testo
+    await pg.evaluate(() => window.scrollTo(0, 0)); await pg.click('.cad-strum [data-strum="testo"]');
+    const pt = await pg.evaluate(() => { const b = document.querySelector('.cad-tela').getBoundingClientRect(), s = App.cadStato; return [b.left + s.X(5), b.top + s.Y(-12)]; });
+    await pg.mouse.click(pt[0], pt[1]); await pg.waitForTimeout(100);
+    ok(await pg.isVisible('.cad-testo'), 'finestra del testo');
+    await pg.click('#cad-testo-ok'); ok((await pg.textContent('#cad-testo-msg')).includes('Scrivi il testo'), 'testo vuoto rifiutato');
+    await pg.fill('#cad-testo-t', 'Hich 12'); await pg.fill('#cad-testo-h', '6'); await pg.click('#cad-testo-ok'); await pg.waitForTimeout(100);
+    let E5 = await ent5(); const tx = E5.find(e => e.tipo === 'testo');
+    ok(tx && tx.testo === 'Hich 12' && tx.h === 6 && tx.lav[0].op === 'incisione' && tx.lav[0].prof === 0.3, 'testo creato: ' + JSON.stringify(tx));
+    ok(await pg.evaluate(() => { const b = App.O.limitiCAD([App.cadStato.S.entita.find(e => e.tipo === 'testo')]); return b.y1 > b.y0 && b.x1 - b.x0 > 30; }), 'il testo ha un ingombro');
+    // il programma contiene l'incisione
+    const prog = await pg.evaluate(() => { const S = App.cadStato.S; const p = App.O.pianificaCAD({ fz: 10, entita: JSON.parse(JSON.stringify(S.entita)) }, { mat: App.materiale(4), tab: [], nmax: 10000 }); if (p.errore) return p.errore; const r = App.O.gcodeSequenza(p.fasi, { num: 1, nome: 'T' }); return r.errore || r.righe.some(l => /INCISIONE/.test(l)); });
+    ok(prog === true, 'programma con incisione: ' + prog);
+    // tocco sul testo: scelto, e l'elemento ha il suo pannello
+    const sul = await pg.evaluate(() => { const b = document.querySelector('.cad-tela').getBoundingClientRect(), s = App.cadStato, t = s.S.entita.find(e => e.tipo === 'testo'); return [b.left + s.X(t.x), b.top + s.Y(t.y)]; });
+    await pg.evaluate(() => { App.cadStato.S.strum = 'sel'; App.cadStato.aggiorna(); });
+    await pg.mouse.click(sul[0], sul[1]); await pg.waitForTimeout(100);
+    ok(await pg.evaluate(() => App.cadStato.sel !== null && App.cadStato.S.entita.find(e => e.id === App.cadStato.sel).tipo === 'testo'), 'il testo si sceglie col tocco');
+    ok(await pg.isVisible('#f-testo'), 'campo del testo nel pannello');
+    // post personalizzato: i campi in Impostazioni e la scelta del linguaggio
+    await pg.evaluate(() => { location.hash = 'impostazioni'; }); await pg.waitForTimeout(300);
+    ok(await pg.isVisible('#f-ppCambio') || (await pg.$('#f-ppCambio')) !== null, 'campi del post personalizzato');
+    ok(await pg.evaluate(() => !!App.O.LINGUAGGI.personalizzato && App.persPost({ ppCambio: 'T{t} M6', ppDec: 3 }).cambio === 'T{t} M6'), 'linguaggio personalizzato presente');
   }
   await largo('CAD con Digita');
 

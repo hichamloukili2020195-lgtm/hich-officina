@@ -26,6 +26,7 @@
   }
   function polilinee(e) {
     if (e.tipo === 'punto') return { croce: { x: num(e.x), y: num(e.y) } };
+    if (e.tipo === 'testo') return { multi: (O.tratteTesto ? O.tratteTesto(e) : []).map(tr => tr.map(q => ({ a: q[0], b: q[1] }))) };
     const pr = O.profiloCAD(e);
     if (!pr) return null;
     const g = O.costruisciProfilo(pr.punti.map(p => ({ a: p.x, b: p.y, tratto: p.tratto, r: p.r, raccordo: p.raccordo, smusso: p.smusso })), pr.chiuso);
@@ -54,6 +55,7 @@
     c.push('0 G 0.8 w');
     E.forEach(e => {
       const q = polilinee(e); if (!q) return;
+      if (q.multi) { q.multi.forEach(P => { P.forEach((p, i) => c.push(f2(X(p.a)) + ' ' + f2(Y(p.b)) + (i ? ' l' : ' m'))); c.push('S'); }); return; }
       if (q.croce) { const x = X(q.croce.x), y = Y(q.croce.y); c.push(f2(x - 4) + ' ' + f2(y) + ' m ' + f2(x + 4) + ' ' + f2(y) + ' l ' + f2(x) + ' ' + f2(y - 4) + ' m ' + f2(x) + ' ' + f2(y + 4) + ' l S'); return; }
       q.poli.forEach((p, i) => c.push(f2(X(p.a)) + ' ' + f2(Y(p.b)) + (i ? ' l' : ' m')));
       c.push(q.chiuso ? 'h S' : 'S');

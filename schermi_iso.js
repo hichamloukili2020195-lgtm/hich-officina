@@ -56,7 +56,7 @@
         const I = A.imp();
         if (!L.ling) L.ling = modoL === 'tornio' ? I.postTornio : I.postFresa;
         if (!O.LINGUAGGI[L.ling] || !O.LINGUAGGI[L.ling][modoL]) L.ling = 'iso';
-        const tr = O.postProcessor(L.iso, { linguaggio: L.ling, modo: modoL, nome: ((L.iso[1] || '').match(/\(([^)]*)\)/) || [])[1] || L.nome });
+        const tr = O.postProcessor(L.iso, { linguaggio: L.ling, modo: modoL, pers: A.persPost(I), nome: ((L.iso[1] || '').match(/\(([^)]*)\)/) || [])[1] || L.nome });
         if (tr.errore) { L.ling = 'iso'; L.righe = L.iso.slice(); L.nomeFile = null; m.appendChild(A.info(esc(tr.errore), 'avviso')); }
         else { L.righe = tr.righe; L.nomeFile = tr.nomeFile || null; if (tr.avvisi.length) m.appendChild(A.info(esc(tr.avvisi.join(' ')), 'avviso')); }
         const sel = el('select', { id: 'f-ling' }, Object.keys(O.LINGUAGGI).filter(k => O.LINGUAGGI[k][modoL]).map(k => el('option', { value: k, testo: O.LINGUAGGI[k].nome })));

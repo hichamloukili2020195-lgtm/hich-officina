@@ -53,6 +53,12 @@
       }
     } else if (e.tipo === 'cerchio') { const c = P({ x: e.cx, y: e.cy }); n.cx = c[0]; n.cy = c[1]; n.r = r3(num(e.r) * k); }
     else if (e.tipo === 'punto') { const c = P(e); n.x = c[0]; n.y = c[1]; }
+    else if (e.tipo === 'testo') {
+      if (spec) return { errore: 'Il testo non si specchia: disegna le linee e specchiale, oppure scrivilo dal lato giusto.' };
+      const c = P(e); n.x = c[0]; n.y = c[1];
+      if (T.tipo === 'ruota') n.ang = r3((num(e.ang) || 0) + T.ang);
+      if (k !== 1) { n.h = r3(num(e.h) * k); if (num(e.spazio)) n.spazio = r3(num(e.spazio) * k); }
+    }
     else if (e.tipo === 'asola') { const a = P({ x: e.x1, y: e.y1 }), b = P({ x: e.x2, y: e.y2 }); n.x1 = a[0]; n.y1 = a[1]; n.x2 = b[0]; n.y2 = b[1]; n.w = r3(num(e.w) * k); }
     else return { errore: 'Questo elemento non si puo trasformare.' };
     return n;

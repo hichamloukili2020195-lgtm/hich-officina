@@ -10,13 +10,14 @@
 
   /** Lavorazioni possibili per ogni tipo di entita (la prima e quella proposta). */
   const LAVORAZIONI = {
-    poli: ['contorno', 'tasca'],
-    rett: ['contorno', 'tasca'],
-    cerchio: ['foro', 'maschio', 'alesato', 'tasca', 'contorno'],
+    poli: ['contorno', 'tasca', 'isola', 'incisione'],
+    rett: ['contorno', 'tasca', 'isola', 'incisione'],
+    cerchio: ['foro', 'maschio', 'alesato', 'tasca', 'contorno', 'isola'],
     punto: ['foro', 'maschio', 'alesato'],
-    asola: ['asola']
+    asola: ['asola'],
+    testo: ['incisione']
   };
-  const NOMI_LAV = { contorno: 'Contornatura', tasca: 'Tasca', foro: 'Foro', maschio: 'Maschiatura', alesato: 'Alesatura', asola: 'Asola' };
+  const NOMI_LAV = { contorno: 'Contornatura', tasca: 'Tasca', foro: 'Foro', maschio: 'Maschiatura', alesato: 'Alesatura', asola: 'Asola', isola: 'Isola (resta in piedi)', incisione: 'Incisione' };
 
   /** Punti del profilo di un'entita chiusa o aperta, nel formato di profilo.js. Ritorna {punti, chiuso} o null. */
   function profiloDi(e) {
@@ -47,6 +48,7 @@
       else if (e.tipo === 'rett') { dai(num(e.x0), num(e.y0)); dai(num(e.x1), num(e.y1)); }
       else if (e.tipo === 'cerchio') { const r = num(e.r) || 0; dai(num(e.cx) - r, num(e.cy) - r); dai(num(e.cx) + r, num(e.cy) + r); }
       else if (e.tipo === 'punto') dai(num(e.x), num(e.y));
+      else if (e.tipo === 'testo') { (O.tratteTesto ? O.tratteTesto(e) : []).forEach(tr => tr.forEach(q => dai(q[0], q[1]))); if (!isFinite(x0)) dai(num(e.x), num(e.y)); }
       else if (e.tipo === 'asola') { const w = num(e.w) / 2 || 0; dai(num(e.x1) - w, num(e.y1) - w); dai(num(e.x2) + w, num(e.y2) + w); dai(num(e.x1) + w, num(e.y1) + w); dai(num(e.x2) - w, num(e.y2) - w); }
     });
     return isFinite(x0) ? { x0, y0, x1, y1 } : null;
@@ -71,7 +73,7 @@
     if (!(fz > 0)) return { errore: 'Scrivi lo spessore del pezzo.' };
     const note = { testi: [], daControllare: new Set() };
     const base = { zSic: ctx.zSic || 50, zR: ctx.zR || 2, refrig: ctx.refrig, g43: ctx.g43 };
-    const fasi = [], gruppiFori = new Map(), tasche = [], smussi = [];
+    const fasi = [], gruppiFori = new Map(), tasche = [], smussi = [], isole = [];
     const fresa = (d, z) => { const dt = O.datiTaglio(mt, { tipo: 'fresa', d, z, nmax }) || {}; return { n: dt.n, f: dt.f, ap: dt.ap, ae: dt.ae && d ? Math.round(dt.ae / d * 100) : 50 }; };
     const frese = tab.filter(u => u.tipo === 'fresa' && Number(u.d) > 0).sort((a, b) => Number(b.d) - Number(a.d));
     const utFresa = (dDato, max, prop) => {
@@ -88,6 +90,7 @@
         if (nErrore) return;
         const prof = num(lav.prof);
         const op = lav.op;
+        if (op === 'isola') { if ((LAVORAZIONI[e.tipo] || []).includes('isola')) isole.push({ e, k }); return; }
         if (!(LAVORAZIONI[e.tipo] || []).includes(op)) { nErrore = 'Elemento ' + (k + 1) + ': la lavorazione "' + (NOMI_LAV[op] || op) + '" non si puo fare su questo disegno.'; return; }
         // ----- fori -----
         if (op === 'foro' || op === 'maschio' || op === 'alesato') {
@@ -116,6 +119,16 @@
           tasche.push({ e, k, lav, prof });
           return;
         }
+        // ----- incisione: testo, profili aperti e contorni a linea singola -----
+        if (op === 'incisione') {
+          let tratti;
+          if (e.tipo === 'testo') tratti = O.tratteTesto ? O.tratteTesto(e) : [];
+          else { const pr = profiloDi(e), g = O.costruisciProfilo && O.costruisciProfilo(pr.punti.map(p => ({ a: p.x, b: p.y, tratto: p.tratto, r: p.r, raccordo: p.raccordo, smusso: p.smusso })), pr.chiuso); if (!g || g.errore) { nErrore = 'Elemento ' + (k + 1) + ': ' + ((g && g.errore) || 'profilo non valido') + '.'; return; } const pl = O.polilineaProfilo(g.tratti, 0.1).map(q => [q.a, q.b]); tratti = [pl]; }
+          if (!tratti.length) { nErrore = 'Elemento ' + (k + 1) + ': non c\'e niente da incidere (scrivi il testo).'; return; }
+          const u = utFresa(num(lav.d), 6, { d: 1, z: 2, t: 12 }), dt = fresa(u.d, u.z);
+          fasi.push({ op: 'incisione', titolo: 'Incisione D' + u.d + ' T' + u.t + ' prof. ' + r3(prof), c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: Math.min(dt.f || 150, 300), tratti, prof, ap: Math.max(0.1, Math.min(dt.ap || 0.5, prof)) }) });
+          return;
+        }
         // ----- contorno -----
         if (op === 'contorno') {
           const pr = profiloDi(e);
@@ -132,13 +145,23 @@
       });
     });
     if (nErrore) return { errore: nErrore };
+    // isole: profili chiusi che restano in piedi dentro una tasca (la tasca diventa "libera")
+    const poliDi = e => { const pr = profiloDi(e); if (!pr || !O.costruisciProfilo) return null; const g = O.costruisciProfilo(pr.punti.map(p => ({ a: p.x, b: p.y, tratto: p.tratto, r: p.r, raccordo: p.raccordo, smusso: p.smusso })), true); return g.errore ? null : O.polilineaProfilo(g.tratti, 0.3); };
+    const dentroP = (P, x, y) => { let d = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.b > y) !== (b.b > y) && x < (b.a - a.a) * (y - a.b) / (b.b - a.b) + a.a) d = !d; } return d; };
+    tasche.forEach(t => {
+      if (!['poli', 'rett', 'cerchio'].includes(t.e.tipo) || (t.e.tipo === 'poli' && !t.e.chiuso)) return;
+      const fuori = poliDi(t.e); if (!fuori) return;
+      const dentro = isole.filter(i => i.e.id !== t.e.id && (i.e.tipo !== 'poli' || i.e.chiuso) && (() => { const P = poliDi(i.e); return P && P.length > 2 && P.every(q => dentroP(fuori, q.a, q.b)); })());
+      if (dentro.length) { t.libera = true; t.isole = dentro; dentro.forEach(i => { i.usata = true; }); }
+    });
+    isole.filter(i => !i.usata).forEach(i => note.testi.push('Elemento ' + (i.k + 1) + ': l\'isola non sta dentro nessuna tasca, resta solo disegnata.'));
     // fori: stessi gruppi del ciclo della piastra (centrino, punta, smusso, maschio / alesatore, a fresa se grandi)
     const gruppi = Array.from(gruppiFori.values());
-    if (gruppi.length || tasche.some(t => t.e.tipo === 'rett' || t.e.tipo === 'cerchio')) {
+    if (gruppi.length || tasche.some(t => (t.e.tipo === 'rett' || t.e.tipo === 'cerchio') && !t.libera)) {
       const pezzo = { fx: 1, fy: 1, fz, gx: 1, gy: 1, gz: fz, fori: [], tasche: [] };
       gruppi.forEach(g => pezzo.fori.push({ tipo: g.tipo === 'foro' ? 'foro' : g.tipo, d: g.d, passo: g.passo, passante: g.passante, prof: g.prof, toll: g.toll, smusso: g.smusso > 0 ? g.smusso : undefined,
         schema: 'elenco', testo: g.punti.map(p => 'X' + p[0] + ' Y' + p[1]).join('\n'), nf: g.punti.length }));
-      tasche.filter(t => t.e.tipo === 'rett' || t.e.tipo === 'cerchio').forEach(t => {
+      tasche.filter(t => (t.e.tipo === 'rett' || t.e.tipo === 'cerchio') && !t.libera).forEach(t => {
         if (t.e.tipo === 'cerchio') pezzo.tasche.push({ tipo: 'circ', cx: num(t.e.cx), cy: num(t.e.cy), dt: 2 * num(t.e.r), prof: t.prof });
         else { const r = rettangolo(t.e); pezzo.tasche.push({ tipo: 'rett', cx: (r.x0 + r.x1) / 2, cy: (r.y0 + r.y1) / 2, lx: r.x1 - r.x0, ly: r.y1 - r.y0, prof: t.prof, r: r.r }); }
       });
@@ -164,17 +187,18 @@
       note.testi.push(...(p.note || []).filter(t => !/^(Spianatura|Contornatura|Utensili non trovati)/.test(t)));
     }
     // tasche libere: sgrossatura a righe + finitura col profilo interno
-    tasche.filter(t => t.e.tipo === 'poli').forEach(t => {
+    tasche.filter(t => t.e.tipo === 'poli' || t.libera).forEach(t => {
       const pr = profiloDi(t.e);
-      if (!t.e.chiuso || pr.punti.length < 3) { nErrore = 'Elemento ' + (t.k + 1) + ': la tasca vuole un profilo chiuso.'; return; }
+      if ((t.e.tipo === 'poli' && !t.e.chiuso) || (pr.punti.length < 3 && t.e.tipo !== 'cerchio')) { nErrore = 'Elemento ' + (t.k + 1) + ': la tasca vuole un profilo chiuso.'; return; }
       const b = limiti([t.e]);
       const max = Math.min(b.x1 - b.x0, b.y1 - b.y0) / 2;
       const u = utFresa(num(t.lav.d), Math.min(max, 12), { d: 8, z: 3, t: 7 });
       const dt = fresa(u.d, u.z);
       const ap = Math.max(0.5, Math.min(dt.ap || 2, t.prof));
       const punti = pr.punti.map(p => Object.assign({}, p));
-      fasi.push({ op: 'tascaLibera', titolo: 'Tasca libera D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti, prof: t.prof, ap, ae: dt.ae, sovra: 0.2 }) });
+      fasi.push({ op: 'tascaLibera', titolo: 'Tasca libera D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti, prof: t.prof, ap, ae: dt.ae, sovra: 0.2, isole: (t.isole || []).map(i => profiloDi(i.e).punti.map(p => Object.assign({}, p))) }) });
       fasi.push({ op: 'profilo', titolo: 'Finitura tasca D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti: punti.map(p => Object.assign({}, p)), chiuso: true, lato: 'interno', prof: t.prof, ap, soloFondo: true }) });
+      (t.isole || []).forEach(i => fasi.push({ op: 'profilo', titolo: 'Finitura isola D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti: profiloDi(i.e).punti.map(p => Object.assign({}, p)), chiuso: true, lato: 'esterno', prof: t.prof, ap, soloFondo: true }) }));
     });
     if (nErrore) return { errore: nErrore };
     // smussi dei bordi (tasche, asole, contorni) con lo smussatore a 90°: punta sotto lo smusso di k, percorso spostato di k

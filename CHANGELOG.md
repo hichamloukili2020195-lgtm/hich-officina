@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.41.0 - Fase 3 CAM: isole nelle tasche, incisione di testo, post personalizzato
+- **Isole nelle tasche**: dai la lavorazione **Isola** a un profilo chiuso, a un rettangolo o a un cerchio che sta dentro una tasca. La fresa lo gira intorno: righe di sgrossatura che non entrano nell'isola, un giro di pulizia attorno a ogni isola e la finitura dell'isola a profondita piena. Un'isola fuori da ogni tasca resta solo disegnata e il programma lo scrive nelle note. La tasca rettangolare o circolare con un'isola passa alla tasca libera.
+- **Incisione**: nuova lavorazione per i profili e per il nuovo elemento **Testo**. La fresa segue le linee a profondita fissa (preimpostata 0,3 mm), senza compensazione, con piu passate se serve. Utensile: il piu piccolo della tabella oppure il diametro scritto.
+- **Strumento Testo**: tocca il disegno, scrivi il testo, l'altezza, la profondita e l'angolo. Il carattere a linee singole e scritto da noi (maiuscole, cifre e - _ . , : / + = ( ) % # * ? ! e i simboli di diametro e gradi; le minuscole diventano maiuscole e gli accenti si tolgono). Il testo si sposta, ruota, scala; non si specchia. Esce anche in DXF e PDF.
+- **ISO personalizzato** (Impostazioni e scelta nel listato): le regole della tua macchina applicate al testo ISO dell'app: cambio utensile (T{t} M6...), refrigerante acceso e spento, fine programma, G43 si o no, % si o no, commenti tra parentesi o dopo il punto e virgola o senza, decimali, numeri di riga, righe dopo il numero programma e prima della fine. Mai provato su una macchina: prova a vuoto.
+- Non fatto: i post con il nome della marca del controllo, in attesa della tua decisione su come scriverli; nel frattempo "ISO personalizzato" copre le differenze piu comuni.
+- Prove: tasca con isola (nessun punto di lavoro dentro l'isola), carattere e testo, pianificazione dal CAD, trasformazioni, DXF, PDF, post personalizzato, interfaccia.
+
 ## 2.40.0 - Fase 2d CAD: vincoli veri
 - **Vincoli** (Modifica > Vincoli): restano legati al disegno e si riapplicano da soli quando cambi qualcosa.
   - Su un segmento di profilo (quello che arriva al punto scelto): orizzontale, verticale, lunghezza fissa (numero o formula con i parametri), parallelo, perpendicolare o stessa lunghezza rispetto a un altro profilo (tocca il suo segmento).

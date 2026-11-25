@@ -16,9 +16,9 @@
   const STRUM = [['sel', 'Seleziona', '<path d="M5 3l14 8-6 2-3 6z"/>'], ['poli', 'Profilo', '<path d="M4 18l5-9 5 6 6-10"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="5" r="1.6"/>'],
     ['rett', 'Rettangolo', '<rect x="4" y="6" width="16" height="12" rx="1.5"/>'], ['cerchio', 'Cerchio', '<circle cx="12" cy="12" r="8"/><path d="M12 12h8"/>'],
     ['arco', 'Arco', '<path d="M4 18a9 9 0 0 1 16 0"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="18" r="1.6"/>'], ['poligono', 'Poligono', '<path d="M12 3l8 6-3 10H7L4 9z"/>'],
-    ['punto', 'Foro', '<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'], ['asola', 'Asola', '<rect x="3" y="8" width="18" height="8" rx="4"/>'], ['fin', 'Finestra', '<path d="M4 4h4M12 4h4M20 4v4M20 12v4M20 20h-4M12 20H8M4 20v-4M4 12V8"/>']];
-  const COLORE_LAV = { contorno: '--accento2', tasca: '--ok', foro: '--avviso', maschio: '--avviso', alesato: '--avviso', asola: '--ok' };
-  const NOME_E = { poli: 'Profilo', rett: 'Rettangolo', cerchio: 'Cerchio', punto: 'Punto', asola: 'Asola' };
+    ['punto', 'Foro', '<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'], ['asola', 'Asola', '<rect x="3" y="8" width="18" height="8" rx="4"/>'], ['testo', 'Testo', '<path d="M5 6h14M12 6v13M9 19h6"/>'], ['fin', 'Finestra', '<path d="M4 4h4M12 4h4M20 4v4M20 12v4M20 20h-4M12 20H8M4 20v-4M4 12V8"/>']];
+  const COLORE_LAV = { contorno: '--accento2', tasca: '--ok', foro: '--avviso', maschio: '--avviso', alesato: '--avviso', asola: '--ok', isola: '--errore', incisione: '--accento' };
+  const NOME_E = { poli: 'Profilo', rett: 'Rettangolo', cerchio: 'Cerchio', punto: 'Punto', asola: 'Asola', testo: 'Testo' };
 
   A.schermi.cad = {
     titolo: 'Disegna e programma (fresa)',
@@ -78,7 +78,7 @@
         if (e.tipo === 'poli') return e.punti.map((p, i) => ({ i, x: num(p.x), y: num(p.y) }));
         if (e.tipo === 'rett') return [{ i: 0, x: e.x0, y: e.y0 }, { i: 1, x: e.x1, y: e.y0 }, { i: 2, x: e.x1, y: e.y1 }, { i: 3, x: e.x0, y: e.y1 }];
         if (e.tipo === 'cerchio') return [{ i: 0, x: e.cx, y: e.cy }, { i: 1, x: e.cx + e.r, y: e.cy }];
-        if (e.tipo === 'punto') return [{ i: 0, x: e.x, y: e.y }];
+        if (e.tipo === 'punto' || e.tipo === 'testo') return [{ i: 0, x: e.x, y: e.y }];
         return [{ i: 0, x: e.x1, y: e.y1 }, { i: 1, x: e.x2, y: e.y2 }];
       };
       const puntiAggancio = esclusa => {
@@ -164,6 +164,10 @@
             g.beginPath(); g.moveTo(X(e.x1), Y(e.y1)); g.lineTo(X(e.x2), Y(e.y2)); g.setLineDash([6, 4]); g.stroke(); g.setLineDash([]);
             [[e.x1, e.y1], [e.x2, e.y2]].forEach(q => { g.beginPath(); g.arc(X(q[0]), Y(q[1]), w / 2 * vista.sc, 0, 7); g.stroke(); });
             void ux; void uy; return;
+          }
+          if (e.tipo === 'testo') {
+            g.beginPath(); O.tratteTesto(e).forEach(tr => tr.forEach((q, i) => (i ? g.lineTo(X(q[0]), Y(q[1])) : g.moveTo(X(q[0]), Y(q[1]))))); g.lineJoin = 'round'; g.stroke();
+            g.fillStyle = g.strokeStyle; g.beginPath(); g.arc(X(e.x), Y(e.y), 2.5, 0, 7); g.fill(); return;
           }
           const f = forma(e);
           if (!f) return;
@@ -282,6 +286,7 @@
           if (nascosta(e)) return;
           let d = Infinity;
           if (e.tipo === 'punto') d = Math.hypot(X(e.x) - px, Y(e.y) - py);
+          else if (e.tipo === 'testo') { O.tratteTesto(e).forEach(tr => { for (let i = 1; i < tr.length; i++) d = Math.min(d, distSeg(px, py, X(tr[i - 1][0]), Y(tr[i - 1][1]), X(tr[i][0]), Y(tr[i][1]))); }); d = Math.min(d, Math.hypot(X(e.x) - px, Y(e.y) - py)); if (d < 14) d = Math.max(0, d - 4); }
           else if (e.tipo === 'asola') d = distSeg(px, py, X(e.x1), Y(e.y1), X(e.x2), Y(e.y2)) - (num(e.w) || 8) / 2 * vista.sc;
           else if (e.tipo === 'cerchio') { d = Math.abs(Math.hypot(X(e.cx) - px, Y(e.cy) - py) - e.r * vista.sc); if (Math.hypot(X(e.cx) - px, Y(e.cy) - py) < e.r * vista.sc * 0.35) d = Math.min(d, 8); }
           else { const f = forma(e); if (f) { const p = f.poli; for (let i = 1; i < p.length; i++) d = Math.min(d, distSeg(px, py, X(p[i - 1].a), Y(p[i - 1].b), X(p[i].a), Y(p[i].b))); if (f.chiuso && p.length > 2) d = Math.min(d, distSeg(px, py, X(p[p.length - 1].a), Y(p[p.length - 1].b), X(p[0].a), Y(p[0].b))); } }
@@ -293,14 +298,14 @@
         if (e.tipo === 'poli') { e.punti[h.i].x = x; e.punti[h.i].y = y; }
         else if (e.tipo === 'rett') { const opp = maniglie(e)[(h.i + 2) % 4]; e.x0 = Math.min(x, opp.x); e.x1 = Math.max(x, opp.x); e.y0 = Math.min(y, opp.y); e.y1 = Math.max(y, opp.y); }
         else if (e.tipo === 'cerchio') { if (h.i === 0) { e.cx = x; e.cy = y; } else e.r = Math.max(0.1, R3(Math.hypot(x - e.cx, y - e.cy))); }
-        else if (e.tipo === 'punto') { e.x = x; e.y = y; }
+        else if (e.tipo === 'punto' || e.tipo === 'testo') { e.x = x; e.y = y; }
         else { if (h.i === 0) { e.x1 = x; e.y1 = y; } else { e.x2 = x; e.y2 = y; } }
       };
       const muoviTutto = (e, dx, dy) => {
         if (e.tipo === 'poli') e.punti.forEach(p => { p.x = R3(num(p.x) + dx); p.y = R3(num(p.y) + dy); });
         else if (e.tipo === 'rett') { e.x0 = R3(e.x0 + dx); e.x1 = R3(e.x1 + dx); e.y0 = R3(e.y0 + dy); e.y1 = R3(e.y1 + dy); }
         else if (e.tipo === 'cerchio') { e.cx = R3(e.cx + dx); e.cy = R3(e.cy + dy); }
-        else if (e.tipo === 'punto') { e.x = R3(e.x + dx); e.y = R3(e.y + dy); }
+        else if (e.tipo === 'punto' || e.tipo === 'testo') { e.x = R3(e.x + dx); e.y = R3(e.y + dy); }
         else { e.x1 = R3(e.x1 + dx); e.x2 = R3(e.x2 + dx); e.y1 = R3(e.y1 + dy); e.y2 = R3(e.y2 + dy); }
       };
       const nuovaE = e => {
@@ -450,6 +455,7 @@
           nuova.punti.push({ x: w.x, y: w.y });
           statoBarra(); pannelloAgg(); disegna(); return;
         }
+        if (strum === 'testo') { apriTesto(w); return; }
         if (strum === 'punto') { nuovaE({ tipo: 'punto', x: w.x, y: w.y }); return; }
         if (strum === 'arco') { arcoAggiungi(w); return; }
         if (strum === 'rett' || strum === 'cerchio' || strum === 'asola' || strum === 'poligono') {
@@ -856,6 +862,26 @@
         ridisegnaForm();
         cv.parentNode.parentNode.appendChild(box);
       };
+      let testoBox = null;
+      const apriTesto = w => {
+        if (testoBox) { testoBox.remove(); testoBox = null; }
+        const box = testoBox = el('div', { class: 'cad-digita cad-mod cad-testo', role: 'dialog', 'aria-label': 'Testo da incidere' });
+        const chiudi = () => { box.remove(); testoBox = null; };
+        const i1 = el('input', { type: 'text', id: 'cad-testo-t', maxlength: '60', value: S.ultimoTesto || '', autocomplete: 'off', 'aria-label': 'Testo', placeholder: 'es. PEZZO 12' });
+        const campoN = (id, et, v) => { const i = el('input', { type: 'text', inputmode: 'text', id, value: String(v), autocomplete: 'off', 'aria-label': et }); return [i, el('label', { class: 'cad-mod-c' }, [el('span', { testo: et }), i])]; };
+        const [i2, l2] = campoN('cad-testo-h', 'Altezza delle lettere (mm)', S.ultimoTestoH || 5), [i3, l3] = campoN('cad-testo-p', 'Profondita (mm)', S.ultimoTestoP || 0.3), [i4, l4] = campoN('cad-testo-a', 'Angolo (gradi)', 0);
+        const msg = el('p', { class: 'errore', id: 'cad-testo-msg', role: 'alert', hidden: true });
+        const crea = () => {
+          const t = i1.value.trim().slice(0, 60), h = O.espressione(i2.value), p = O.espressione(i3.value), a = O.espressione(i4.value);
+          const er = !t ? 'Scrivi il testo.' : !(h > 0) ? 'Altezza non valida.' : !(p > 0) ? 'Profondita non valida.' : !isFinite(a) ? 'Angolo non valido.' : '';
+          if (er) { msg.textContent = er; msg.hidden = false; return; }
+          S.ultimoTesto = t; S.ultimoTestoH = String(h); S.ultimoTestoP = String(p);
+          nuovaE({ tipo: 'testo', x: w.x, y: w.y, h, testo: t, ang: a, lav: [{ op: 'incisione', prof: p }] }); chiudi();
+        };
+        box.append(el('div', { class: 'cad-dg-testa' }, [el('b', { class: 'cad-dg-tit', testo: 'Testo da incidere' }), el('button', { class: 'cad-dg-x', id: 'cad-testo-x', type: 'button', 'aria-label': 'Chiudi', testo: '\u2715', onclick: chiudi })]),
+          el('label', { class: 'cad-mod-c' }, [el('span', { testo: 'Testo (lettere maiuscole, numeri e - . , : / + = ( ) % #)' }), i1]), l2, l3, l4, msg, el('button', { class: 'pul cad-dg-ok', id: 'cad-testo-ok', type: 'button', testo: 'Crea il testo', onclick: crea }));
+        cv.parentNode.parentNode.appendChild(box);
+      };
       const bMod = el('button', { class: 'cad-b', id: 'cad-modifica', 'aria-label': 'Modifica: sposta, ruota, specchia, serie, parallela', html: icoSvg('<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 7l3 3"/>') + '<span>Modifica</span>', onclick: () => apriModifica() });
       // layer: mostra/nascondi
       const barraLayer = el('div', { class: 'cad-sub cad-layer', role: 'group', 'aria-label': 'Layer del disegno' });
@@ -960,12 +986,14 @@
       azioni.append(bUndo, bRedo, bDigita, bMod, bQuote, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
 
       // ----- pannello: lavorazioni dell'entita scelta, dati del pezzo, crea -----
-      const OP_TESTO = { contorno: ['Contorno', 'Taglia lungo la linea con G41/G42'], tasca: ['Tasca', 'Svuota l\'interno'], foro: ['Foro', 'Centrino, punta e smusso'], maschio: ['Maschio', 'Foro filettato'], alesato: ['Alesato', 'Foro con alesatore'], asola: ['Asola', 'Fresa a spirale lungo la linea'] };
+      const OP_TESTO = { isola: ['Isola', 'Resta in piedi dentro una tasca'], incisione: ['Incisione', 'Linee a profondita fissa con una fresa piccola'], contorno: ['Contorno', 'Taglia lungo la linea con G41/G42'], tasca: ['Tasca', 'Svuota l\'interno'], foro: ['Foro', 'Centrino, punta e smusso'], maschio: ['Maschio', 'Foro filettato'], alesato: ['Alesato', 'Foro con alesatore'], asola: ['Asola', 'Fresa a spirale lungo la linea'] };
       function nuovaLav(e, op) {
         const l = { op };
         if (op === 'contorno') { l.prof = Number(S.fz) > 0 ? num(S.fz) : 10; l.lato = e.tipo === 'poli' && !e.chiuso ? 'sinistra' : 'esterno'; }
         else if (op === 'tasca') l.prof = Math.min(6, num(S.fz) || 6);
         else if (op === 'asola') l.prof = Math.min(5, num(S.fz) || 5);
+        else if (op === 'incisione') l.prof = 0.3;
+        else if (op === 'isola') { /* niente da scrivere: l'altezza e la profondita della tasca */ }
         else if (op === 'maschio') { l.passante = true; l.passo = String(O.passoGrosso(e.tipo === 'cerchio' ? 2 * e.r : 8) || 1.25); }
         else { l.passante = true; if (e.tipo === 'punto') l.d = 6.8; }
         return l;
@@ -1013,10 +1041,15 @@
         if (e.tipo === 'rett') { campo('x0', 'X sinistra', e.x0, 'mm', x => { e.x0 = x; }); campo('y0', 'Y sotto', e.y0, 'mm', x => { e.y0 = x; }); campo('x1', 'X destra', e.x1, 'mm', x => { e.x1 = x; }); campo('y1', 'Y sopra', e.y1, 'mm', x => { e.y1 = x; }); campo('r', 'Raggio degli angoli', e.r || 0, 'R', x => { e.r = Math.max(0, x); }); }
         else if (e.tipo === 'cerchio') { campo('cx', 'Centro X', e.cx, 'mm', x => { e.cx = x; }); campo('cy', 'Centro Y', e.cy, 'mm', x => { e.cy = x; }); campo('dd', 'Diametro Ø', e.r * 2, 'mm', x => { if (x > 0) e.r = x / 2; }); }
         else if (e.tipo === 'punto') { campo('x', 'X', e.x, 'mm', x => { e.x = x; }); campo('y', 'Y', e.y, 'mm', x => { e.y = x; }); }
+        else if (e.tipo === 'testo') { campo('x', 'Inizio X', e.x, 'mm', x => { e.x = x; }); campo('y', 'Inizio Y', e.y, 'mm', x => { e.y = x; }); campo('h', 'Altezza delle lettere', e.h, 'mm', x => { if (x > 0) e.h = x; }); campo('ang', 'Angolo', e.ang || 0, 'gradi', x => { e.ang = x; }); campo('spazio', 'Spazio in piu tra le lettere', e.spazio || 0, 'mm', x => { e.spazio = x; }); }
         else if (e.tipo === 'asola') { campo('x1', 'Centro iniziale X', e.x1, 'mm', x => { e.x1 = x; }); campo('y1', 'Centro iniziale Y', e.y1, 'mm', x => { e.y1 = x; }); campo('x2', 'Centro finale X', e.x2, 'mm', x => { e.x2 = x; }); campo('y2', 'Centro finale Y', e.y2, 'mm', x => { e.y2 = x; }); campo('w', 'Larghezza', e.w, 'mm', x => { if (x > 0) e.w = x; }); }
         if (campi.length) {
           const pan = el('div', { class: 'pannello' }); box.appendChild(pan);
           A.modulo(pan, campi.map(c => ({ id: c.id, et: c.et, u: c.u })), v, id => { const c = campi.find(q => q.id === id), n = num(v[id]); if (isFinite(n) && c._agg) { ricorda(); c._agg(n); anteprima = null; A.salva(); disegna(); } });
+        }
+        if (e.tipo === 'testo') {
+          const tv = { testo: e.testo || '' };
+          A.modulo(box.appendChild(el('div', { class: 'pannello' })), [{ id: 'testo', et: 'Testo da incidere', sub: 'lettere maiuscole, numeri e - . , : / + = ( ) % #', tipo: 'testo' }], tv, () => { ricorda(); e.testo = String(tv.testo).slice(0, 60); anteprima = null; A.salva(); disegna(); });
         }
         if (e.tipo === 'poli') mostraProfilo(e, box);
         // spostamento fine con le frecce
@@ -1067,6 +1100,8 @@
             { id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = scelta dalla tabella utensili', u: 'mm' });
         } else if (l.op === 'tasca') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = la piu grande che ci sta', u: 'mm' });
         else if (l.op === 'asola') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = dalla tabella', u: 'mm' });
+        else if (l.op === 'incisione') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro della punta', sub: 'vuoto = dalla tabella', u: 'mm' });
+        else if (l.op === 'isola') { /* nessun campo */ }
         else {
           if (e.tipo === 'punto') campi.push({ id: 'd', et: l.op === 'maschio' ? 'Diametro del filetto' : 'Diametro del foro', u: 'mm' });
           campi.push({ id: 'passante', et: 'Foro passante', tipo: 'spunta' }, { id: 'prof', et: 'Profondita', sub: 'se non e passante', u: 'mm', se: q => !q.passante });
