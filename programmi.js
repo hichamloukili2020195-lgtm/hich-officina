@@ -528,10 +528,10 @@
   // lamature, fori a fresa, alesature, smusso d'imbocco e maschiatura, smussi, profili. Lo stesso utensile di seguito
   // non fa il cambio; un ordine che non si puo lavorare non si accetta.
   const ORDINE = { spianatura: 0, centrino: 1, puntaIns: 2, puntaMD: 3, lamatore: 4, tascaCircolare: 5, alesatore: 6, bareno: 6,
-    smussoMaschio: 7, maschio: 7.5, filettoFresa: 7.5, smussatore: 8, contorno: 9, profilo: 9, tasca: 9, tascaLibera: 8.5, asola: 9 };
+    smussoMaschio: 7, maschio: 7.5, filettoFresa: 7.5, smussatore: 8, contorno: 9, profilo: 9, tasca: 9, tascaLibera: 8.5, asola: 9, smussoBordo: 9.6 };
   const NOME_FASE = { spianatura: 'Spianatura', centrino: 'Centrinatura', puntaIns: 'Punta a inserti', puntaMD: 'Foratura', lamatore: 'Lamatura',
     tascaCircolare: 'Tasca circolare', alesatore: 'Alesatura', bareno: 'Barenatura', smussoMaschio: 'Smusso d\'imbocco', maschio: 'Maschiatura',
-    filettoFresa: 'Filetto a fresa', smussatore: 'Smusso', contorno: 'Contornatura', profilo: 'Profilo', tasca: 'Tasca', tascaLibera: 'Tasca libera', asola: 'Asola' };
+    filettoFresa: 'Filetto a fresa', smussatore: 'Smusso', contorno: 'Contornatura', profilo: 'Profilo', tasca: 'Tasca', tascaLibera: 'Tasca libera', asola: 'Asola', smussoBordo: 'Smusso dei bordi' };
   const PREFORO = ['puntaMD', 'puntaIns', 'tascaCircolare'];
   const DOPO_PREFORO = ['maschio', 'alesatore', 'bareno', 'filettoFresa', 'smussoMaschio'];
   /** Chiave dei punti di una fase (per sapere se due fasi lavorano gli stessi fori). */
@@ -541,6 +541,7 @@
   };
   /** Il tipo di una fase per l'ordine: l'utensile per i fori, la lavorazione per il resto. */
   function tipoFase(f, fasi) {
+    if (f.smussoBordo) return 'smussoBordo';
     if (f.op !== 'fori') return f.op;
     const t = f.tipoUt || 'puntaMD';
     if (t === 'smussatore') {

@@ -68,7 +68,8 @@
       if (gs.includes(43)) { z = p.Z; out.push('G0 Z' + numero(p.Z) + (p.M.includes(8) ? ' M8' : '')); continue; }
       if (gs.includes(96)) { s = p.S; out.push('G96 S' + numero(p.S) + (lims ? ' LIMS=' + numero(lims) : '') + (p.M.length ? ' ' + p.M.map(m => 'M' + m).join(' ') : '')); continue; }
       if (gs.includes(97) || (p.S !== undefined && !gs.length)) { s = p.S; out.push(r.replace(/\.(?=\s|$)/g, '')); continue; }
-      const ciclo = gs.find(g => [73, 81, 82, 83, 84, 85, 86].includes(g));
+      if (tornio && gs.some(g => g >= 70 && g <= 76) && !avvisi.some(t => /cicli fissi del tornio/.test(t))) avvisi.push('I cicli fissi del tornio (G70-G76) restano scritti come nel programma ISO: con questo linguaggio scegli il programma a passate.');
+      const ciclo = !tornio || !gs.some(g => g >= 70 && g <= 76) ? gs.find(g => [73, 81, 82, 83, 84, 85, 86].includes(g)) : undefined;
       if (ciclo) {
         const rtp = z !== null ? z : 50, sdis = p.R || 2, dp = p.Z;
         const ff = p.F !== undefined ? p.F : f;

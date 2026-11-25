@@ -448,6 +448,7 @@
     };
     const err = e => ({ errore: e, righe: [], percorso: [], avvisi: [] });
     const pos = v => v > 0;
+    const tx = v => String(Math.round(v * 1000) / 1000).replace('.', ',');   // numeri nei messaggi
     { const k = campoNonValido(c); if (k) return err('Il valore di "' + k + '" non e valido (numero infinito, non numerico o enorme).'); }
     if (!pos(c.dg)) return err('Diametro del grezzo mancante.');
     if (!pos(c.nmax)) return err('Giri massimi mancanti.');
@@ -590,15 +591,27 @@
       if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
       avvioG96();
       va(sic, s + 1, true, refrig.trim());
-      let z = s, passate = 0;
-      while (z > 1e-9 && passate < 500) {
-        z = Math.max(z - ap, 0);
-        va(null, z, true);
-        va(-0.8, null, false, 'F' + gc(c.f));
-        va(null, z + 1, true);
-        va(sic, null, true);
-        passate++;
-      }
+      let passate = 0;
+      const sfaccia = () => {
+        let z = s;
+        while (z > 1e-9 && passate < 500) {
+          z = Math.max(z - ap, 0);
+          va(null, z, true);
+          va(-0.8, null, false, 'F' + gc(c.f));
+          va(null, z + 1, true);
+          va(sic, null, true);
+          passate++;
+        }
+      };
+      if (c.metodo === 'ciclo') {
+        soloPercorso(sfaccia);
+        R.push('G72 W' + gc(ap) + ' R0.5');
+        R.push('G72 P100 Q200 U0 W0 F' + gc(c.f));
+        R.push('N100 G0 Z0');
+        R.push('N200 G1 X-0.8');
+        x0 = sic; z0 = s + 1;
+        avvisi.push('Ciclo fisso G72 (sgrossatura frontale) con la faccia da N100 a N200.');
+      } else sfaccia();
       avvisi.push(passate + ' passate fino a Z0, la punta supera il centro di 0.4 mm.');
     } else if (op === 'gola') {
       const { dg, dfondo, zg, b, w } = c;
@@ -632,7 +645,8 @@
       if (!pos(giriF)) return err('Giri al minuto mancanti.');
       if (giriF > c.nmax) return err('I giri superano il massimo impostato.');
       const trap = c.tipoFil === 'trapezio';
-      const h = trap ? 0.5 * p + (p <= 1.5 ? 0.15 : p <= 5 ? 0.25 : p <= 12 ? 0.5 : 1) : 0.613343 * p;
+      const h = pos(c.h) ? c.h : trap ? 0.5 * p + (p <= 1.5 ? 0.15 : p <= 5 ? 0.25 : p <= 12 ? 0.5 : 1) : 0.613343 * p;
+      const ang = c.ang > 0 ? Math.round(c.ang) : trap ? 30 : 60;
       const d2 = pos(c.d2) ? c.d2 : d;            // diametro alla fine: diverso = filetto conico
       const zA = Math.max(3 * p, 3);
       const dIn = d - (d2 - d) * zA / l;          // diametro allungato fino al punto di partenza
@@ -651,11 +665,11 @@
       if (c.metodo === 'ciclo') {
         soloPercorso(passate);
         const conico = Math.abs(d2 - d) > 1e-9;
-        R.push('G76 P01' + '00' + (trap ? '30' : '60') + ' Q50 R0.02');
+        R.push('G76 P01' + '00' + String(ang).padStart(2, '0') + ' Q50 R0.02');
         R.push('G76 X' + gc(d2 - 2 * h) + ' Z' + gc(-l) + (conico ? ' R' + gc((dIn - d2) / 2) : '') + ' P' + Math.round(h * 1000) + ' Q' + Math.round(h / Math.sqrt(np) * 1000) + ' F' + gc(p));
-        avvisi.push('Ciclo fisso G76 (P e Q in millesimi di mm, una passata di finitura, angolo ' + (trap ? 30 : 60) + '°).');
+        avvisi.push('Ciclo fisso G76 (P e Q in millesimi di mm, una passata di finitura, angolo ' + ang + '°).');
       } else passate();
-      avvisi.push((trap ? 'Trapezio' : 'Metrico') + (Math.abs(d2 - d) > 1e-9 ? ' conico (D' + gc(d) + ' a Z0, D' + gc(d2) + ' a Z' + gc(-l) + ')' : '') + ': profondita radiale ' + gc(h) + ' mm in ' + np + ' passate + 1 a vuoto.');
+      avvisi.push((c.nomeFil ? 'Filetto ' + c.nomeFil : trap ? 'Trapezio' : 'Metrico') + (Math.abs(d2 - d) > 1e-9 ? ' conico (D' + gc(d) + ' a Z0, D' + gc(d2) + ' a Z' + gc(-l) + ')' : '') + ': profondita radiale ' + gc(h) + ' mm in ' + np + ' passate + 1 a vuoto.');
       if (trap) avvisi.push('Trapezio: inserto con il profilo a 30°, passate leggere; con passi grandi meglio l\'entrata sul fianco.');
       avvisi.push('Lascia una gola di scarico o tieni conto della rampa di uscita del filetto.');
     } else if (op === 'interna') {
@@ -721,6 +735,83 @@
         avvisi.push('Ciclo fisso G74 (Q in millesimi di mm).');
       } else fora();
       avvisi.push(beccate + ' beccate fino a Z' + gc(-prof) + ' (profondita della punta, cono compreso).');
+    } else if (op === 'centrino' || op === 'alesaturaAsse' || op === 'maschiatura') {
+      // in asse: centrino, alesatore (entra e esce in lavoro), maschio (G32 avanti, M4, G32 indietro)
+      const prof = c.prof, giriF = Math.round(c.giri || 0);
+      if (!pos(prof)) return err('Profondita mancante.');
+      if (!pos(giriF)) return err('Giri al minuto mancanti.');
+      if (giriF > c.nmax) return err('I giri superano il massimo impostato.');
+      const zA = op === 'maschiatura' ? Math.max(5, 3 * (c.p || 1)) : zSic;
+      R.push('G97 S' + giriF + ' M3');
+      va(0, zA, true, refrig.trim());
+      if (op === 'maschiatura') {
+        if (!pos(c.p)) return err('Passo del maschio mancante.');
+        va(null, -prof, false, 'F' + gc(c.p));
+        R[R.length - 1] = R[R.length - 1].replace(/^G1/, c.codFiletto || 'G32');
+        R.push('M4');
+        va(null, zA, false, 'F' + gc(c.p));
+        R[R.length - 1] = R[R.length - 1].replace(/^G1/, c.codFiletto || 'G32');
+        R.push('M3');
+        avvisi.push('Maschio in asse con ' + (c.codFiletto || 'G32') + ' e inversione M4: serve un portamaschi compensato. Avanzamento = passo ' + tx(c.p) + ' mm/giro.');
+      } else {
+        if (!pos(c.f)) return err('Avanzamento mancante.');
+        va(null, -prof, false, 'F' + gc(c.f));
+        if (op === 'alesaturaAsse') { va(null, zSic, false); avvisi.push('Alesatore in asse: entra ed esce in lavoro.'); }
+        else { R.push('G4 X0.3'); va(null, zSic, true); avvisi.push('Centrino a Z' + tx(-prof) + '.'); }
+      }
+      va(null, zSic, true);
+    } else if (op === 'golaFrontale') {
+      // gola sulla faccia: lama assiale, X sul diametro esterno della lama, Z sullo spigolo che tocca la faccia
+      const { dInt, dEst, prof, w } = c;
+      if (!pos(dInt) || !pos(dEst) || dEst <= dInt) return err('Il diametro esterno della gola deve essere maggiore di quello interno.');
+      if (!pos(prof) || !pos(w)) return err('Profondita della gola e larghezza della lama mancanti.');
+      if (dEst - dInt < 2 * w - 1e-9) return err('La lama (' + gc(w) + ' mm) e piu larga della gola (' + gc((dEst - dInt) / 2) + ' mm).');
+      if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
+      avvioG96();
+      const xx = [], passo = 0.8 * w, xUlt = dInt + 2 * w;
+      for (let x = dEst; x > xUlt + 1e-9; x -= 2 * passo) xx.push(x);
+      xx.push(xUlt);
+      const q = pos(c.q) ? c.q : 2;
+      va(dEst, zSic, true, refrig.trim());
+      const affonda = () => xx.forEach(x => {
+        va(x, null, true);
+        let z = 0, k = 0;
+        while (z > -prof + 1e-9 && k++ < 200) { const zn = Math.max(z - q, -prof); if (z < 0) va(null, z + 0.3, true); va(null, zn, false, 'F' + gc(c.f)); va(null, 1, true); z = zn; }
+      });
+      if (c.metodo === 'ciclo') {
+        va(null, 1, true);
+        soloPercorso(affonda);
+        R.push('G74 R0.5');
+        R.push('G74 X' + gc(xUlt) + ' Z' + gc(-prof) + ' P' + Math.round(passo * 1000) + ' Q' + Math.round(q * 1000) + ' F' + gc(c.f));
+        x0 = dEst; z0 = 1;
+        avvisi.push('Ciclo fisso G74 per la gola frontale (P e Q in millesimi di mm).');
+      } else affonda();
+      va(null, zSic, true);
+      avvisi.push('Gola frontale da Ø' + tx(dInt) + ' a Ø' + tx(dEst) + ', profonda ' + tx(prof) + ': ' + xx.length + ' affondamenti. Serve una lama per gole frontali con il raggio adatto ai diametri.');
+    } else if (op === 'golaInterna') {
+      // gola dentro il foro: si entra al diametro del foro, si affonda verso l'esterno
+      const { dp, dfondo, zg, b, w } = c;
+      if (!pos(dp) || !pos(dfondo) || dfondo <= dp) return err('Il fondo della gola interna deve essere piu grande del foro.');
+      if (!pos(b) || !pos(w) || w > b + 1e-9) return err('Larghezza della gola e della lama non valide.');
+      if (!(zg < 0)) return err('La gola interna deve stare dentro il foro (Z negativa).');
+      if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
+      avvioG96();
+      const dentro = dp - 1, passo = 0.8 * w, zUlt = zg - (b - w), zz = [];
+      for (let z = zg; z > zUlt + 1e-9; z -= passo) zz.push(z);
+      zz.push(zUlt);
+      va(dentro, zSic, true, refrig.trim());
+      const affonda = () => zz.forEach(z => { va(null, z, true); va(dfondo, null, false, 'F' + gc(c.f)); va(dentro, null, true); });
+      if (c.metodo === 'ciclo') {
+        va(null, zg, true);
+        soloPercorso(affonda);
+        R.push('G75 R0.3');
+        R.push('G75 X' + gc(dfondo) + ' Z' + gc(zUlt) + ' P' + Math.round((dfondo - dp) / 2 * 1000) + ' Q' + Math.round(passo * 1000) + ' F' + gc(c.f));
+        x0 = dentro; z0 = zg;
+        avvisi.push('Ciclo fisso G75 per la gola interna.');
+      } else affonda();
+      va(dentro, null, true);
+      va(null, zSic, true);
+      avvisi.push('Gola interna Ø' + tx(dfondo) + ' larga ' + tx(b) + ' a Z' + tx(zg) + ' (fianco DESTRO della lama). Controlla che la lama entri nel foro Ø' + tx(dp) + '.');
     } else if (op === 'filettoInt') {
       const { d, p, l, n } = c;
       if (!pos(d) || !pos(p) || !pos(l)) return err('Diametro, passo e lunghezza mancanti.');
@@ -728,22 +819,34 @@
       const giriF = Math.round(c.giri || 0);
       if (!pos(giriF)) return err('Giri al minuto mancanti.');
       if (giriF > c.nmax) return err('I giri superano il massimo impostato.');
-      const h = 0.541266 * p, d1 = d - 1.082532 * p, dentro = d1 - 1;
-      if (dentro <= 0) return err('Diametro troppo piccolo per filettare all\'interno.');
-      R.push('G97 S' + giriF + ' M3');
+      // h profondita radiale, d1 nocciolo all'imbocco; conico (Rc, NPT): d2 = diametro in fondo, piu piccolo
+      const h = pos(c.h) ? c.h : 0.541266 * p, d1 = pos(c.d1) ? c.d1 : d - 1.082532 * p;
+      const d2 = pos(c.d2) ? c.d2 : d, conico = Math.abs(d2 - d) > 1e-9;
       const zA = Math.max(3 * p, 3);
+      const dIn = d + (d - d2) * zA / l;                  // diametro allungato fino al punto di partenza
+      const nIn = d1 + (dIn - d), nFin = d1 - (d - d2);    // nocciolo all'inizio e in fondo
+      const dentro = Math.min(nIn, nFin) - 1;
+      if (dentro <= 0) return err('Diametro troppo piccolo per filettare all\'interno.');
+      const ang = c.ang > 0 ? Math.round(c.ang) : 60;
+      R.push('G97 S' + giriF + ' M3');
       va(dentro, zA, true, refrig.trim());
       const prof = passateFiletto(h, np);
       prof.push(h);
-      prof.forEach((pr, i) => {
+      const passate = () => prof.forEach((pr, i) => {
         if (i === np) R.push('(PASSATA A VUOTO)');
-        va(d1 + 2 * pr, null, true);
-        va(null, -l, false, 'F' + gc(p));
+        va(nIn + 2 * pr, null, true);
+        va(nFin + 2 * pr, -l, false, 'F' + gc(p));
         R[R.length - 1] = R[R.length - 1].replace(/^G1/, c.codFiletto || 'G32');
         va(dentro, null, true);
         va(null, zA, true);
       });
-      avvisi.push('Si parte dal nocciolo D1 ' + gc(d1) + ' fino al diametro ' + gc(d) + ', ' + np + ' passate + 1 a vuoto.');
+      if (c.metodo === 'ciclo') {
+        soloPercorso(passate);
+        R.push('G76 P01' + '00' + String(ang).padStart(2, '0') + ' Q50 R0.02');
+        R.push('G76 X' + gc(d2) + ' Z' + gc(-l) + (conico ? ' R' + gc((nIn - nFin) / 2) : '') + ' P' + Math.round(h * 1000) + ' Q' + Math.round(h / Math.sqrt(np) * 1000) + ' F' + gc(p));
+        avvisi.push('Ciclo fisso G76 interno (P e Q in millesimi di mm, angolo ' + ang + '°).');
+      } else passate();
+      avvisi.push((c.nomeFil ? 'Filetto interno ' + c.nomeFil + ': ' : '') + 'si parte dal nocciolo D1 ' + gc(d1) + ' fino al diametro ' + gc(d) + (conico ? ' (conico, Ø' + gc(d2) + ' in fondo)' : '') + ', ' + np + ' passate + 1 a vuoto.');
     } else if (op === 'profilo') {
       if (!pos(c.ap)) return err('Profondita di passata mancante.');
       if (!pos(c.vc) || !pos(c.f)) return err('Velocita di taglio e avanzamento mancanti.');
@@ -766,12 +869,21 @@
       const fine = dfin > 0 ? dfin : -1;
       let x = dg + 1, k = 0;
       va(x, null, true);
-      while (x > fine + 1e-9 && k++ < 1000) {
-        const xn = Math.max(x - 2 * q, fine);
-        va(xn, null, false, 'F' + gc(c.f));
-        if (xn > fine + 1e-9) { va(xn + 1, null, true); va(xn, null, true); }
-        x = xn;
-      }
+      const tronca = () => {
+        while (x > fine + 1e-9 && k++ < 1000) {
+          const xn = Math.max(x - 2 * q, fine);
+          va(xn, null, false, 'F' + gc(c.f));
+          if (xn > fine + 1e-9) { va(xn + 1, null, true); va(xn, null, true); }
+          x = xn;
+        }
+      };
+      if (c.metodo === 'ciclo') {
+        soloPercorso(tronca);
+        R.push('G75 R0.5');
+        R.push('G75 X' + gc(fine) + ' Z' + gc(zt) + ' P' + Math.round(q * 1000) + ' F' + gc(c.f));
+        x0 = dg + 1; z0 = zt;
+        avvisi.push('Ciclo fisso G75 per la troncatura (P in millesimi di mm).');
+      } else tronca();
       va(dg + 2, null, true);
       va(null, zSic, true);
       avvisi.push('Troncatura a Z' + gc(zt) + ' (fianco DESTRO della lama), beccate di ' + gc(q) + ' mm sul raggio fino a ' + (dfin > 0 ? 'D' + gc(dfin) : 'oltre il centro') + '. Vicino al centro i giri arrivano al massimo: tieni basso il limite.');

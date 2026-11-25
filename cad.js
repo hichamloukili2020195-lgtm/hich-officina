@@ -25,6 +25,12 @@
       const x0 = Math.min(num(e.x0), num(e.x1)), x1 = Math.max(num(e.x0), num(e.x1)), y0 = Math.min(num(e.y0), num(e.y1)), y1 = Math.max(num(e.y0), num(e.y1)), R = num(e.r) || 0;
       return { punti: [{ x: x0, y: y0, raccordo: R }, { x: x1, y: y0, raccordo: R }, { x: x1, y: y1, raccordo: R }, { x: x0, y: y1, raccordo: R }], chiuso: true };
     }
+    if (e.tipo === 'asola') {
+      const x1 = num(e.x1), y1 = num(e.y1), x2 = num(e.x2), y2 = num(e.y2), r = num(e.w) / 2, L = Math.hypot(x2 - x1, y2 - y1);
+      if (!(r > 0) || !(L > 1e-9)) return null;
+      const ux = (x2 - x1) / L, uy = (y2 - y1) / L, nx = -uy * r, ny = ux * r;
+      return { punti: [{ x: x1 - nx, y: y1 - ny, tratto: 'ccw', r }, { x: x2 - nx, y: y2 - ny }, { x: x2 + nx, y: y2 + ny, tratto: 'ccw', r }, { x: x1 + nx, y: y1 + ny }], chiuso: true };
+    }
     if (e.tipo === 'cerchio') {
       const cx = num(e.cx), cy = num(e.cy), r = num(e.r);
       return { punti: [{ x: cx + r, y: cy, tratto: 'ccw', r }, { x: cx - r, y: cy, tratto: 'ccw', r }], chiuso: true };
@@ -65,7 +71,7 @@
     if (!(fz > 0)) return { errore: 'Scrivi lo spessore del pezzo.' };
     const note = { testi: [], daControllare: new Set() };
     const base = { zSic: ctx.zSic || 50, zR: ctx.zR || 2, refrig: ctx.refrig, g43: ctx.g43 };
-    const fasi = [], gruppiFori = new Map(), tasche = [];
+    const fasi = [], gruppiFori = new Map(), tasche = [], smussi = [];
     const fresa = (d, z) => { const dt = O.datiTaglio(mt, { tipo: 'fresa', d, z, nmax }) || {}; return { n: dt.n, f: dt.f, ap: dt.ap, ae: dt.ae && d ? Math.round(dt.ae / d * 100) : 50 }; };
     const frese = tab.filter(u => u.tipo === 'fresa' && Number(u.d) > 0).sort((a, b) => Number(b.d) - Number(a.d));
     const utFresa = (dDato, max, prop) => {
@@ -93,6 +99,7 @@
           gruppiFori.get(chiave).punti.push([r3(c.x), r3(c.y)]);
           return;
         }
+        if (num(lav.smusso) > 0) smussi.push({ e, k, lav, prof: num(lav.prof) });
         // ----- asola -----
         if (op === 'asola') {
           const w = num(e.w);
@@ -140,6 +147,14 @@
       fasi.push(...p.fasi.filter(f => f.op !== 'spianatura' && f.op !== 'contorno'));
       // lamature: lamatore sul foro gia fatto, con sosta sul fondo
       gruppi.filter(g => g.lamD > 0).forEach(g => {
+        const pr0 = g.lamProf > 0 ? g.lamProf : r3(g.d * 0.6);
+        if (tab.length && !tab.some(u => u.tipo === 'lamatore' && Math.abs(Number(u.d) - g.lamD) < 0.05)) {
+          // nessun lamatore di quel diametro nella tabella: la lamatura si fa a fresa a elica
+          const u = utFresa(0, g.lamD * 0.6, { d: Math.min(10, Math.floor(g.lamD * 0.6)), z: 3, t: 7 }), dt = fresa(u.d, u.z);
+          g.punti.forEach((q, i) => fasi.push({ op: 'tascaCircolare', titolo: 'Lamatura Ø' + r3(g.lamD) + ' a fresa ' + (i + 1) + ' D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, cx: q[0], cy: q[1], dt: g.lamD, prof: pr0, ap: Math.max(0.5, Math.min(dt.ap || 2, pr0)), ae: 40, sovra: 0.1, finitura: true }) }));
+          note.testi.push('Lamatura Ø' + r3(g.lamD) + ': nessun lamatore di quel diametro nella tabella, si fa a fresa a elica.');
+          return;
+        }
         const dt = O.datiTaglio(mt, { tipo: 'lamatore', d: g.lamD, nmax }) || {};
         const t = O.trovaT(tab, ['lamatore'], g.lamD, 11, note);
         const pr = g.lamProf > 0 ? g.lamProf : r3(g.d * 0.6);
@@ -162,9 +177,23 @@
       fasi.push({ op: 'profilo', titolo: 'Finitura tasca D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti: punti.map(p => Object.assign({}, p)), chiuso: true, lato: 'interno', prof: t.prof, ap, soloFondo: true }) });
     });
     if (nErrore) return { errore: nErrore };
+    // smussi dei bordi (tasche, asole, contorni) con lo smussatore a 90°: punta sotto lo smusso di k, percorso spostato di k
+    smussi.forEach(({ e, k, lav, prof }) => {
+      const c = num(lav.smusso), pr = profiloDi(e);
+      if (!pr || !pr.chiuso) { note.testi.push('Elemento ' + (k + 1) + ': lo smusso si fa solo sui profili chiusi.'); return; }
+      const kk = Math.min(1, r3(prof - c - 0.2));
+      if (!(kk >= 0.2)) { note.testi.push('Elemento ' + (k + 1) + ': smusso C' + c + ' troppo grande per la profondita ' + prof + ': saltato.'); return; }
+      const lato = lav.op === 'contorno' ? (lav.lato === 'interno' ? 'interno' : 'esterno') : 'interno';
+      const dt = O.datiTaglio(mt, { tipo: 'smussatore', d: 16, nmax }) || {};
+      const t = O.trovaT(tab, ['smussatore'], 0, 4, note);
+      const stacco = lav.op === 'contorno' && lato === 'esterno';
+      fasi.push({ op: 'profilo', smussoBordo: true, staccoFinale: stacco, titolo: 'Smusso C' + c + ' ' + (NOMI_LAV[lav.op] || lav.op).toLowerCase() + ' ' + (k + 1) + ' T' + t,
+        c: Object.assign({}, base, { t, d: r3(2 * kk), utTipo: 'smussatore', n: dt.n || 3000, f: dt.f || 300, punti: pr.punti.map(p => Object.assign({}, p)), chiuso: true, lato, prof: r3(c + kk), ap: r3(c + kk) }) });
+    });
+    if (smussi.length) note.testi.push('Smussi a 45° con lo smussatore a punta: la punta scende sotto lo smusso, la parte che taglia e a meta cono.');
     if (!fasi.length) return { errore: 'Nessuna lavorazione: scegli un elemento e aggiungi una lavorazione.' };
     // due utensili diversi non possono avere lo stesso numero: si rinumera il secondo (i numeri della tabella restano)
-    const chiaveUt = f => (f.op === 'fori' ? f.tipoUt || 'puntaMD' : 'fresa') + '|' + r3(Number(f.c.d));
+    const chiaveUt = f => { const tp = f.op === 'fori' ? f.tipoUt || 'puntaMD' : f.c.utTipo || 'fresa'; return tp + '|' + (tp === 'smussatore' ? 'S' : r3(Number(f.c.d))); };
     const perT = new Map(), perChiave = new Map();
     fasi.forEach(f => { const k = chiaveUt(f), t = Number(f.c.t); if (!perT.has(t)) { perT.set(t, k); if (!perChiave.has(k)) perChiave.set(k, t); } });
     fasi.forEach(f => {

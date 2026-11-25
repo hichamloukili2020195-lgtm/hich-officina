@@ -6,6 +6,7 @@
   const A = window.App, O = A.O, el = A.el, fmt = A.fmt;
   const col = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
   const num = v => { if (v === '' || v === null || v === undefined) return NaN; return Number(String(v).replace(',', '.')); };
+  const r1 = x => Math.round(x * 10) / 10;
   const PASSI = [['grezzo', 'Grezzo'], ['forma', 'Forma'], ['lav', 'Lavorazioni'], ['prog', 'Programma']];
   const svg = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
   const IC = {
@@ -62,7 +63,7 @@
         if (i >= 2) { prop = calcolaProposta(); if (prop.errore) { S.passo = 1; A.salva(); tutto(); A.avviso(prop.errore); return; } }
         S.passo = i; A.salva(); A.chiudiTastierino(); tutto(); window.scrollTo(0, 0);
       };
-      const ctx = () => { const I = A.imp(); return { mat: A.materiale(S.mat || 0), tab: A.tabellaUt ? A.tabellaUt() : [], nmax: S.modo === 'tornio' ? I.nmaxTornio : I.nmaxFresa, zSic: I.zSic, zR: I.zR, refrig: I.refrig, g43: I.g43, codLimite: I.codLimite, codFiletto: I.codFiletto }; };
+      const ctx = () => { const I = A.imp(); return { mat: A.materiale(S.mat || 0), tab: A.tabellaUt ? A.tabellaUt() : [], nmax: S.modo === 'tornio' ? I.nmaxTornio : I.nmaxFresa, zSic: I.zSic, zR: I.zR, refrig: I.refrig, g43: I.g43, codLimite: I.codLimite, codFiletto: I.codFiletto, metodo: S.modo === 'tornio' && L().metodo === 'ciclo' ? 'ciclo' : 'passate' }; };
       const calcolaProposta = () => O.proponiLavoro(Object.assign({ modo: S.modo }, L()), ctx());
 
       // ----- disegno del pezzo (si aggiorna mentre scrivi) -----
@@ -104,7 +105,7 @@
           zone.push({ x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: 0, y1: H, i });
           if (i === scelta) { g.fillStyle = col('--avviso'); g.globalAlpha = 0.18; g.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0), H); g.globalAlpha = 1; }
           if (num(t.fil) > 0 && t.tipo === 'cil') { g.strokeStyle = col('--ok'); g.lineWidth = 1.2; g.beginPath(); for (let zz = za, k = 0; zz > zb + (num(t.gola) || 0); zz -= Math.max(num(t.fil), 3 / sc) / 2, k++) { const y = Y(d / 2 - (k % 2 ? Math.min(0.6 * num(t.fil), d * 0.15) : 0)); k ? g.lineTo(X(zz), y) : g.moveTo(X(zz), y); } g.stroke(); }
-          if (Math.abs(x1 - x0) > 34) quota(g, 'Ø' + fmt(d, 2) + (t.toll ? ' ' + t.toll : '') + (num(t.fil) > 0 ? ' M' : ''), (x0 + x1) / 2, Y(d / 2) - 10, i === scelta ? col('--avviso') : null);
+          if (Math.abs(x1 - x0) > 34) quota(g, 'Ø' + fmt(d, 2) + (t.toll ? ' ' + t.toll : '') + (num(t.fil) > 0 ? ' ' + (t.filNome || 'M') : ''), (x0 + x1) / 2, Y(d / 2) - 10, i === scelta ? col('--avviso') : null);
           if (Math.abs(x1 - x0) > 24) quota(g, fmt(l, 2), (x0 + x1) / 2, Y(-d / 2) + 12, col('--tenue'));
           g.fillStyle = i === scelta ? col('--avviso') : col('--tenue'); g.font = '700 10px system-ui'; g.fillText(String(i + 1), (x0 + x1) / 2, H - 4);
         });
@@ -220,6 +221,18 @@
           el('button', { class: 'icona-pul', 'aria-label': 'Elimina ' + w.nome, html: A.icona('cestino'), onclick: async () => { if (!(await A.conferma('Eliminare il lavoro?', '"' + w.nome + '" viene tolto dall\'elenco.', 'Elimina', true))) return; A.mem.lavori = salvati.filter(x => x.id !== w.id); A.salva(); tutto(); } })])));
       };
       const interruttore = (testo, on, cambia, id) => el('button', { class: 'lav-int' + (on ? ' on' : ''), role: 'switch', 'aria-checked': on ? 'true' : 'false', id, onclick: () => cambia(!on) }, [el('span', { class: 't', testo }), el('span', { class: 'sw', 'aria-hidden': 'true' })]);
+      /** Tutti i filetti del tornio, per famiglia: o e il tratto (o l'interno) con fil/filFam/filNome. */
+      const sceltaFiletto = (o, id, scegli) => {
+        const fam = O.filettiTornio ? O.filettiTornio() : [];
+        const sel = el('select', { class: 'lav-altro-fil', id, 'aria-label': 'Altro filetto' }, [el('option', { value: '', testo: 'Altro filetto (gas, NPT, UNC, Whitworth, trapezio…)' })].concat(fam.map(f => {
+          const g = document.createElement('optgroup'); g.label = f.nomeFam;
+          f.righe.forEach(r => g.appendChild(el('option', { value: f.fam + '|' + r.nome, testo: r.nome + ' · Ø' + fmt(r.d, 3) + ' · passo ' + fmt(r.p, 3) })));
+          return g;
+        })));
+        sel.value = o.filFam && o.filNome ? o.filFam + '|' + o.filNome : '';
+        sel.addEventListener('change', () => { if (!sel.value) return; const [fm, nome] = sel.value.split('|'); const f = fam.find(x => x.fam === fm), r = f && f.righe.find(x => x.nome === nome); if (r) scegli({ fam: fm, nome, d: r.d, p: r.p }); });
+        return el('div', { class: 'ctrl' }, [sel]);
+      };
       const chips = (valori, attuale, cambia, etichetta) => el('div', { class: 'chips lav-chips', role: 'group', 'aria-label': etichetta }, valori.map(([v, t]) => el('button', { class: 'chip' + (String(attuale) === String(v) ? ' attiva' : ''), testo: t, onclick: () => cambia(v) })));
 
       // ----- passo 2: forma -----
@@ -235,7 +248,7 @@
       const descriviTratto = t => {
         const d = fmt(num(t.d), 3), l = fmt(num(t.l), 3);
         const base = t.tipo === 'cono' ? 'Cono fino a Ø' + d + ' · L ' + l : t.tipo === 'arco' ? 'Arco R' + fmt(num(t.r), 2) + ' fino a Ø' + d + ' · L ' + l : 'Ø ' + d + ' · L ' + l;
-        const extra = [num(t.fil) > 0 ? 'filetto M' + d + 'x' + fmt(num(t.fil), 2) : '', num(t.gola) > 0 ? 'gola ' + fmt(num(t.gola), 2) : '', t.toll || '', t.spigolo || ''].filter(Boolean).join(' · ');
+        const extra = [num(t.fil) > 0 ? 'filetto ' + (t.filNome || 'M' + d + 'x' + fmt(num(t.fil), 2)) : '', num(t.gola) > 0 ? 'gola ' + fmt(num(t.gola), 2) : '', t.toll || '', t.spigolo || ''].filter(Boolean).join(' · ');
         return [base, extra];
       };
       const passoFormaTornio = () => {
@@ -255,7 +268,8 @@
             if ((t.tipo || 'cil') === 'cil') {
               const d = num(t.d), pg = O.passoGrosso(d);
               const passi = Array.from(new Set([pg].concat(O.FILETTI_FINI.filter(f => f[0] === d).map(f => f[1])))).filter(p => p > 0);
-              ed.append(el('div', { class: 'lav-et', testo: 'Filetto' }), chips([['', 'No']].concat(passi.map(p => [p, 'M' + fmt(d) + 'x' + fmt(p)])), t.fil || '', v => { if (v) { t.fil = v; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * v * 10) / 10); } else delete t.fil; ri(); }, 'Filetto'));
+              ed.append(el('div', { class: 'lav-et', testo: 'Filetto' }), chips([['', 'No']].concat(passi.map(p => [p, 'M' + fmt(d) + 'x' + fmt(p)])), t.filFam ? '' : (t.fil || ''), v => { delete t.filFam; delete t.filNome; if (v) { t.fil = v; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * v * 10) / 10); } else delete t.fil; ri(); }, 'Filetto'));
+              ed.appendChild(sceltaFiletto(t, 'lav-altro-fil-' + i, F => { t.d = F.d; t.fil = F.p; t.filFam = F.fam; t.filNome = F.nome; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * F.p * 10) / 10); ri(); }));
               ed.append(el('div', { class: 'lav-et', testo: 'Gola di scarico alla fine' }), chips([['', 'No'], [3, '3 mm'], [4, '4 mm'], [5, '5 mm'], [6, '6 mm']], t.gola || '', v => { if (v) t.gola = v; else delete t.gola; ri(); }, 'Gola'));
               ed.append(el('div', { class: 'lav-et', testo: 'Tolleranza' }), chips([['', 'No'], ['h6', 'h6'], ['h7', 'h7'], ['g6', 'g6'], ['f7', 'f7'], ['k6', 'k6'], ['js6', 'js6']], t.toll || '', v => { if (v) t.toll = v; else delete t.toll; ri(); }, 'Tolleranza'));
               const tutte = [];
@@ -279,12 +293,31 @@
         } }));
         corpo.appendChild(el('div', { class: 'sez', testo: 'Testa e fine' }));
         corpo.append(el('div', { class: 'lav-et', testo: 'Smusso sulla testa' }), chips([['', 'Vivo'], ['C0.5', 'C0,5'], ['C1', 'C1'], ['C2', 'C2']], T.smussoTesta === undefined ? 'C0.5' : T.smussoTesta, v => { T.smussoTesta = v; A.salva(); tutto(); }, 'Smusso di testa'));
-        const box = el('div', { class: 'lav-campi' }, [A.campoNum(T, 'foroD', 'Foro in asse Ø (vuoto = no)', 'mm', (k, f) => { A.salva(); if (f) tutto(); })]);
+        const agg2 = (k, f) => { A.salva(); if (f) tutto(); };
+        const box = el('div', { class: 'lav-campi' }, [A.campoNum(T, 'foroD', T.foroTipo === 'maschio' ? 'Foro filettato M' : 'Foro in asse Ø (vuoto = no)', 'mm', agg2)].concat(num(T.foroD) > 0 ? [A.campoNum(T, 'foroP', 'Profondita del foro', 'mm', agg2)] : []));
+        corpo.append(box);
         if (num(T.foroD) > 0) {
-          T.interno = T.interno || {};
-          corpo.append(box, el('div', { class: 'lav-et', testo: 'Barenatura interna (vuoto = solo il foro)' }), el('div', { class: 'lav-campi' }, [A.campoNum(T.interno, 'di', 'Ø finito del foro', 'mm', (k, f) => { A.salva(); if (f) tutto(); }), A.campoNum(T.interno, 'l', 'Profondita', 'mm', (k, f) => { A.salva(); if (f) tutto(); })]));
-          if (num(T.interno.di) > 0) corpo.append(el('div', { class: 'lav-et', testo: 'Filetto interno' }), chips([['', 'No'], [O.passoGrosso(num(T.interno.di)) || 1.5, 'M' + fmt(num(T.interno.di)) + 'x' + fmt(O.passoGrosso(num(T.interno.di)) || 1.5)]], T.interno.fil || '', v => { if (v) T.interno.fil = v; else delete T.interno.fil; A.salva(); tutto(); }, 'Filetto interno'));
-        } else corpo.append(box);
+          const dF = num(T.foroD), tipoF = T.foroTipo === 'maschio' || T.foroTipo === 'alesato' ? T.foroTipo : 'foro';
+          corpo.append(chips([['foro', 'Liscio'], ['maschio', 'Filettato'], ['alesato', 'Alesato']], tipoF, v => { T.foroTipo = v; if (v === 'maschio' && !(num(T.foroPasso) > 0)) T.foroPasso = O.passoGrosso(dF) || 1.5; A.salva(); tutto(); }, 'Foro in asse'));
+          if (tipoF === 'maschio') {
+            const passi = Array.from(new Set([O.passoGrosso(dF)].concat(O.FILETTI_FINI.filter(f => f[0] === dF).map(f => f[1])))).filter(q => q > 0);
+            corpo.append(el('div', { class: 'lav-et', testo: 'Passo del maschio' }), chips(passi.map(q => [q, 'M' + fmt(dF) + 'x' + fmt(q)]), num(T.foroPasso) || passi[0], v => { T.foroPasso = v; A.salva(); tutto(); }, 'Passo del maschio'));
+          } else if (tipoF === 'alesato') corpo.append(el('div', { class: 'lav-et', testo: 'Tolleranza del foro' }), chips([['H7', 'H7'], ['H8', 'H8'], ['G7', 'G7']], T.foroToll || 'H7', v => { T.foroToll = v; A.salva(); tutto(); }, 'Tolleranza del foro'));
+          else {
+            T.interno = T.interno || {};
+            const I = T.interno;
+            corpo.append(el('div', { class: 'lav-et', testo: 'Barenatura interna (vuoto = solo il foro)' }), el('div', { class: 'lav-campi' }, [A.campoNum(I, 'di', 'Ø finito del foro', 'mm', agg2), A.campoNum(I, 'l', 'Profondita', 'mm', agg2)]));
+            if (num(I.di) > 0) {
+              corpo.append(el('div', { class: 'lav-et', testo: 'Filetto interno' }), chips([['', 'No'], [O.passoGrosso(num(I.di)) || 1.5, 'M' + fmt(num(I.di)) + 'x' + fmt(O.passoGrosso(num(I.di)) || 1.5)]], I.filFam ? '' : (I.fil || ''), v => { delete I.filFam; delete I.filNome; if (v) I.fil = v; else delete I.fil; A.salva(); tutto(); }, 'Filetto interno'),
+                sceltaFiletto(I, 'lav-altro-fil-int', F => { I.di = F.d; I.fil = F.p; I.filFam = F.fam; I.filNome = F.nome; A.salva(); tutto(); }));
+              if (num(I.fil) > 0) corpo.append(interruttore('Gola di scarico in fondo al filetto', I.scarico !== false, v => { I.scarico = v; A.salva(); tutto(); }, 'lav-scarico-int'));
+              corpo.append(interruttore('Gola interna', !!I.golaOn, v => { I.golaOn = v; I.gola = I.gola || { z: 5, b: 3, d: r1(num(I.di) + 3) }; A.salva(); tutto(); }, 'lav-gola-int'));
+              if (I.golaOn) { I.gola = I.gola || {}; corpo.append(el('div', { class: 'lav-campi' }, [A.campoNum(I.gola, 'z', 'Distanza dalla faccia', 'mm', agg2), A.campoNum(I.gola, 'b', 'Larghezza', 'mm', agg2), A.campoNum(I.gola, 'd', 'Ø del fondo', 'mm', agg2)])); }
+            }
+          }
+        }
+        corpo.append(interruttore('Gola frontale sulla faccia', !!T.golaFrontOn, v => { T.golaFrontOn = v; const d0 = num((T.tratti[0] || {}).d) || 30; T.golaFront = T.golaFront || { dInt: r1(d0 * 0.5), dEst: r1(d0 * 0.75), prof: 2 }; A.salva(); tutto(); }, 'lav-gola-front'));
+        if (T.golaFrontOn) { T.golaFront = T.golaFront || {}; corpo.append(el('div', { class: 'lav-campi' }, [A.campoNum(T.golaFront, 'dInt', 'Ø interno', 'mm', agg2), A.campoNum(T.golaFront, 'dEst', 'Ø esterno', 'mm', agg2), A.campoNum(T.golaFront, 'prof', 'Profondita', 'mm', agg2)])); }
         corpo.append( interruttore('Troncatura alla fine', !!T.troncatura, v => { T.troncatura = v; A.salva(); tutto(); }, 'lav-tronca'));
       };
       const passoFormaFresa = () => {
@@ -327,6 +360,7 @@
           if (f.foro !== 'maschio') ed.append(interruttore('Lamatura', num(f.lamD) > 0, v => { if (v) { f.lamD = Math.round(num(f.d) * 1.6 * 2) / 2; f.lamProf = Math.round(num(f.d) * 0.6 * 2) / 2; } else { delete f.lamD; delete f.lamProf; } ri(); }), num(f.lamD) > 0 ? campi([['lamD', 'Lamatura Ø'], ['lamProf', 'Profondita lamatura']]) : el('span'));
           if (f.passante === false) ed.append(campi([['prof', 'Profondita']]));
         }
+        if (f.tipo !== 'profilo' || (f.lav || 'contorno') === 'tasca' || f.lato !== 'centro') ed.append(el('div', { class: 'lav-et', testo: 'Smusso dei bordi' }), chips([['', 'No'], [0.5, 'C0,5'], [1, 'C1'], [2, 'C2']], f.smusso || '', v => { if (v) f.smusso = v; else delete f.smusso; ri(); }, 'Smusso dei bordi'));
         return ed;
       };
 
@@ -335,6 +369,10 @@
         if (!prop) prop = calcolaProposta();
         if (prop.errore) { corpo.appendChild(el('p', { class: 'errore', role: 'alert', testo: prop.errore })); return; }
         const sc = L().scelte = L().scelte || {}; sc.spente = sc.spente || {}; sc.correzioni = sc.correzioni || {};
+        if (prop.modo === 'tornio') {
+          corpo.append(el('div', { class: 'lav-et', testo: 'Come scrivere il programma' }), chips([['passate', 'A passate'], ['ciclo', 'Con cicli fissi']], L().metodo === 'ciclo' ? 'ciclo' : 'passate', v => { L().metodo = v; prop = null; A.salva(); tutto(); }, 'Metodo del programma'));
+          corpo.appendChild(el('p', { class: 'leggenda', testo: L().metodo === 'ciclo' ? 'Cicli fissi: G71/G70 profilo, G72 sfacciatura, G74 foratura, G75 gole e troncatura, G76 filetti. Programma corto, da controllare sul manuale della macchina.' : 'A passate: ogni movimento scritto per esteso, va bene su ogni controllo.' }));
+        }
         corpo.appendChild(el('p', { class: 'leggenda', testo: 'Proposte dalle regole di officina. Spegni quelle che non servono; giri e avanzamento si possono correggere.' }));
         prop.fasi.forEach((f, i) => {
           const on = !sc.spente[f.chiave];

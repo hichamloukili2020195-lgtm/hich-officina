@@ -599,11 +599,11 @@ prova('lavoro guidato: tornio a tratti, fresa a forme, fasi spente e corrette', 
   const p = O.proponiLavoro(T, { mat: mt, nmax: 3000 });
   assert.ok(!p.errore, p.errore);
   const ops = p.fasi.map(f => f.op);
-  assert.deepStrictEqual([ops[0], ops[1], ops[2], ops[ops.length - 1]], ['sfacciatura', 'foratura', 'profilo', 'troncatura']);
+  assert.deepStrictEqual([ops[0], ops[1], ops[2], ops[3], ops[ops.length - 1]], ['sfacciatura', 'centrino', 'foratura', 'profilo', 'troncatura']);   // 2.33.0: il centrino prima della punta
   assert.ok(ops.includes('gola') && ops.includes('filetto') && ops.indexOf('gola') < ops.indexOf('filetto'));
   assert.ok(O.proponiLavoro(Object.assign({}, T, { grezzo: { dg: 30 } }), { mat: mt }).errore.includes('piu grosso del grezzo'));
   // spegnere una fase e correggere i giri
-  const kForo = p.fasi[1].chiave, kFil = p.fasi.find(f => f.op === 'filetto').chiave;
+  const kForo = p.fasi.find(f => f.op === 'foratura').chiave, kFil = p.fasi.find(f => f.op === 'filetto').chiave;
   const r = O.programmaLavoro(p, { spente: { [kForo]: true } }, { num: 1, nome: 'A' });
   assert.ok(!r.errore && !r.righe.some(l => /G83|G74|FORO IN ASSE/.test(l)), 'foro spento');
   assert.ok(r.tempo > 0 && r.utensili.length >= 3);
@@ -955,5 +955,89 @@ prova('three.js: in locale (non dal web), con la licenza, nel funzionamento senz
   assert.ok(!/<script[^>]+src="https?:/.test(html), 'nessun programma caricato dal web');
   assert.ok(/'\.\/three\.min\.js'/.test(fs.readFileSync(r('sw.js'), 'utf8')) && /'\.\/vista3d\.js'/.test(fs.readFileSync(r('sw.js'), 'utf8')), 'nel funzionamento senza rete');
   assert.ok(/cp stile\.css \*\.js/.test(fs.readFileSync(r('.github/workflows/apk.yml'), 'utf8')), 'l\'APK copia i file js della radice');
+});
+prova('tornio: filetti di tutte le famiglie (esterni, interni, conici) con angolo e profondita giusti', () => {
+  const fam = O.filettiTornio();
+  assert.deepStrictEqual(fam.map(f => f.fam).sort(), ['acme', 'bsf', 'bsw', 'g', 'm', 'mf', 'npt', 'pg', 'r', 'tr', 'unc', 'unef', 'unf']);
+  assert.ok(fam.every(f => f.righe.length >= 10 && f.righe.every(r => r.d > 0 && r.p > 0)));
+  const m = O.datiFiletto({ d: 20, p: 2.5 }), g = O.datiFiletto({ fam: 'g', d: 20.955, p: 1.814 }), t = O.datiFiletto({ fam: 'tr', d: 20, p: 4 }), n = O.datiFiletto({ fam: 'npt', d: 21.336, p: 1.814 });
+  assert.ok(m.nome === 'M20x2.5' && m.ang === 60 && Math.abs(m.hEst - 1.533) < 0.001 && Math.abs(m.hInt - 1.353) < 0.001);
+  assert.ok(g.ang === 55 && Math.abs(g.hEst - 0.640327 * 1.814) < 0.001 && !g.conico);
+  assert.ok(t.ang === 30 && t.trapezio && Math.abs(t.hEst - 2.25) < 1e-9);
+  assert.ok(n.conico && n.ang === 60 && Math.abs(n.hEst - 0.8 * 1.814) < 0.001);
+  const mt = O.MATERIALI[0];
+  const L = { modo: 'tornio', grezzo: { dg: 50, lg: 80 }, tratti: [{ tipo: 'cil', d: 20.955, l: 20, fil: 1.814, filFam: 'r', filNome: 'R / Rc 1/2', gola: 3 }, { tipo: 'cil', d: 30, l: 20, toll: 'h6' }, { tipo: 'cil', d: 40, l: 15 }],
+    foroD: 10, interno: { di: 20.955, l: 15, fil: 1.814, filFam: 'g', filNome: 'G 1/2' } };
+  // il tratto conico cresce 1:16
+  const pt = O.puntiTornio(L.tratti, { dg: 50 });
+  assert.ok(pt.punti.some(q => Math.abs(q.x - (20.955 + 20 / 16)) < 0.001), 'tratto conico');
+  for (const metodo of ['passate', 'ciclo']) {
+    const p = O.proponiLavoro(L, { mat: mt, tab: [], nmax: 3000, metodo });
+    assert.ok(!p.errore, p.errore);
+    const fe = p.fasi.find(f => f.op === 'filetto'), fi = p.fasi.find(f => f.op === 'filettoInt'), bar = p.fasi.find(f => f.op === 'interna');
+    assert.ok(/R \/ Rc 1\/2/.test(fe.titolo) && fe.c.ang === 55 && fe.c.d2 > fe.c.d, 'filetto conico esterno');
+    assert.ok(/G 1\/2/.test(fi.titolo) && fi.c.ang === 55, 'filetto interno gas');
+    assert.ok(Math.abs(bar.c.di - O.datiFiletto({ fam: 'g', d: 20.955, p: 1.814 }).d1) < 0.001, 'la barenatura si ferma al nocciolo, non al diametro del filetto');
+    assert.ok(p.fasi.some(f => f.op === 'golaInterna'), 'gola di scarico del filetto interno');
+    const r = O.programmaLavoro(p, {}, { num: 1, nome: 'P' });
+    assert.ok(!r.errore, r.errore);
+    const testo = r.righe.join('\n');
+    if (metodo === 'ciclo') assert.ok(/G76 P010055/.test(testo) && /G71 /.test(testo) && /G72 /.test(testo) && /G74 /.test(testo), 'cicli fissi nel programma');
+    else assert.ok(!/G7[1-6] /.test(testo), 'a passate niente cicli');
+    const e = O.controllaISO(testo, { modo: 'tornio' });
+    assert.deepStrictEqual(e.segnalazioni.filter(q => q.livello !== 'nota'), [], metodo);
+  }
+});
+prova('tornio: cicli fissi simulati (G72 sfacciatura, G75 troncatura e gola interna, G74 gola frontale, G76 interno)', () => {
+  const sim = (op, c) => { const r = O.gcodeTornio(op, Object.assign({ nmax: 3000, t: 1, dg: 50, metodo: 'ciclo' }, c)); assert.ok(!r.errore, op + ': ' + r.errore); return { r, e: O.controllaISO(r.righe.join('\n'), { modo: 'tornio' }) }; };
+  let x = sim('sfacciatura', { s: 2, ap: 1, vc: 200, f: 0.2 });
+  assert.ok(/G72 W1/.test(x.r.righe.join(' ')) && x.e.segmenti.filter(q => !q.rapido).length === 3 && x.e.segmenti.some(q => !q.rapido && Math.abs(q.z) < 1e-9 && q.x < 0), 'G72: tre passate fino a Z0 oltre il centro');
+  x = sim('troncatura', { zt: -30, w: 3, vc: 100, f: 0.05 });
+  assert.ok(/G75 X-1\. Z-30\./.test(x.r.righe.join(' ')) && x.e.segmenti.some(q => !q.rapido && q.x < 0));
+  x = sim('golaFrontale', { dInt: 30, dEst: 40, prof: 3, w: 3, vc: 100, f: 0.05 });
+  assert.ok(/G74 X36\. Z-3\./.test(x.r.righe.join(' ')));
+  const xs = new Set(x.e.segmenti.filter(q => !q.rapido).map(q => Math.round(q.x * 10) / 10));
+  assert.ok(xs.has(40) && xs.has(36) && Math.min(...x.e.segmenti.map(q => q.z)) === -3, 'gola frontale simulata su piu diametri');
+  x = sim('golaInterna', { dp: 24, dfondo: 27, zg: -15, b: 4, w: 3, vc: 100, f: 0.05 });
+  assert.ok(x.e.segmenti.some(q => !q.rapido && Math.abs(q.x - 27) < 1e-6) && Math.max(...x.e.segmenti.filter(q => !q.rapido).map(q => q.x)) <= 27 + 1e-6, 'la gola interna va verso l\'esterno fino a 27');
+  x = sim('filettoInt', { d: 30, p: 2, l: 20, n: 8, giri: 400 });
+  const lav = x.e.segmenti.filter(q => !q.rapido);
+  assert.ok(lav.length >= 9 && lav.every(q => q.x > 27.8 && q.x <= 30 + 1e-6), 'G76 interno: le passate salgono verso il diametro 30');
+  // in asse
+  x = sim('maschiatura', { prof: 20, giri: 200, p: 1.5 });
+  assert.ok(/G32 Z-20\. F1\.5/.test(x.r.righe.join(' ')) && x.r.righe.includes('M4'), 'maschio con G32 e M4');
+});
+prova('tornio: centrino, maschio e alesatore in asse, gola frontale nel lavoro guidato', () => {
+  const mt = O.MATERIALI[0], ctx = { mat: mt, tab: [], nmax: 3000 };
+  let p = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 50 }, tratti: [{ tipo: 'cil', d: 40, l: 30 }], foroD: 12, foroTipo: 'maschio', foroP: 20 }, ctx);
+  assert.deepStrictEqual(p.fasi.slice(0, 4).map(f => f.op), ['sfacciatura', 'centrino', 'foratura', 'maschiatura']);
+  assert.ok(Math.abs(p.fasi[2].c.dpunta - 10.25) < 1e-9 && p.fasi[3].c.p === 1.75, 'preforo e passo del maschio');
+  p = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 50 }, tratti: [{ tipo: 'cil', d: 40, l: 30 }], foroD: 12, foroTipo: 'alesato', foroP: 20 }, ctx);
+  assert.ok(p.fasi[3].op === 'alesaturaAsse' && Math.abs(p.fasi[2].c.dpunta - 11.7) < 1e-9 && p.misure.some(m => m.toll === 'H7'));
+  p = O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 60 }, tratti: [{ tipo: 'cil', d: 56, l: 30 }], golaFrontOn: true, golaFront: { dInt: 34, dEst: 44, prof: 3 } }, ctx);
+  const ops = p.fasi.map(f => f.op);
+  assert.ok(ops.indexOf('golaFrontale') === ops.indexOf('profilo') + 1, 'gola frontale dopo il profilo');
+  assert.ok(O.proponiLavoro({ modo: 'tornio', grezzo: { dg: 60 }, tratti: [{ tipo: 'cil', d: 40, l: 30 }], golaFrontOn: true, golaFront: { dInt: 34, dEst: 44, prof: 3 } }, ctx).errore.includes('esce dalla faccia'));
+});
+prova('fresa: smussi dei bordi, foro e lamatura a fresa quando manca l\'utensile', () => {
+  const tab = [{ t: 1, tipo: 'fresa', d: 10, z: 3 }, { t: 2, tipo: 'centrino', d: 10 }, { t: 3, tipo: 'puntaMD', d: 8.5 }, { t: 4, tipo: 'smussatore', d: 16 }];
+  const L = { modo: 'fresa', grezzo: { lx: 100, ly: 80, lz: 20 }, forme: [
+    { tipo: 'tasca', cx: 50, cy: 40, lx: 40, ly: 30, r: 6, prof: 8, smusso: 1 }, { tipo: 'asola', x1: 70, y1: 15, x2: 90, y2: 15, w: 10, prof: 5, smusso: 0.5 },
+    { tipo: 'foro', x: 15, y: 65, d: 14, passante: true, smusso: 1 }, { tipo: 'foro', x: 85, y: 65, d: 8.5, passante: true, lamD: 14, lamProf: 8 },
+    { tipo: 'profilo', lav: 'contorno', lato: 'esterno', prof: 10, smusso: 1, punti: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 80 }, { x: 0, y: 80 }] }] };
+  const p = O.proponiLavoro(L, { mat: O.MATERIALI[0], tab, nmax: 12000, zSic: 50, zR: 2 });
+  assert.ok(!p.errore, p.errore);
+  const tit = p.fasi.map(f => f.titolo);
+  assert.ok(tit.some(t => /^Foro Ø14 a fresa/.test(t)) && tit.some(t => /^Lamatura Ø14 a fresa/.test(t)), tit.join(' | '));
+  const sm = p.fasi.filter(f => f.smussoBordo);
+  assert.strictEqual(sm.length, 3);
+  assert.ok(sm.every(f => f.c.t === 4 && Math.abs(f.c.d - 2) < 1e-9), 'smussatore T4, percorso spostato di 1 mm');
+  assert.ok(/^Smusso C1 contornatura/.test(p.fasi[p.fasi.length - 1].titolo) && /^Contorno esterno/.test(p.fasi[p.fasi.length - 2].titolo), 'lo smusso del contorno esterno dopo il contorno');
+  const r = O.programmaLavoro(p, {}, { num: 1, nome: 'P' });
+  assert.ok(!r.errore, r.errore);
+  assert.deepStrictEqual(O.controllaISO(r.righe.join('\n'), { modo: 'fresa' }).segnalazioni.filter(q => q.livello !== 'nota'), []);
+  // con la punta giusta in tabella il foro resta a punta
+  const p2 = O.proponiLavoro(L, { mat: O.MATERIALI[0], tab: tab.concat([{ t: 6, tipo: 'puntaMD', d: 14 }]), nmax: 12000 });
+  assert.ok(p2.fasi.some(f => /^Punta Ø14/.test(f.titolo)) && !p2.fasi.some(f => /^Foro Ø14 a fresa/.test(f.titolo)));
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

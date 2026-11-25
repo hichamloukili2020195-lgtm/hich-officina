@@ -340,7 +340,7 @@
         pc = kP;
         return true;
       }
-      const datiCiclo = gg === 71 ? (w.P !== undefined && w.Q !== undefined) : gg === 74 ? w.Z !== undefined : (w.X !== undefined || w.Z !== undefined);
+      const datiCiclo = gg === 71 || gg === 72 ? (w.P !== undefined && w.Q !== undefined) : gg === 74 ? w.Z !== undefined : (w.X !== undefined || w.Z !== undefined);
       if (!datiCiclo) {
         // primo blocco: i dati del ciclo
         cicli[gg] = Object.assign({}, w);
@@ -372,12 +372,41 @@
         pc = pr.kQ + 1;
         return true;
       }
+      if (gg === 72) {
+        // sgrossatura frontale: passate in X a Z sempre piu bassa fino al profilo (simulata per profili di faccia piani o quasi)
+        const prima = cicli[72] || {};
+        const ap = (prima.W !== undefined ? prima.W : 1) * sc;
+        const pr = profiloPQ(Math.round(w.P), Math.round(w.Q), riga);
+        if (!pr || !(ap > 0)) return false;
+        const pts = pr.pts.slice(1);
+        const zFin = Math.max.apply(null, pts.map(q => q.a)) + (w.W || 0) * sc, xFin = 2 * Math.min.apply(null, pts.map(q => q.b)) + (w.U || 0) * sc;
+        if (Math.max.apply(null, pts.map(q => q.a)) - Math.min.apply(null, pts.map(q => q.a)) > 0.01) avvisa('G72 con un profilo non piano: la simulazione fa solo le passate fino alla faccia piu alta', riga);
+        if (w.F !== undefined) st.f = w.F;
+        let z = z0, k = 0;
+        while (z > zFin + 1e-9 && k++ < 2000) {
+          z = Math.max(z - ap, zFin);
+          muovi(x0, st.y, z, true, riga);
+          muovi(xFin, st.y, z, false, riga, true);
+          muovi(xFin, st.y, z + 0.5, true, riga);
+          muovi(x0, st.y, z + 0.5, true, riga);
+        }
+        muovi(x0, st.y, z0, true, riga);
+        pc = pr.kQ + 1;
+        return true;
+      }
       if (gg === 74) {
         const zf = w.Z * sc, q = (w.Q || 0) / 1000 * sc || Math.abs(zf - z0);
         if (w.F !== undefined) st.f = w.F;
-        let z = z0, k = 0;
-        while (z > zf + 1e-9 && k++ < 2000) { const zn = Math.max(z - q, zf); muovi(st.x, st.y, zn, false, riga, true); muovi(st.x, st.y, zn + 0.5, true, riga); z = zn; }
-        muovi(st.x, st.y, z0, true, riga);
+        // con X: gola frontale, piu affondamenti spostati di P (raggio, millesimi) verso X
+        const xx = [x0];
+        if (w.X !== undefined) { const xf = w.X * sc, dp = 2 * ((w.P || 0) / 1000 * sc || Math.abs(xf - x0) / 2), s = xf < x0 ? -1 : 1; for (let x = x0 + s * dp, k = 0; s * (xf - x) > 1e-9 && k < 500; x += s * dp, k++) xx.push(x); if (Math.abs(xx[xx.length - 1] - xf) > 1e-9) xx.push(xf); }
+        xx.forEach(x => {
+          muovi(x, st.y, z0, true, riga);
+          let z = z0, k = 0;
+          while (z > zf + 1e-9 && k++ < 2000) { const zn = Math.max(z - q, zf); muovi(x, st.y, zn, false, riga, true); muovi(x, st.y, zn + 0.5, true, riga); z = zn; }
+          muovi(x, st.y, z0, true, riga);
+        });
+        muovi(x0, st.y, z0, true, riga);
         return true;
       }
       if (gg === 75) {
@@ -396,13 +425,14 @@
         if (!(h > 0) || !(d1 > 0)) return false;
         const fin = prima.P !== undefined ? Math.floor(Math.round(prima.P) / 10000) : 1;
         if (w.F !== undefined) st.f = w.F;
-        const xs = xf + 2 * h + i;    // diametro della cresta all'inizio
+        const sg = xf > x0 ? -1 : 1;      // filetto interno: si va verso l'esterno
+        const xs = xf + sg * 2 * h + i;    // diametro della cresta all'inizio
         const prof = [];
         for (let k = 1; prof.length < 500; k++) { const p = Math.min(d1 * Math.sqrt(k), h); prof.push(p); if (p >= h - 1e-9) break; }
         for (let k = 0; k < fin; k++) prof.push(h);
         prof.forEach(p => {
-          muovi(xs - 2 * p, st.y, z0, true, riga);
-          muovi(xf + 2 * h - 2 * p, st.y, zf, false, riga, true);
+          muovi(xs - sg * 2 * p, st.y, z0, true, riga);
+          muovi(xf + sg * 2 * h - sg * 2 * p, st.y, zf, false, riga, true);
           muovi(x0, st.y, zf, true, riga);
           muovi(x0, st.y, z0, true, riga);
         });
@@ -522,8 +552,8 @@
             st.ciclo = gg; st.zIniz = st.z;
             if (gg === 76 || gg === 87 || gg === 88) avvisa('ciclo G' + gg + ' simulato come foratura semplice', riga);
           }
-          else if (tornio && [70, 71, 74, 75, 76].includes(gg)) { if (!cicloTornio(gg, w, riga)) avvisa('ciclo G' + gg + ' scritto in un modo che non simulo: il percorso manca', riga); senzaAssi = true; numG = 'ciclo'; }
-          else if (tornio && [72, 73, 90, 92, 94].includes(gg)) { avvisa('ciclo fisso del tornio G' + gg + ': non simulato, il percorso manca', riga); senzaAssi = true; }
+          else if (tornio && [70, 71, 72, 74, 75, 76].includes(gg)) { if (!cicloTornio(gg, w, riga)) avvisa('ciclo G' + gg + ' scritto in un modo che non simulo: il percorso manca', riga); senzaAssi = true; numG = 'ciclo'; }
+          else if (tornio && [73, 90, 92, 94].includes(gg)) { avvisa('ciclo fisso del tornio G' + gg + ': non simulato, il percorso manca', riga); senzaAssi = true; }
           else if (gg === 65) numG = 65;
           else if (gg === 28 || gg === 30 || gg === 53) { numG = gg; }
           else if (gg === 31) { st.moto = 31; mossa = 31; }

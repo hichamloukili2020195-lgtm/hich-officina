@@ -5,6 +5,7 @@
 (function (radice) {
   'use strict';
   const O = typeof module !== 'undefined' && module.exports ? require('./calcoli.js') : radice.Officina;
+  if (typeof module !== 'undefined' && module.exports) require('./filetti.js');
   const r3 = x => Math.round(x * 1000) / 1000;
   const num = v => { if (v === '' || v === null || v === undefined) return NaN; return Number(String(v).replace(',', '.')); };
   const pos = v => isFinite(v) && v > 0;
@@ -34,17 +35,19 @@
       if ((t.tipo || 'cil') === 'cil' && Math.abs(dt - d) > 1e-9) { P.push({ x: dt, z }); d = dt; }   // spallamento verso il nuovo diametro
       else if (t.tipo === 'cono' && pos(num(t.d0)) && Math.abs(num(t.d0) - d) > 1e-9) { P.push({ x: num(t.d0), z }); d = num(t.d0); }
       z = r3(z - L);
-      const p = { x: dt, z };
+      // filetto conico (gas R, NPT): il tratto cresce 1:16 sul diametro verso il mandrino
+      const conico = (t.tipo || 'cil') === 'cil' && pos(num(t.fil)) && O.datiFiletto && O.datiFiletto({ fam: t.filFam, d: dt, p: num(t.fil) }).conico;
+      const p = { x: conico ? r3(dt + L / 16) : dt, z };
       if (t.tipo === 'arco') {
         const R = num(t.r);
         const corda = Math.hypot(L, (dt - d) / 2);
         if (!(R >= corda / 2 - 1e-6)) return { errore: 'Tratto ' + (i + 1) + ': raggio troppo piccolo (almeno ' + r3(corda / 2) + ').', punti: [] };
         p.tratto = t.forma === 'incavato' ? 'cw' : 'ccw'; p.r = R;
       }
-      if (t.tipo === 'cil') { if (pos(num(t.fil))) p.fil = num(t.fil); if (pos(num(t.gola))) p.gola = num(t.gola); if (t.toll && String(t.toll).trim()) p.toll = String(t.toll).trim(); }
+      if (t.tipo === 'cil') { if (pos(num(t.fil))) { p.fil = num(t.fil); if (t.filFam) p.filFam = t.filFam; if (t.filNome) p.filNome = t.filNome; } if (pos(num(t.gola))) p.gola = num(t.gola); if (t.toll && String(t.toll).trim()) p.toll = String(t.toll).trim(); }
       spigolo(p, t.spigolo);
       P.push(p);
-      d = dt;
+      d = p.x;
     }
     const dg = num(opz.dg);
     if (pos(dg) && d < dg - 1e-9) P.push({ x: dg, z });
@@ -63,6 +66,7 @@
       const l = { op: tipo, d: num(f.d), passante: f.passante !== false, prof: num(f.prof) };
       if (tipo === 'maschio') l.passo = pos(num(f.passo)) ? num(f.passo) : O.passoGrosso(num(f.d));
       if (tipo === 'alesato') l.toll = f.toll || 'H7';
+      if (pos(num(f.smusso))) l.smusso = num(f.smusso);
       if (pos(num(f.lamD))) { l.lamD = num(f.lamD); l.lamProf = pos(num(f.lamProf)) ? num(f.lamProf) : r3(num(f.d) * 0.6); }
       return l;
     };
@@ -71,9 +75,9 @@
       if (f.spenta) return;
       if (f.tipo === 'tasca') {
         const lx = num(f.lx), ly = num(f.ly), cx = num(f.cx), cy = num(f.cy);
-        E.push({ id: id++, tipo: 'rett', x0: r3(cx - lx / 2), y0: r3(cy - ly / 2), x1: r3(cx + lx / 2), y1: r3(cy + ly / 2), r: num(f.r) || 0, lav: [{ op: 'tasca', prof: num(f.prof), d: num(f.du) }] });
-      } else if (f.tipo === 'tascaTonda') E.push({ id: id++, tipo: 'cerchio', cx: num(f.cx), cy: num(f.cy), r: num(f.dt) / 2, lav: [{ op: 'tasca', prof: num(f.prof), d: num(f.du) }] });
-      else if (f.tipo === 'asola') E.push({ id: id++, tipo: 'asola', x1: num(f.x1), y1: num(f.y1), x2: num(f.x2), y2: num(f.y2), w: num(f.w), lav: [{ op: 'asola', prof: num(f.prof), d: num(f.du) }] });
+        E.push({ id: id++, tipo: 'rett', x0: r3(cx - lx / 2), y0: r3(cy - ly / 2), x1: r3(cx + lx / 2), y1: r3(cy + ly / 2), r: num(f.r) || 0, lav: [{ op: 'tasca', prof: num(f.prof), d: num(f.du), smusso: num(f.smusso) || 0 }] });
+      } else if (f.tipo === 'tascaTonda') E.push({ id: id++, tipo: 'cerchio', cx: num(f.cx), cy: num(f.cy), r: num(f.dt) / 2, lav: [{ op: 'tasca', prof: num(f.prof), d: num(f.du), smusso: num(f.smusso) || 0 }] });
+      else if (f.tipo === 'asola') E.push({ id: id++, tipo: 'asola', x1: num(f.x1), y1: num(f.y1), x2: num(f.x2), y2: num(f.y2), w: num(f.w), lav: [{ op: 'asola', prof: num(f.prof), d: num(f.du), smusso: num(f.smusso) || 0 }] });
       else if (f.tipo === 'foro') punto(num(f.x), num(f.y), f);
       else if (f.tipo === 'foriCerchio') {
         const n = Math.max(1, Math.round(num(f.n) || 1));
@@ -82,7 +86,7 @@
         const nx = Math.max(1, Math.round(num(f.nx) || 1)), ny = Math.max(1, Math.round(num(f.ny) || 1));
         for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) punto(num(f.x0) + i * (num(f.px) || 0), num(f.y0) + j * (num(f.py) || 0), f);
       } else if (f.tipo === 'profilo') {
-        E.push({ id: id++, tipo: 'poli', chiuso: f.chiuso !== false, punti: (f.punti || []).map(p => ({ x: num(p.x), y: num(p.y), raccordo: num(p.raccordo) || 0, smusso: num(p.smusso) || 0 })), lav: [{ op: f.lav === 'tasca' ? 'tasca' : 'contorno', prof: num(f.prof), lato: f.lato || 'esterno', d: num(f.du) }] });
+        E.push({ id: id++, tipo: 'poli', chiuso: f.chiuso !== false, punti: (f.punti || []).map(p => ({ x: num(p.x), y: num(p.y), raccordo: num(p.raccordo) || 0, smusso: num(p.smusso) || 0 })), lav: [{ op: f.lav === 'tasca' ? 'tasca' : 'contorno', prof: num(f.prof), lato: f.lato || 'esterno', d: num(f.du), smusso: num(f.smusso) || 0 }] });
       }
     });
     if (grezzo && grezzo.contorna) E.push({ id: id++, tipo: 'rett', x0: 0, y0: 0, x1: num(grezzo.lx), y1: num(grezzo.ly), r: num(grezzo.raggio) || 0, lav: [{ op: 'contorno', lato: 'esterno', prof: num(grezzo.lz) }] });
@@ -107,11 +111,16 @@
       const p = O.pianificaProfilo(pr.punti, Object.assign({}, ctx, { dg }));
       if (p.errore) return { errore: p.errore };
       // sfacciatura, foro in asse e troncatura come nel ciclo dell'albero
-      const a = O.pianificaAlbero({ dg, lg: Math.max(num(g.lg) || 0, pr.lunghezza + 5), smusso: 0, tratti: [{ d: dg, l: pr.lunghezza }], foro: pos(num(L.foroD)) ? { d: num(L.foroD), prof: num(L.foroP) || 2 * num(L.foroD) } : null, troncatura: !!L.troncatura }, ctx);
+      // foro in asse: liscio, filettato (preforo + maschio) o alesato (punta piu piccola + alesatore)
+      const tipoF = L.foroTipo === 'maschio' || L.foroTipo === 'alesato' ? L.foroTipo : 'foro', dN = num(L.foroD);
+      const pM = tipoF === 'maschio' ? (pos(num(L.foroPasso)) ? num(L.foroPasso) : O.passoGrosso(dN) || 1.5) : 0;
+      const dPunta = !pos(dN) ? NaN : tipoF === 'maschio' ? r3(O.filetto(dN, pM).preforo) : tipoF === 'alesato' ? r3(dN - (dN <= 10 ? 0.2 : 0.3)) : dN;
+      const profF = pos(num(L.foroP)) ? num(L.foroP) : 2 * dN;
+      const a = O.pianificaAlbero({ dg, lg: Math.max(num(g.lg) || 0, pr.lunghezza + 5), smusso: 0, tratti: [{ d: dg, l: pr.lunghezza }], foro: pos(dN) ? { d: dPunta, prof: profF + (tipoF === 'maschio' ? 2 * pM : 0) } : null, troncatura: !!L.troncatura }, ctx);
       const extra = a.errore ? [] : a.fasi.filter(f => f.op !== 'profilo');
       const prima = extra.filter(f => f.op === 'sfacciatura' || f.op === 'foratura'), dopo = extra.filter(f => f.op === 'troncatura');
       // barenatura interna e filetto interno: dopo il foro in asse (la barenatura) e dopo il filetto esterno (il filetto)
-      const I = L.interno || {}, dpF = num(L.foroD), di = num(I.di), li = num(I.l);
+      const I = tipoF === 'foro' ? (L.interno || {}) : {}, dpF = dPunta, di = num(I.di), li = num(I.l);
       const base = { nmax: ctx.nmax || 3000, codLimite: ctx.codLimite, codFiletto: ctx.codFiletto, refrig: ctx.refrig };
       const mt = ctx.mat, tab = ctx.tab || [], nt = { testi: [], daControllare: new Set() };
       let internaF = [], filettoI = [];
@@ -120,20 +129,70 @@
         if (di <= dpF) return { errore: 'La barenatura (Ø' + di + ') deve essere piu grande del foro (Ø' + dpF + ').' };
         if (di >= dg - 2) return { errore: 'La barenatura (Ø' + di + ') lascia troppo poca parete nel pezzo (Ø' + dg + ').' };
         const tB = O.trovaT(tab, ['bareno'], 0, 7, nt);
-        internaF.push({ op: 'interna', titolo: 'Barenatura interna Ø' + di + ' T' + tB, c: Object.assign({}, base, { t: tB, dp: dpF, di, dg, l: li, ap: 1, sx: 0.3, sz: 0.1, finitura: true, ff: r3(Math.max(0.05, (mt.lf || 0.2) * 0.3)), smusso: 0.5, vc: r3((mt.lvc || 100) * 0.7), f: r3(Math.max(0.05, (mt.lf || 0.2) * 0.6)) }) });
-        if (pos(num(I.fil))) {
-          const tF = O.trovaT(tab, ['bareno', 'inserto'], 0, 8, nt), pF = num(I.fil);
+        // con il filetto interno la barenatura si ferma al nocciolo (il filetto toglie il resto)
+        const FI = pos(num(I.fil)) ? O.datiFiletto({ fam: I.filFam, nome: I.filNome, d: di, p: num(I.fil) }) : null;
+        const dBar = FI ? r3(FI.conico ? FI.d1 - li / 16 : FI.d1) : di;
+        if (FI && dBar <= dpF) return { errore: 'Il foro in asse (Ø' + dpF + ') e piu grande del nocciolo del filetto interno (Ø' + dBar + '): fai un foro piu piccolo.' };
+        internaF.push({ op: 'interna', titolo: 'Barenatura interna Ø' + dBar + ' T' + tB, c: Object.assign({}, base, { t: tB, dp: dpF, di: dBar, dg, l: li, ap: 1, sx: FI ? 0 : 0.3, sz: 0.1, finitura: true, ff: r3(Math.max(0.05, (mt.lf || 0.2) * 0.3)), smusso: FI ? 0 : 0.5, vc: r3((mt.lvc || 100) * 0.7), f: r3(Math.max(0.05, (mt.lf || 0.2) * 0.6)) }) });
+        if (FI) {
+          const tF = O.trovaT(tab, ['bareno', 'inserto'], 0, 8, nt), pF = FI.p;
           const giri = Math.min(base.nmax, Math.max(100, Math.round(1000 * (mt.lvc || 100) * 0.4 / (Math.PI * di) / 10) * 10));
-          filettoI.push({ op: 'filettoInt', titolo: 'Filetto interno M' + di + 'x' + pF + ' T' + tF, c: Object.assign({}, base, { t: tF, d: di, dg: di, p: pF, l: li, n: pF <= 1 ? 5 : pF <= 1.5 ? 6 : pF <= 2 ? 8 : 10, giri, vc: Math.round((mt.lvc || 100) * 0.4), f: pF, metodo: 'passate' }) });
-          nt.testi.push('Filetto interno: la barenatura va a ' + r3(di - 1.082532 * pF) + ' (nocciolo), poi la fresa filetti o il filetto a passate.');
+          const np = FI.hInt <= 0.65 ? 5 : FI.hInt <= 0.95 ? 6 : FI.hInt <= 1.25 ? 8 : FI.hInt <= 1.9 ? 10 : 12;
+          filettoI.push({ op: 'filettoInt', titolo: 'Filetto interno ' + FI.nome + ' T' + tF, c: Object.assign({}, base, { t: tF, d: di, d2: FI.conico ? r3(di - li / 16) : di, d1: FI.d1, h: FI.hInt, ang: FI.ang, nomeFil: FI.nome, dg: di, p: pF, l: li, n: np, giri, vc: Math.round((mt.lvc || 100) * 0.4), f: pF, metodo: ctx.metodo || 'passate' }) });
+          nt.testi.push('Filetto interno ' + FI.nome + ': la barenatura va al nocciolo Ø' + dBar + ', poi il filetto a ' + FI.ang + '°' + (FI.conico ? ' (conico 1:16)' : '') + '.');
         }
-        p.note = (p.note || []).concat(nt.testi);
       }
+      // centrino prima della punta; maschio o alesatore dopo
+      const inAsse = [], dopoPunta = [];
+      if (pos(dN)) {
+        const dtC = O.datiTaglio(mt, { tipo: 'centrino', d: 10, nmax: base.nmax }) || {};
+        inAsse.push({ op: 'centrino', titolo: 'Centrino in asse T' + O.trovaT(tab, ['centrino'], 0, 2, nt), c: Object.assign({}, base, { t: O.trovaT(tab, ['centrino'], 0, 2, nt), dg, prof: r3(Math.min(dPunta, 10) / 2), giri: dtC.n || 1000, f: r3(dtC.fn || 0.08), vc: dtC.vc }) });
+        if (tipoF === 'maschio') {
+          const dtM = O.datiTaglio(mt, { tipo: 'maschio', d: dN, passo: pM, nmax: base.nmax }) || {};
+          const tM = O.trovaT(tab, ['maschio'], dN, 5, nt);
+          dopoPunta.push({ op: 'maschiatura', titolo: 'Maschio in asse M' + dN + 'x' + pM + ' T' + tM, c: Object.assign({}, base, { t: tM, dg, p: pM, prof: profF, giri: dtM.n || 200, f: pM, vc: dtM.vc }) });
+        } else if (tipoF === 'alesato') {
+          const dtA = O.datiTaglio(mt, { tipo: 'alesatore', d: dN, nmax: base.nmax }) || {};
+          const tA = O.trovaT(tab, ['alesatore'], dN, 6, nt), toll = L.foroToll || 'H7';
+          dopoPunta.push({ op: 'alesaturaAsse', titolo: 'Alesatore in asse Ø' + dN + ' ' + toll + ' T' + tA, c: Object.assign({}, base, { t: tA, dg, prof: profF, giri: dtA.n || 300, f: r3(dtA.fn || 0.15), vc: dtA.vc }) });
+          (p.misure = p.misure || []).push({ nome: 'Foro in asse Ø' + dN + ' ' + toll, nominale: String(dN), toll });
+        }
+      }
+      // gola interna (a una distanza dalla faccia) e gola di scarico in fondo al filetto interno
+      const golaI = [];
+      if (internaF.length) {
+        const dBar = internaF[0].c.di, tGI = O.trovaT(tab, ['bareno', 'inserto'], 0, 9, nt);
+        const golaInt = (zDist, b, dF, titolo) => golaI.push({ op: 'golaInterna', titolo: titolo + ' T' + tGI, c: Object.assign({}, base, { t: tGI, dg, dp: dBar, dfondo: r3(dF), zg: r3(-zDist), b, w: Math.min(3, b), vc: r3((mt.lvc || 100) * 0.5), f: r3(Math.max(0.03, (mt.lf || 0.2) * 0.25)) }) });
+        const G = I.gola || {};
+        if (I.golaOn && pos(num(G.z)) && pos(num(G.b)) && pos(num(G.d))) {
+          if (num(G.z) + num(G.b) > li + 1e-9) return { errore: 'La gola interna esce dal fondo della barenatura (profonda ' + li + ').' };
+          if (num(G.d) <= dBar) return { errore: 'Il fondo della gola interna (Ø' + num(G.d) + ') deve essere piu grande del foro (Ø' + dBar + ').' };
+          if (num(G.d) >= dg - 2) return { errore: 'La gola interna (Ø' + num(G.d) + ') lascia troppo poca parete.' };
+          golaInt(num(G.z), num(G.b), num(G.d), 'Gola interna Ø' + num(G.d) + ' larga ' + num(G.b));
+        }
+        if (filettoI.length && I.scarico !== false) {
+          const fi = filettoI[0].c, b = Math.max(3, Math.round(2 * fi.p * 2) / 2);
+          golaInt(li - b, b, fi.d + 0.4, 'Gola di scarico del filetto interno larga ' + b);
+          fi.l = r3(li - b / 2);
+        }
+      }
+      // gola frontale sulla faccia
+      const golaF = [];
+      const GF = L.golaFront || {};
+      if (L.golaFrontOn && pos(num(GF.dInt)) && pos(num(GF.dEst)) && pos(num(GF.prof))) {
+        const dFaccia = pr.punti[1] ? pr.punti[1].x : dg;
+        if (num(GF.dEst) > dFaccia - 1) return { errore: 'La gola frontale (Ø' + num(GF.dEst) + ') esce dalla faccia (Ø' + dFaccia + ').' };
+        if (pos(dN) && num(GF.dInt) < (internaF.length ? internaF[0].c.di : dPunta) + 1) return { errore: 'La gola frontale tocca il foro in asse: allarga il diametro interno della gola.' };
+        const tGF = O.trovaT(tab, ['inserto'], 0, 10, nt);
+        golaF.push({ op: 'golaFrontale', titolo: 'Gola frontale Ø' + num(GF.dInt) + '-' + num(GF.dEst) + ' T' + tGF, c: Object.assign({}, base, { t: tGF, dg, dInt: num(GF.dInt), dEst: num(GF.dEst), prof: num(GF.prof), w: Math.min(3, (num(GF.dEst) - num(GF.dInt)) / 2), q: 2, vc: r3((mt.lvc || 100) * 0.5), f: r3(Math.max(0.03, (mt.lf || 0.2) * 0.25)) }) });
+      }
+      p.note = (p.note || []).concat(nt.testi);
       const iForo = prima.findIndex(f => f.op === 'foratura');
-      const dopoForo = iForo >= 0 ? prima.slice(0, iForo + 1).concat(internaF, prima.slice(iForo + 1)) : prima.concat(internaF);
+      const dopoForo = iForo >= 0 ? prima.slice(0, iForo).concat(inAsse, prima[iForo], dopoPunta, internaF, golaI, prima.slice(iForo + 1)) : prima.concat(internaF, golaI);
       // il filetto interno va dopo i filetti e le gole esterne, prima della troncatura
-      const fasi = dopoForo.concat(p.fasi, filettoI, dopo);
+      const fasi = dopoForo.concat(p.fasi.slice(0, 1), golaF, p.fasi.slice(1), filettoI, dopo);
       const note = (p.note || []).concat(a.errore ? [] : (a.note || []).filter(t => !/^Utensili non trovati/.test(t)));
+      if (ctx.metodo) fasi.forEach(f => { if (f.c) f.c.metodo = ctx.metodo; });
       return { fasi: fasi.map((f, i) => Object.assign(f, { chiave: chiaveFase(f, i) })), note, misure: p.misure || [], punti: pr.punti, modo: 'tornio' };
     }
     const lx = num(g.lx), ly = num(g.ly), lz = num(g.lz);

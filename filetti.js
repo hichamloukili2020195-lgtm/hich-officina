@@ -111,7 +111,35 @@
     return righe.filter(r => r.nome.toLowerCase().replace(/,/g, '.').includes(t) || String(r.d) === t);
   }
 
-  const Filetti = { FILETTI_FAMIGLIE: FAMIGLIE, FILETTI_ETICHETTE: ETICHETTE, righeFamiglia };
+  // ----- filetti al tornio: angolo dell'inserto, profondita esterna e interna, conicita -----
+  const TORNIO = {
+    m: { ang: 60 }, mf: { ang: 60 }, unc: { ang: 60 }, unf: { ang: 60 }, unef: { ang: 60 },
+    g: { ang: 55 }, r: { ang: 55, conico: true }, bsw: { ang: 55 }, bsf: { ang: 55 },
+    npt: { ang: 60, conico: true }, tr: { ang: 30, trapezio: true }, acme: { ang: 29, trapezio: true }, pg: { ang: 80 }
+  };
+  /**
+   * Dati per filettare al tornio. f = {fam, nome, d, p}: senza famiglia e metrico.
+   * Ritorna {fam, nome, d, p, ang, conico, trapezio, hEst (profondita radiale della vite), hInt (della madrevite), d1 (nocciolo della madrevite)}.
+   * Conici (R, NPT): 1:16 sul diametro, il diametro scritto e quello all'inizio del filetto.
+   */
+  function datiFiletto(f) {
+    const fam = TORNIO[f && f.fam] ? f.fam : 'm', T = TORNIO[fam];
+    const d = Number(f.d), p = Number(f.p);
+    let hEst, hInt, d1;
+    if (fam === 'tr' || fam === 'acme') { const ac = fam === 'acme' ? 0.127 : p <= 1.5 ? 0.15 : p <= 5 ? 0.25 : p <= 12 ? 0.5 : 1; hEst = hInt = 0.5 * p + ac; d1 = d - p; }
+    else if (fam === 'npt') { hEst = hInt = 0.8 * p; d1 = d - 1.6 * p; }
+    else if (fam === 'pg') { hEst = hInt = 0.55 * p; d1 = d - 1.1 * p; }
+    else if (T.ang === 55) { hEst = hInt = 0.640327 * p; d1 = d - 1.280654 * p; }
+    else { hEst = 0.613343 * p; hInt = 0.541266 * p; d1 = d - 1.082532 * p; }
+    const nome = f.nome || ('M' + r3(d) + 'x' + r3(p));
+    return { fam, nome, d, p, ang: T.ang, conico: !!T.conico, trapezio: !!T.trapezio, hEst: r3(hEst), hInt: r3(hInt), d1: r3(d1) };
+  }
+  /** Tutti i filetti che si fanno al tornio, per famiglia: [{fam, nomeFam, righe:[{nome, d, p}]}]. */
+  function filettiTornio() {
+    return FAMIGLIE.filter(f => TORNIO[f.id]).map(f => ({ fam: f.id, nomeFam: f.nome + ' (' + f.angolo + ')', righe: f.righe().filter(r => Number(r.d) > 0 && Number(r.p) > 0).map(r => ({ nome: r.nome, d: Number(r.d), p: Number(r.p) })) }));
+  }
+
+  const Filetti = { FILETTI_FAMIGLIE: FAMIGLIE, FILETTI_ETICHETTE: ETICHETTE, righeFamiglia, datiFiletto, filettiTornio };
   Object.assign(O, Filetti);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

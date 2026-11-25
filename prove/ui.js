@@ -1330,6 +1330,52 @@ const server = http.createServer((q, r) => {
     ok((await pg.$$eval('.sim-box canvas.sim-tela', x => x.length)) === 2, 'vista 3D del tornio');
   }
 
+  // ===== 2.33.0: tutti i filetti al tornio, cicli fissi, lavori in asse, gole, smussi alla fresa =====
+  await vai('lavoro'); await pg.waitForTimeout(100);
+  await pg.click('.lav-passi button[data-passo="0"]'); await pg.click('.lav-macchina[data-modo="tornio"]');
+  await pg.click('.lav-passi button[data-passo="1"]'); await pg.waitForTimeout(80);
+  await pg.evaluate(() => { const S = App.lavoroStato.S; S.tornio.tratti = [{ tipo: 'cil', d: 20, l: 20 }, { tipo: 'cil', d: 30, l: 20 }]; S.tornio.foroD = ''; S.aperta = 0; App.lavoroStato.tutto(); });
+  await pg.waitForTimeout(80);
+  if ((await pg.getAttribute('.lav-card[data-i="0"] .lav-card-apri', 'aria-expanded')) !== 'true') { await pg.click('.lav-card[data-i="0"] .lav-card-apri'); await pg.waitForTimeout(80); }
+  ok(await pg.$('#lav-altro-fil-0'), 'scelta di tutti i filetti nel tratto');
+  const opz = await pg.$$eval('#lav-altro-fil-0 optgroup', x => x.map(g => g.label));
+  ok(opz.length === 13 && opz.some(t => /Gas G/.test(t)) && opz.some(t => /NPT/.test(t)) && opz.some(t => /Trapezio/.test(t)), 'famiglie dei filetti: ' + opz.join(','));
+  await pg.selectOption('#lav-altro-fil-0', 'g|G 1/2'); await pg.waitForTimeout(100);
+  let tr0 = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0]);
+  ok(tr0.filFam === 'g' && tr0.filNome === 'G 1/2' && Math.abs(tr0.d - 20.955) < 1e-6 && Math.abs(tr0.fil - 1.814) < 1e-6, 'filetto gas scelto: ' + JSON.stringify(tr0));
+  // foro filettato in asse e gola frontale
+  await pg.evaluate(() => { const S = App.lavoroStato.S; S.tornio.foroD = 10; App.lavoroStato.tutto(); }); await pg.waitForTimeout(80);
+  await pg.click('.chips[aria-label="Foro in asse"] .chip:text-is("Filettato")'); await pg.waitForTimeout(80);
+  ok((await pg.evaluate(() => App.lavoroStato.S.tornio.foroTipo)) === 'maschio' && await pg.$('.chips[aria-label="Passo del maschio"]'), 'foro filettato in asse');
+  await pg.click('#lav-gola-front'); await pg.waitForTimeout(80);
+  ok((await pg.evaluate(() => App.lavoroStato.S.tornio.golaFrontOn)) === true, 'gola frontale accesa');
+  await pg.evaluate(() => { const S = App.lavoroStato.S; S.tornio.golaFront = { dInt: 12, dEst: 17, prof: 2 }; App.lavoroStato.tutto(); });
+  // passo 3: cicli fissi
+  await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
+  const fasiT = await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave));
+  ok(fasiT.some(k => /^Centrino/.test(k)) && fasiT.some(k => /^Maschio in asse/.test(k)) && fasiT.some(k => /^Gola frontale/.test(k)) && fasiT.some(k => /^Filetto G 1\/2/.test(k)), 'fasi nuove del tornio: ' + fasiT.join(', '));
+  await pg.click('.chips[aria-label="Metodo del programma"] .chip:text-is("Con cicli fissi")'); await pg.waitForTimeout(200);
+  ok((await pg.evaluate(() => App.lavoroStato.S.tornio.metodo)) === 'ciclo', 'cicli fissi scelti');
+  await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
+  await pg.click('#lav-programma'); await pg.waitForTimeout(200);
+  const lstC = await pg.textContent('.listato');
+  ok(/G71/.test(lstC) && /G72/.test(lstC) && /G76/.test(lstC) && /G74/.test(lstC), 'programma con i cicli fissi');
+  if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '37-tornio-cicli.png'), fullPage: true });
+  await pg.goBack(); await pg.waitForTimeout(200);
+  await pg.click('#lav-simula'); await pg.waitForTimeout(400);
+  await erroreSchermo('simulazione con i cicli fissi');
+  ok(!/\d+ error/.test(await pg.textContent('.controllo-esito').catch(() => '')), 'simulazione dei cicli senza errori: ' + (await pg.textContent('.controllo-esito').catch(() => '')));
+  // fresa: smusso dei bordi su una tasca
+  await vai('lavoro'); await pg.click('.lav-passi button[data-passo="0"]'); await pg.click('.lav-macchina[data-modo="fresa"]');
+  await pg.click('.lav-passi button[data-passo="1"]'); await pg.waitForTimeout(80);
+  await pg.evaluate(() => { const S = App.lavoroStato.S; S.fresa.forme = [{ tipo: 'tasca', cx: 40, cy: 30, lx: 30, ly: 20, r: 5, prof: 6 }]; S.aperta = 0; App.lavoroStato.tutto(); });
+  await pg.waitForTimeout(80);
+  if ((await pg.getAttribute('.lav-card[data-i="0"] .lav-card-apri', 'aria-expanded')) !== 'true') { await pg.click('.lav-card[data-i="0"] .lav-card-apri'); await pg.waitForTimeout(80); }
+  await pg.click('.chips[aria-label="Smusso dei bordi"] .chip:text-is("C1")'); await pg.waitForTimeout(80);
+  ok((await pg.evaluate(() => App.lavoroStato.S.fresa.forme[0].smusso)) === 1, 'smusso scelto');
+  await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
+  ok((await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave))).some(k => /^Smusso C1 tasca/.test(k)), 'fase di smusso della tasca');
+
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }
   console.log('OK interfaccia');

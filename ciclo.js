@@ -4,6 +4,7 @@
 (function (radice) {
   'use strict';
   const O = typeof module !== 'undefined' && module.exports ? require('./calcoli.js') : radice.Officina;
+  if (typeof module !== 'undefined' && module.exports) require('./filetti.js');
   const r3 = x => Math.round(x * 1000) / 1000;
   const giriDa = (vc, d, nmax) => Math.min(nmax, Math.max(100, Math.round(1000 * vc / (Math.PI * d) / 10) * 10));
 
@@ -206,11 +207,18 @@
         return { op: 'fori', tipoUt, titolo: titolo + ' T' + t, c: Object.assign({}, base, { t, n: giri, f, punti, prof: r3(pr), d: dd, ciclo, q: dd }, extra || {}) };
       };
       const nome = (tipo === 'maschio' ? 'M' + d + 'x' + passo : 'Ø' + d + (tipo === 'alesato' ? ' ' + (g.toll || 'H7') : '')) + ' (' + punti.length + ' fori)';
-      if (dPre > 40) {
-        // foro grande: tasca circolare
-        const u = sceltaFresa(dPre * 0.6, { d: 16, z: 4, t: 7 });
+      const senzaPunta = tipo === 'foro' && tab.length > 0 && dPre >= 8 && !tab.some(u => (u.tipo === 'puntaMD' || u.tipo === 'puntaIns') && Math.abs(Number(u.d) - dPre) < 0.05);
+      if (senzaPunta && dPre <= 40) note.testi.push('Foro Ø' + d + ': nessuna punta di quel diametro nella tabella, si fa a fresa a elica.');
+      if (dPre > 40 || senzaPunta) {
+        // foro grande (o senza la punta giusta): tasca circolare a elica
+        const u = sceltaFresa(dPre * 0.6, { d: Math.max(2, Math.min(16, Math.floor(dPre * 0.6))), z: 4, t: 7 });
         const dt = fresa('fresa', u.d, u.z);
         punti.forEach((p, i) => fasi.push({ op: 'tascaCircolare', titolo: 'Foro Ø' + d + ' a fresa ' + (i + 1) + ' D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, cx: p[0], cy: p[1], dt: dPre, prof: r3(prof), ap: Math.max(0.5, Math.min(dt.ap || 2, 5)), ae: 40, sovra: 0.2, finitura: true }) }));
+        if (Number(g.smusso) > 0) {
+          const cc = Number(g.smusso);
+          if (d + 2 * cc <= 16) fasi.push(fase('smussatore', 16, (d + 2 * cc) / 2, trovaT(tab, ['smussatore'], 0, 4, note), null, 'Smusso ' + cc + 'x45° ' + nome));
+          else note.testi.push('Foro Ø' + d + ': lo smusso C' + cc + ' e piu grande dello smussatore, fallo come tasca tonda con smusso.');
+        }
       } else {
         fasi.push(fase('centrino', 10, Math.min(dPre, 10) / 2, trovaT(tab, ['centrino'], 0, 2, note), null, 'Centrino ' + nome));
         const ins = dPre > 20;
@@ -327,7 +335,7 @@
     for (let i = 1; i < punti.length; i++) {
       const b = punti[i], d = Number(b.x), zA = Number(punti[i - 1].z), zB = Number(b.z);
       if (Number(b.gola) > 0) {
-        const w = Number(b.gola), pf = Number(b.fil) > 0 ? 0.613343 * Number(b.fil) + 0.1 : Math.max(0.5, Number(b.golaProf) || 0.5);
+        const w = Number(b.gola), pf = Number(b.fil) > 0 ? O.datiFiletto({ fam: b.filFam, d, p: Number(b.fil) }).hEst + 0.1 : Math.max(0.5, Number(b.golaProf) || 0.5);
         const tG = trovaT(tab, ['inserto'], 0, 4, note);
         fasi.push({ op: 'gola', titolo: 'Gola di scarico su Ø' + d + ' larga ' + w + ' T' + tG, c: Object.assign({}, base, { t: tG, dg: d, dfondo: r3(d - 2 * pf), zg: r3(zB + w), b: w, w: Math.min(3, w), vc: r3(mt.lvc * 0.6), f: r3(Math.max(0.03, mt.lf * 0.3)) }) });
       }
@@ -337,15 +345,21 @@
       if (!(p > 0)) continue;
       const d = Number(b.x), zA = Number(punti[i - 1].z), zB = Number(b.z);
       const w = Number(b.gola) > 0 ? Number(b.gola) : 0;
+      const F = O.datiFiletto({ fam: b.filFam, nome: b.filNome, d: F0(b, punti[i - 1]), p });
+      const dA = F.d, dB = F.conico ? d : F.d;
       const tF = trovaT(tab, ['inserto'], 0, 3, note);
-      const np = p <= 1 ? 5 : p <= 1.5 ? 6 : p <= 2 ? 8 : p <= 3 ? 10 : 12;
-      fasi.push({ op: 'filetto', titolo: 'Filetto M' + d + 'x' + p + ' T' + tF, c: Object.assign({}, base, { t: tF, dg: d, d, p, l: r3(-zB - w / 2), n: np, giri: giriDa(mt.lvc * 0.5, d, nmax), metodo: ctx.metodo || 'passate', vc: Math.round(mt.lvc * 0.5) }) });
-      if (zA < 0) note.testi.push('Il filetto M' + d + ' non parte dalla testa: le prime passate vanno in aria.');
-      if (!w && i < punti.length - 1 && Number(punti[i + 1].x) > d) note.testi.push('Il filetto M' + d + ' finisce contro uno spallamento senza gola di scarico.');
+      const np = F.hEst <= 0.65 ? 5 : F.hEst <= 0.95 ? 6 : F.hEst <= 1.25 ? 8 : F.hEst <= 1.9 ? 10 : F.hEst <= 3 ? 12 : 16;
+      fasi.push({ op: 'filetto', titolo: 'Filetto ' + F.nome + ' T' + tF, c: Object.assign({}, base, { t: tF, dg: Math.max(dA, dB), d: dA, d2: dB, p, h: F.hEst, ang: F.ang, nomeFil: F.nome, tipoFil: F.trapezio ? 'trapezio' : '', l: r3(-zB - w / 2), n: np, giri: giriDa(mt.lvc * (F.trapezio ? 0.35 : 0.5), Math.max(dA, dB), nmax), metodo: ctx.metodo || 'passate', vc: Math.round(mt.lvc * (F.trapezio ? 0.35 : 0.5)) }) });
+      if (zA < 0) note.testi.push('Il filetto ' + F.nome + ' non parte dalla testa: le prime passate vanno in aria.');
+      if (!w && i < punti.length - 1 && Number(punti[i + 1].x) > d) note.testi.push('Il filetto ' + F.nome + ' finisce contro uno spallamento senza gola di scarico.');
+      if (F.conico) note.testi.push('Filetto ' + F.nome + ': conico 1:16, da Ø' + r3(dA) + ' in testa a Ø' + r3(dB) + '. Controlla il diametro sul piano di misura con il calibro del filetto.');
+      if (F.ang !== 60) note.testi.push('Filetto ' + F.nome + ': inserto con profilo a ' + F.ang + '°.');
     }
     return { fasi, misure, note: finisci(note), modo: 'tornio' };
   }
 
+  /** Diametro all'inizio del tratto filettato: per i conici quello del punto prima (la spalla), se no quello del tratto. */
+  function F0(b, prima) { const F = O.datiFiletto({ fam: b.filFam, d: Number(b.x), p: Number(b.fil) }); return F.conico && prima ? Number(prima.x) : Number(b.x); }
   const Ciclo = { pianificaProfilo, estraiQuote, pianificaAlbero, pianificaPiastra, gcodeSequenzaTornio, passoGrosso, trovaT };
   Object.assign(O, Ciclo);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;

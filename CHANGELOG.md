@@ -2,6 +2,16 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.33.0 - Tutti i filetti al tornio, cicli fissi, nuove lavorazioni
+- **Filetti al tornio di tutte le famiglie**, esterni e interni: metrici grossi e fini, UNC, UNF, UNEF, gas G, gas R/Rc conico, NPT conico, Whitworth BSW e BSF, trapezio Tr, ACME, Pg. Nel tratto (e nel filetto interno) c'e "Altro filetto": diametro e passo si mettono da soli. Profondita e angolo dell'inserto (60°, 55°, 30°, 29°, 80°) cambiano con la famiglia; i conici crescono 1:16.
+- **Correzione**: con il filetto interno la barenatura andava al diametro del filetto (toglieva tutto il materiale da filettare); ora si ferma al nocciolo.
+- **Cicli fissi del tornio a scelta** nel passo Lavorazioni: "A passate" o "Con cicli fissi" (G71/G70 profilo, G72 sfacciatura, G74 foratura e gola frontale, G75 gole e troncatura, G76 filetti anche interni). La simulazione li fa tutti, G72 compreso.
+- **Tornio, lavori in asse**: centrino prima della punta; foro filettato (preforo e maschio con G32 e M4) o alesato (punta piu piccola e alesatore, misura H7 nel foglio delle misure).
+- **Tornio, gole**: gola frontale sulla faccia, gola interna dentro la barenatura, gola di scarico in fondo al filetto interno (si puo spegnere).
+- **Fresa, smussi dei bordi** (C0,5, C1, C2) su tasche, tasche tonde, asole, profili e fori, con lo smussatore a punta.
+- **Fresa, fori e lamature a fresa**: se nella tabella utensili manca la punta (o il lamatore) di quel diametro, il foro o la lamatura si fanno a fresa a elica.
+- Con il linguaggio a cicli a nome, i cicli fissi del tornio restano in ISO: l'app lo dice e consiglia il programma a passate.
+
 ## 2.32.1 - Correzione grafica nella spiegazione del programma
 - Nella spiegazione riga per riga, le righe dei rapidi (G0) apparivano dentro un riquadro tondo preso dal calcolo rapido della home. Corretto: ora hanno solo la barretta colorata a sinistra come le altre.
 
