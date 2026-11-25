@@ -217,6 +217,25 @@
    * Valore di un'espressione scritta a mano: 50/2+3, (10+5)*2, sqrt(2)*10, 30*sin(45), pi*20. Virgola o punto decimale.
    * Niente eval: un piccolo interprete. Ritorna il numero oppure NaN. Gli angoli di sin, cos e tan sono in gradi.
    */
+  // parametri nominati del disegno (L, H, spessore...): valgono in tutte le espressioni
+  let PARAMETRI = {};
+  const RISERVATE = ['pi', 'sqrt', 'abs', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan'];
+  /** Nome valido per un parametro: lettere, cifre e _, comincia con una lettera, senza la lettera x (serve per 40x30) e non riservato. */
+  function nomeParametroValido(n) { n = String(n || '').trim().toLowerCase(); return /^[a-z][a-z0-9_]*$/.test(n) && n.indexOf('x') < 0 && !RISERVATE.includes(n); }
+  /** Imposta i parametri da una lista [{n, v}] (v puo usare i parametri scritti prima). Ritorna {errori:[...]} con i problemi trovati. */
+  function impostaParametri(lista) {
+    PARAMETRI = {}; const errori = [];
+    (lista || []).forEach(p => {
+      const n = String(p && p.n || '').trim().toLowerCase();
+      if (!n && !String(p && p.v || '').trim()) return;
+      if (!nomeParametroValido(n)) { errori.push('Nome non valido: "' + (p && p.n) + '" (lettere e cifre, senza x, non pi/sqrt/sin...)'); return; }
+      if (Object.prototype.hasOwnProperty.call(PARAMETRI, n)) { errori.push('Il nome "' + n + '" e scritto due volte.'); return; }
+      const v = espressione(p.v);
+      if (!isFinite(v)) { errori.push('"' + n + '": valore non valido (' + p.v + ')'); return; }
+      PARAMETRI[n] = v;
+    });
+    return { errori };
+  }
   function espressione(testo) {
     const t = String(testo === undefined || testo === null ? '' : testo).replace(/,/g, '.').replace(/\s+/g, '').toLowerCase();
     if (!t) return NaN;
@@ -235,6 +254,7 @@
       if (!w) fallisci();
       i += w[0].length;
       if (w[0] === 'pi') return Math.PI;
+      if (Object.prototype.hasOwnProperty.call(PARAMETRI, w[0]) && t[i] !== '(') return PARAMETRI[w[0]];
       if (FUNZ[w[0]] && t[i] === '(') { i++; const v = somma(); if (t[i] !== ')') fallisci(); i++; return FUNZ[w[0]](v); }
       return fallisci();
     }
@@ -415,7 +435,7 @@
     return { x: r3(migliore.x), y: r3(migliore.y), tipo: migliore.tipo };
   }
 
-  const Cad = { CAD_LAVORAZIONI: LAVORAZIONI, CAD_NOMI_LAV: NOMI_LAV, profiloCAD: profiloDi, limitiCAD: limiti, pianificaCAD, espressione, puntoDaTesto, arcoDa3Punti, arcoCentroInizioFine, arcoInizioFineRaggio, poligonoRegolare, geometriaCAD, agganciCAD };
+  const Cad = { impostaParametri, nomeParametroValido, parametriCAD: () => Object.assign({}, PARAMETRI), CAD_LAVORAZIONI: LAVORAZIONI, CAD_NOMI_LAV: NOMI_LAV, profiloCAD: profiloDi, limitiCAD: limiti, pianificaCAD, espressione, puntoDaTesto, arcoDa3Punti, arcoCentroInizioFine, arcoInizioFineRaggio, poligonoRegolare, geometriaCAD, agganciCAD };
   Object.assign(O, Cad);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

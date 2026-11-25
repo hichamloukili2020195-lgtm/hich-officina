@@ -38,6 +38,8 @@
       if (S.arcoOrario === undefined) S.arcoOrario = false;
       let arco = null;                             // arco in costruzione: {punti:[{x,y}], chiede:bool}
       let Gc = null, GcEsc = undefined;            // geometria per l'aggancio (si rifa a ogni gesto)
+      if (!Array.isArray(S.parametri)) S.parametri = [];
+      O.impostaParametri(S.parametri);
       let multi = [];                              // elementi scelti con la finestra
       let sel = null, selV = null;                 // entita scelta (id) e suo punto scelto (indice)
       let nuova = null;                            // profilo in costruzione
@@ -169,6 +171,17 @@
           g.strokeStyle = f.errore ? col('--errore') : (scelta ? col('--avviso') : c0); percorso(f.poli, f.chiuso); g.stroke();
           if (e.tipo === 'cerchio') { g.strokeStyle = col('--tenue'); g.lineWidth = 1; g.beginPath(); g.moveTo(X(e.cx) - 6, Y(e.cy)); g.lineTo(X(e.cx) + 6, Y(e.cy)); g.moveTo(X(e.cx), Y(e.cy) - 6); g.lineTo(X(e.cx), Y(e.cy) + 6); g.stroke(); }
         });
+        // quote
+        if (S.quote) {
+          g.font = '600 11px ui-monospace,Menlo,Consolas,monospace'; g.textAlign = 'center'; g.fillStyle = col('--accento'); g.strokeStyle = col('--accento'); g.lineWidth = 1;
+          O.quoteCAD(vis()).forEach(d => {
+            let px, py;
+            if (d.tipo === 'lin') { px = X((d.x0 + d.x1) / 2); py = Y((d.y0 + d.y1) / 2); if (d.lato === 'sotto') py += 14; else if (d.lato === 'destra') { px += 16; } else py -= 6; }
+            else if (d.tipo === 'dia') { px = X(d.x0); py = Y(d.y0) - 6; }
+            else { px = X(d.x0) + 12; py = Y(d.y0) - 6; }
+            const w = g.measureText(d.testo).width + 6; g.globalAlpha = 0.85; g.fillStyle = col('--pannello'); g.fillRect(px - w / 2, py - 11, w, 14); g.globalAlpha = 1; g.fillStyle = col('--accento'); g.fillText(d.testo, px, py);
+          });
+        }
         // etichette delle lavorazioni
         g.font = '700 11px system-ui'; g.textAlign = 'left';
         S.entita.forEach((e, k) => {
@@ -313,6 +326,7 @@
         if (attivi.size === 3) { pinch = null; tocchiDue = { t0: Date.now(), tre: true, mosso: false, p: Array.from(attivi.values()) }; return; }
         if (attivi.size > 3) return;
         const [px, py] = pos(e);
+        if (pickPunto) { const cb = pickPunto; pickPunto = null; const w = mondo(e); gesto = null; mirino = null; cb(w); disegna(); return; }
         const strum = S.strum;
         if (pick && strum === 'sel') { const t = trova(px, py); const pk = pick; pick = null; if (t && t.e.id !== pk.A) eseguiPick(pk, t.e); else A.avviso('Operazione annullata: non hai toccato un altro elemento.'); gesto = null; disegna(); return; }
         if (strum === 'fin') { gesto = { tipo: 'finestra', px, py, px2: px, py2: py, mosso: false }; disegna(); return; }
@@ -572,6 +586,7 @@
             extra.append(el('button', { class: 'chip' + (!grande ? ' attiva' : ''), testo: 'Arco piccolo', onclick: () => { grande = false; aggiornaDg(); } }), el('button', { class: 'chip' + (grande ? ' attiva' : ''), testo: 'Arco grande', onclick: () => { grande = true; aggiornaDg(); } }),
               el('button', { class: 'chip', testo: S.arcoOrario ? 'Orario' : 'Antiorario', onclick: () => { S.arcoOrario = !S.arcoOrario; A.salva(); aggiornaDg(); } }));
           }
+          (S.parametri || []).filter(q => O.nomeParametroValido(q.n)).forEach(q => extra.append(el('button', { class: 'chip', type: 'button', 'aria-label': 'Parametro ' + q.n, testo: q.n, onclick: () => { testo += String(q.n).trim().toLowerCase(); aggiornaDg(); } })));
           // anteprima del punto
           prev.classList.remove('errore');
           if (!testo.trim()) { prev.textContent = ''; mirino = null; disegna(); return; }
@@ -624,11 +639,11 @@
       const bPan = el('button', { class: 'cad-b cad-solopieno', id: 'cad-pannello-b', 'aria-label': 'Apri o chiudi il pannello', html: icoSvg('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>') + '<span>Pannello</span>', onclick: () => radice.classList.toggle('pannello-aperto') });
       const bDigita = el('button', { class: 'cad-b', id: 'cad-digita', 'aria-label': 'Scrivi le coordinate con il tastierino', html: icoSvg('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>') + '<span>Digita</span>', onclick: () => (digitaBox ? chiudiDigita() : apriDigita()) });
       // ----- 2.38.0: Modifica (sposta, ruota, scala, specchia, serie, parallela, raccordo, smusso, taglia, layer), layer e DXF -----
-      let modBox = null, pick = null;
+      let modBox = null, pick = null, pickPunto = null;
       const chiudiMod = () => { if (modBox) { modBox.remove(); modBox = null; } };
       const bersagli = () => (multi.length ? multi : sel ? [sel] : []).map(trovaE).filter(Boolean);
       const centroSel = () => { const b = O.limitiCAD(bersagli()); return b ? { x: R3((b.x0 + b.x1) / 2), y: R3((b.y0 + b.y1) / 2) } : { x: 0, y: 0 }; };
-      const OPS = [['sposta', 'Sposta'], ['ruota', 'Ruota'], ['scala', 'Scala'], ['specchia', 'Specchia'], ['slin', 'Serie in fila'], ['spol', 'Serie in cerchio'], ['offset', 'Parallela'], ['raccordo', 'Raccordo'], ['smusso', 'Smusso'], ['taglia', 'Taglia / estendi'], ['angolo', 'Angolo vivo'], ['layer', 'Layer']];
+      const OPS = [['sposta', 'Sposta'], ['ruota', 'Ruota'], ['scala', 'Scala'], ['specchia', 'Specchia'], ['slin', 'Serie in fila'], ['spol', 'Serie in cerchio'], ['offset', 'Parallela'], ['raccordo', 'Raccordo'], ['smusso', 'Smusso'], ['taglia', 'Taglia / estendi'], ['angolo', 'Angolo vivo'], ['quota', 'Quota segmento'], ['layer', 'Layer']];
       const cambiaE = (vecchio, nuovo) => { nuovo.id = vecchio.id; const i = S.entita.findIndex(x => x.id === vecchio.id); S.entita[i] = nuovo; };
       const aggiungiE = n => { n.id = S.prossimo++; S.entita.push(n); return n.id; };
       const finito = ids => { multi = ids && ids.length > 1 ? ids : []; sel = ids && ids.length === 1 ? ids[0] : (ids && ids.length ? null : sel); selV = null; anteprima = null; A.salva(); aggiorna(); };
@@ -645,7 +660,7 @@
         chiudiMod(); chiudiMenu(); chiudiDigita();
         const B = bersagli();
         if (!B.length) { A.avviso('Scegli prima un elemento (con Seleziona) o piu elementi (con Finestra).'); return; }
-        const st = { op: op0 || 'sposta', copia: false, lato: 'fuori', fine: 'fine', fineB: 'fine', asse: 'V', tutti: false };
+        const st = { op: op0 || 'sposta', orienta: '', segue: true, copia: false, lato: 'fuori', fine: 'fine', fineB: 'fine', asse: 'V', tutti: false };
         const box = modBox = el('div', { class: 'cad-digita cad-mod', role: 'dialog', 'aria-label': 'Modifica' });
         const testa = el('div', { class: 'cad-dg-testa' }, [el('b', { class: 'cad-dg-tit', testo: 'Modifica: ' + B.length + (B.length === 1 ? ' elemento' : ' elementi') }), el('button', { class: 'cad-dg-x', id: 'cad-mod-x', type: 'button', 'aria-label': 'Chiudi', testo: '✕', onclick: chiudiMod })]);
         const ops = el('div', { class: 'cad-mod-ops', role: 'tablist' });
@@ -658,23 +673,27 @@
         const val = id => { const v = O.espressione(campi[id].value); if (!isFinite(v)) throw new Error('Scrivi un numero valido in "' + campi[id].getAttribute('aria-label') + '" (puoi usare anche 50/2+3).'); return v; };
         const pt = id => { const r = O.puntoDaTesto(campi[id].value, null); if (r.errore) throw new Error(r.errore); return r; };
         const errore = t => { msg.textContent = t; msg.hidden = !t; };
+        const scrivi = (id, v) => { if (campi[id]) { campi[id].value = String(R3(v)); memo[st.op + id] = campi[id].value; } };
+        const tocca = (testo, id, fn) => chip(testo, false, () => { box.style.display = 'none'; pickPunto = w => { box.style.display = ''; fn(w); }; A.avviso('Tocca un punto sul disegno'); }, id);
+        const toccaDaA = id => tocca('Tocca: da punto a punto', id, a => { box.style.display = 'none'; pickPunto = w => { box.style.display = ''; scrivi('dx', w.x - a.x); scrivi('dy', w.y - a.y); }; A.avviso('Ora tocca il punto di arrivo'); });
+        const toccaCentro = id => tocca('Tocca il centro', id, w => { scrivi('cx', w.x); scrivi('cy', w.y); });
         const ridisegnaForm = () => {
           form.innerHTML = ''; campi = {}; errore('');
           ops.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.op === st.op));
           const F = [];
           const copiaChip = () => chip(st.copia ? 'Copia: si' : 'Copia: no (sposta l\'originale)', st.copia, () => { st.copia = !st.copia; ridisegnaForm(); }, 'cad-mod-copia');
-          if (st.op === 'sposta') F.push(campo('dx', 'Sposta X', 0, 'mm'), campo('dy', 'Sposta Y', 0, 'mm'), copiaChip());
-          else if (st.op === 'ruota') F.push(campo('cx', 'Centro X', c.x), campo('cy', 'Centro Y', c.y), campo('ang', 'Angolo', 90, 'gradi, + antiorario'), copiaChip());
-          else if (st.op === 'scala') F.push(campo('cx', 'Centro X', c.x), campo('cy', 'Centro Y', c.y), campo('k', 'Fattore', 2, '2 = doppio, 0,5 = meta'), copiaChip());
+          if (st.op === 'sposta') F.push(campo('dx', 'Sposta X', 0, 'mm'), campo('dy', 'Sposta Y', 0, 'mm'), toccaDaA('cad-mod-tocca-da'), copiaChip());
+          else if (st.op === 'ruota') F.push(campo('cx', 'Centro X', c.x), campo('cy', 'Centro Y', c.y), campo('ang', 'Angolo', 90, 'gradi, + antiorario'), toccaCentro('cad-mod-tocca-c'), copiaChip());
+          else if (st.op === 'scala') F.push(campo('cx', 'Centro X', c.x), campo('cy', 'Centro Y', c.y), campo('k', 'Fattore', 2, '2 = doppio, 0,5 = meta'), toccaCentro('cad-mod-tocca-c'), copiaChip());
           else if (st.op === 'specchia') {
             F.push(el('div', { class: 'cad-mod-righe' }, [['V', 'Asse verticale'], ['O', 'Asse orizzontale'], ['P', 'Due punti']].map(([k, t]) => chip(t, st.asse === k, () => { st.asse = k; ridisegnaForm(); }, 'cad-mod-asse-' + k))));
             if (st.asse === 'V') F.push(campo('a', 'X dell\'asse', c.x, 'mm')); else if (st.asse === 'O') F.push(campo('a', 'Y dell\'asse', c.y, 'mm'));
-            else F.push(campo('p1', 'Primo punto', c.x + ';' + c.y, 'X;Y'), campo('p2', 'Secondo punto', (c.x + 10) + ';' + c.y, 'X;Y'));
+            else F.push(campo('p1', 'Primo punto', c.x + ';' + c.y, 'X;Y'), tocca('Tocca il primo punto', 'cad-mod-tocca-p1', w => { campi.p1.value = w.x + ';' + w.y; memo[st.op + 'p1'] = campi.p1.value; }), campo('p2', 'Secondo punto', (c.x + 10) + ';' + c.y, 'X;Y'), tocca('Tocca il secondo punto', 'cad-mod-tocca-p2', w => { campi.p2.value = w.x + ';' + w.y; memo[st.op + 'p2'] = campi.p2.value; }));
             if (!st.copiaSet) { st.copia = true; st.copiaSet = true; }
             F.push(copiaChip());
           }
-          else if (st.op === 'slin') F.push(campo('dx', 'Passo X', 20, 'mm'), campo('dy', 'Passo Y', 0, 'mm'), campo('n', 'Elementi in tutto', 4, 'con l\'originale'));
-          else if (st.op === 'spol') F.push(campo('cx', 'Centro X', 0), campo('cy', 'Centro Y', 0), campo('n', 'Elementi in tutto', 6, 'con l\'originale'), campo('ang', 'Angolo totale', 360, 'gradi'));
+          else if (st.op === 'slin') F.push(campo('dx', 'Passo X', 20, 'mm'), campo('dy', 'Passo Y', 0, 'mm'), campo('n', 'Elementi in tutto', 4, 'con l\'originale'), toccaDaA('cad-mod-tocca-da'));
+          else if (st.op === 'spol') F.push(campo('cx', 'Centro X', 0), campo('cy', 'Centro Y', 0), campo('n', 'Elementi in tutto', 6, 'con l\'originale'), campo('ang', 'Angolo totale', 360, 'gradi'), toccaCentro('cad-mod-tocca-c'));
           else if (st.op === 'offset') {
             const chiuso = unica && unica.tipo !== 'poli' ? true : !!(unica && unica.chiuso);
             F.push(campo('d', 'Distanza', 2, 'mm'));
@@ -689,6 +708,15 @@
             F.push(el('div', { class: 'cad-mod-righe' }, [['inizio', 'Inizio'], ['fine', 'Fine']].map(([k, t]) => chip((st.op === 'angolo' ? 'Questo: ' : 'Estremo: ') + t, st.fine === k, () => { st.fine = k; ridisegnaForm(); }, 'cad-mod-fine-' + k))));
             if (st.op === 'angolo') F.push(el('div', { class: 'cad-mod-righe' }, [['inizio', 'Inizio'], ['fine', 'Fine']].map(([k, t]) => chip('Altro: ' + t, st.fineB === k, () => { st.fineB = k; ridisegnaForm(); }, 'cad-mod-fineB-' + k))));
             F.push(el('p', { class: 'aiuto', testo: st.op === 'taglia' ? 'Dopo Applica tocca l\'elemento che taglia: l\'estremo si ferma li (accorcia o allunga).' : 'Dopo Applica tocca l\'altro profilo aperto: i due estremi si incontrano nell\'angolo.' }));
+          }
+          else if (st.op === 'quota') {
+            const ee = unica && unica.tipo === 'poli' ? unica : null, i = selV;
+            let cur = '';
+            if (ee && i !== null && i < ee.punti.length) { const a = ee.punti[i > 0 ? i - 1 : ee.punti.length - 1], b = ee.punti[i]; cur = 'Segmento ' + (i > 0 ? i : ee.punti.length) + '-' + (i + 1) + ': lunghezza ' + R3(Math.hypot(b.x - a.x, b.y - a.y)) + ' mm, angolo ' + R3(Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI) + ' gradi'; }
+            F.push(el('p', { class: 'aiuto', id: 'cad-mod-quota-info', testo: cur || 'Scegli un profilo e tocca un suo punto (la maniglia): si cambia il segmento che ci arriva.' }));
+            F.push(campo('len', 'Nuova lunghezza', '', 'mm, vuoto = invariata'), campo('ang', 'Nuovo angolo', '', 'gradi, vuoto = invariato'));
+            F.push(el('div', { class: 'cad-mod-righe' }, [['', 'Direzione libera'], ['H', 'Orizzontale'], ['V', 'Verticale']].map(([k, t]) => chip(t, st.orienta === k, () => { st.orienta = k; ridisegnaForm(); }, 'cad-mod-or-' + (k || 'no')))));
+            F.push(chip(st.segue ? 'Il resto del profilo segue' : 'Si sposta solo il vertice', st.segue, () => { st.segue = !st.segue; ridisegnaForm(); }, 'cad-mod-segue'));
           }
           else if (st.op === 'layer') F.push(campo('nome', 'Nome del layer', (unica && unica.layer) || '0', 'es. Sagoma, Fori'));
           form.append(...F);
@@ -733,6 +761,16 @@
               pick = op === 'taglia' ? { op, A: e.id, fine: st.fine } : { op, A: e.id, fine: st.fine, fineB: st.fineB };
               S.strum = 'sel'; chiudiMod(); aggiorna(); A.avviso('Tocca l\'elemento ' + (op === 'taglia' ? 'che taglia' : 'da unire')); return;
             }
+            if (op === 'quota') {
+              if (e.tipo !== 'poli' || selV === null) throw new Error('Scegli un profilo e tocca un suo punto (la maniglia): si cambia il segmento che ci arriva.');
+              const o = { segue: st.segue };
+              if (String(campi.len.value).trim()) o.lunghezza = val('len');
+              if (String(campi.ang.value).trim()) o.angolo = val('ang');
+              if (st.orienta) o.orienta = st.orienta;
+              if (o.lunghezza === undefined && o.angolo === undefined && !o.orienta) throw new Error('Scrivi una lunghezza o un angolo, oppure scegli orizzontale/verticale.');
+              const r = O.quotaSegmentoCAD(e, selV, o); if (r.errore) throw new Error(r.errore);
+              ricorda(); cambiaE(e, r); finito([e.id]); chiudiMod(); return;
+            }
             if (op === 'layer') {
               const nome = String(campi.nome.value || '0').trim().slice(0, 31) || '0';
               ricorda(); bs.forEach(x => { x.layer = nome; }); finito(bs.map(x => x.id)); chiudiMod(); return;
@@ -771,7 +809,81 @@
         if (!S.entita.length) { A.avviso('Il disegno e vuoto.'); return; }
         A.scarica('disegno.dxf', O.scriviDXF(vis()));
       };
-      azioni.append(bUndo, bRedo, bDigita, bMod, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
+
+      // ----- 2.39.0: parametri, quote visibili, PDF, PNG, QR -----
+      const testoProgramma = () => {
+        const I = A.imp();
+        const modello = { fz: num(S.fz), entita: JSON.parse(JSON.stringify(vis())).map(e => { e.lav = (e.lav || []).map(l => Object.assign({}, l, { prof: num(l.prof), d: num(l.d), smusso: num(l.smusso), passo: num(l.passo) })); return e; }) };
+        const p = O.pianificaCAD(modello, { mat: A.materiale(S.mat || 0), tab: A.tabellaUt ? A.tabellaUt() : [], nmax: I.nmaxFresa, zSic: I.zSic, zR: I.zR, refrig: I.refrig, g43: I.g43 });
+        if (p.errore) return { errore: p.errore };
+        const r = O.gcodeSequenza(p.fasi, { num: I.numProg, nome: 'DISEGNO', numerare: I.numerare });
+        if (r.errore) return { errore: r.errore };
+        return { testo: r.righe.join('\n') + '\n', righe: r.righe.length };
+      };
+      const intestazione = () => { const m = A.materiale(S.mat || 0); return { titolo: S.titolo || 'Disegno', righe: ['Materiale: ' + (m ? m.n : '-'), 'Spessore del pezzo: ' + (S.fz || '-') + ' mm', 'Elementi: ' + vis().length + (S.nascosti && S.nascosti.length ? ' (layer nascosti: ' + S.nascosti.join(', ') + ')' : '')], data: new Date().toISOString().slice(0, 10) }; };
+      const esportaPDF = () => {
+        if (!vis().length) { A.avviso('Il disegno e vuoto.'); return; }
+        const pr = testoProgramma(); let qr = null;
+        if (!pr.errore) { const q = O.qrMatrice(pr.testo); if (!q.errore) qr = q; }
+        const t = O.scriviPDF(vis(), Object.assign(intestazione(), { quote: !!S.quote, qr }));
+        A.scarica('disegno.pdf', t);
+        if (!qr) A.avviso('PDF salvato' + (pr.errore ? ' (senza QR: ' + pr.errore + ')' : ' (senza QR: programma troppo lungo)'));
+      };
+      const esportaPNG = () => {
+        const L = vis(); const b = O.limitiCAD(L);
+        if (!b) { A.avviso('Il disegno e vuoto.'); return; }
+        const W = 1600, marg = 70, bw = Math.max(b.x1 - b.x0, 1), bh = Math.max(b.y1 - b.y0, 1), sc = Math.min((W - 2 * marg) / bw, 1200 / bh), H = Math.round(bh * sc + 2 * marg + 60);
+        const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+        const px = x => marg + (x - b.x0) * sc + (W - 2 * marg - bw * sc) / 2, py = y => H - 60 - marg + (b.y0 - y) * sc;
+        g.strokeStyle = '#000'; g.lineWidth = 2.5; g.lineJoin = 'round';
+        L.forEach(e => {
+          if (e.tipo === 'punto') { g.beginPath(); g.moveTo(px(e.x) - 10, py(e.y)); g.lineTo(px(e.x) + 10, py(e.y)); g.moveTo(px(e.x), py(e.y) - 10); g.lineTo(px(e.x), py(e.y) + 10); g.stroke(); return; }
+          const f = forma(e); if (!f) return;
+          g.beginPath(); f.poli.forEach((q, i) => (i ? g.lineTo(px(q.a), py(q.b)) : g.moveTo(px(q.a), py(q.b)))); if (f.chiuso) g.closePath(); g.stroke();
+        });
+        if (S.quote) { g.font = '600 22px monospace'; g.fillStyle = '#1d3fbf'; g.textAlign = 'center'; O.quoteCAD(L).forEach(d => { const mx0 = d.tipo === 'lin' ? (d.x0 + d.x1) / 2 : d.x0, my0 = d.tipo === 'lin' ? (d.y0 + d.y1) / 2 : d.y0; g.fillText(d.testo, px(mx0) + (d.lato === 'destra' ? 34 : 0), py(my0) + (d.lato === 'sotto' ? 28 : -10)); }); }
+        g.font = '600 24px sans-serif'; g.fillStyle = '#333'; g.textAlign = 'left';
+        g.fillText('Hich-Officina - ' + intestazione().righe[0] + ' - spessore ' + (S.fz || '-') + ' mm - quote in mm, da controllare', marg, H - 24);
+        A.scaricaBin('disegno.png', c.toDataURL('image/png').split(',')[1], 'image/png');
+      };
+      let qrBox = null;
+      const mostraQR = () => {
+        if (qrBox) { qrBox.remove(); qrBox = null; }
+        const pr = testoProgramma();
+        const box = qrBox = el('div', { class: 'cad-digita cad-mod cad-qr', role: 'dialog', 'aria-label': 'Codice QR del programma' });
+        const chiudi = () => { box.remove(); qrBox = null; };
+        box.append(el('div', { class: 'cad-dg-testa' }, [el('b', { class: 'cad-dg-tit', testo: 'QR del programma' }), el('button', { class: 'cad-dg-x', id: 'cad-qr-x', type: 'button', 'aria-label': 'Chiudi', testo: '✕', onclick: chiudi })]));
+        const q = pr.errore ? { errore: pr.errore } : O.qrMatrice(pr.testo);
+        if (q.errore) box.append(el('p', { class: 'errore', id: 'cad-qr-msg', role: 'alert', testo: q.errore + (pr.errore ? '' : ' Usa il file del programma.') }));
+        else {
+          const k = Math.max(3, Math.min(8, Math.floor((cv.parentNode.clientWidth - 40) / (q.n + 8)))), cq = el('canvas', { id: 'cad-qr-tela', 'aria-label': 'Codice QR', style: 'display:block;margin:6px auto;max-width:100%' });
+          cq.width = cq.height = (q.n + 8) * k; const g = cq.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cq.width, cq.height); g.fillStyle = '#000';
+          for (let r = 0; r < q.n; r++) for (let c = 0; c < q.n; c++) if (q.m[r][c]) g.fillRect((c + 4) * k, (r + 4) * k, k, k);
+          box.append(cq, el('p', { class: 'aiuto', id: 'cad-qr-msg', testo: pr.righe + ' righe, ' + q.byte + ' byte (versione ' + q.versione + '). Inquadralo con il lettore del telefono per portare il testo del programma. Controllalo sempre prima di lavorare.' }));
+        }
+        cv.parentNode.parentNode.appendChild(box);
+      };
+      const bQuote = el('button', { class: 'cad-b', id: 'cad-quote', 'aria-label': 'Mostra le quote', html: icoSvg('<path d="M4 7v10M20 7v10M4 12h16"/><path d="M7 9l-3 3 3 3M17 9l3 3-3 3"/>') + '<span>Quote</span>', onclick: () => { S.quote = !S.quote; A.salva(); aggiorna(); } });
+      const pannelloParametri = () => {
+        const box = el('details', { class: 'cad-par', id: 'cad-parametri' }, [el('summary', { testo: 'Parametri (L, H...)' })]);
+        const msg = el('p', { class: 'errore', id: 'cad-par-msg', hidden: true });
+        const riempi = () => {
+          box.querySelectorAll('.cad-par-riga').forEach(r => r.remove());
+          S.parametri.forEach((q, i) => {
+            const n = el('input', { type: 'text', value: q.n || '', 'aria-label': 'Nome del parametro ' + (i + 1), placeholder: 'nome', autocomplete: 'off', class: 'cad-par-n' });
+            const v = el('input', { type: 'text', value: q.v || '', 'aria-label': 'Valore del parametro ' + (i + 1), placeholder: 'valore o formula', autocomplete: 'off', class: 'cad-par-v' });
+            const agg = () => { q.n = n.value; q.v = v.value; const r = O.impostaParametri(S.parametri); msg.hidden = !r.errori.length; msg.textContent = r.errori.join(' '); A.salva(); };
+            n.addEventListener('input', agg); v.addEventListener('input', agg);
+            box.insertBefore(el('div', { class: 'cad-par-riga' }, [n, v, el('button', { class: 'icona-pul', type: 'button', 'aria-label': 'Togli il parametro ' + (i + 1), html: A.icona('cestino'), onclick: () => { S.parametri.splice(i, 1); agg(); riempi(); } })]), msg);
+          });
+        };
+        box.append(el('p', { class: 'aiuto', testo: 'Dai un nome a una misura (L = 80, H = L/2) e usala in ogni campo numerico e nel tastierino. Il nome non puo contenere la x.' }), msg, el('button', { class: 'pul sec', id: 'cad-par-nuovo', type: 'button', testo: 'Aggiungi un parametro', onclick: () => { S.parametri.push({ n: '', v: '' }); riempi(); box.open = true; } }));
+        riempi();
+        box.open = !!S.parOpen; box.addEventListener('toggle', () => { S.parOpen = box.open; });
+        return box;
+      };
+      azioni.append(bUndo, bRedo, bDigita, bMod, bQuote, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
 
       // ----- pannello: lavorazioni dell'entita scelta, dati del pezzo, crea -----
       const OP_TESTO = { contorno: ['Contorno', 'Taglia lungo la linea con G41/G42'], tasca: ['Tasca', 'Svuota l\'interno'], foro: ['Foro', 'Centrino, punta e smusso'], maschio: ['Maschio', 'Foro filettato'], alesato: ['Alesato', 'Foro con alesatore'], asola: ['Asola', 'Fresa a spirale lungo la linea'] };
@@ -810,6 +922,8 @@
         pannello.append(msg, el('div', { class: 'pulsanti' }, [
           el('button', { class: 'pul sec', id: 'cad-percorso', html: A.icona('modifica') + 'Mostra il percorso', onclick: () => calcola(false, msg) }),
           el('button', { class: 'pul', id: 'cad-crea', html: A.icona('codice') + 'Crea il programma', onclick: () => calcola(true, msg) })]));
+        pannello.appendChild(pannelloParametri());
+        pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'cad-pdf', testo: 'Esporta PDF', onclick: () => esportaPDF() }), el('button', { class: 'pul sec', id: 'cad-png', testo: 'Esporta PNG', onclick: () => esportaPNG() }), el('button', { class: 'pul sec', id: 'cad-qr', testo: 'QR del programma', onclick: () => mostraQR() })]));
         pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'cad-dxf-imp', testo: 'Importa DXF', onclick: () => importaDXF() }), el('button', { class: 'pul sec', id: 'cad-dxf-esp', testo: 'Esporta DXF', onclick: () => esportaDXF() })]));
         pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', testo: 'Carica un disegno di prova', onclick: () => { ricorda(); S.entita = ESEMPIO(); S.prossimo = 10; sel = null; anteprima = null; adattato = false; A.salva(); aggiorna(); adatta(); disegna(); } })]));
       };
@@ -937,7 +1051,7 @@
         barra.querySelectorAll('[data-strum]').forEach(b => b.classList.toggle('attiva', b.dataset.strum === S.strum));
         bUndo.disabled = !storia.length && !(nuova && nuova.punti.length); bRedo.disabled = !futuro.length;
         bFine.hidden = bChiudi.hidden = !(nuova && nuova.punti.length); bChiudi.disabled = !(nuova && nuova.punti.length > 2);
-        bSnap.classList.toggle('attiva', !!S.snap); bMir.classList.toggle('attiva', !!S.mirino);
+        bQuote.classList.toggle('attiva', !!S.quote); bSnap.classList.toggle('attiva', !!S.snap); bMir.classList.toggle('attiva', !!S.mirino);
         radice.dataset.strum = S.strum;
       };
       const aggiorna = () => { Gc = null; statoBarra(); pannelloAgg(); ridisegna(); };

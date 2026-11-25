@@ -696,3 +696,7 @@ body.cad-pieno .cad-digita,.cad.pieno .cad-digita{bottom:0}
 .cad-mod .chip{min-height:40px;font-size:14px;padding:0 12px;white-space:nowrap;flex:0 0 auto}
 .cad-mod-c input{min-height:44px;font-size:17px}
 .cad-mod .pul{min-height:48px}
+.cad-par summary{min-height:48px;display:flex;align-items:center;font-weight:600;cursor:pointer}
+.cad-par-riga{display:flex;gap:6px;align-items:center;margin:6px 0}
+.cad-par-riga input{min-height:48px;font-size:17px;font-family:ui-monospace,Menlo,Consolas,monospace;padding:0 10px;border-radius:10px;border:1px solid var(--bordo,#445);background:var(--fondo,#111);color:var(--testo,#eee);min-width:0}
+.cad-par-n{flex:0 0 28%}.cad-par-v{flex:1}

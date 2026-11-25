@@ -7,6 +7,8 @@ require('../filetti.js');
 require('../cad.js');
 require('../modifica.js');
 require('../dxf.js');
+require('../qr.js');
+require('../pdf.js');
 require('../lavoro.js');
 require('../ciclo.js');
 require('../disegno_foto.js');
@@ -1283,5 +1285,47 @@ prova('DXF: lettura di rette e archi sciolti, LWPOLYLINE, unita, errori', () => 
   const inch = g(0, 'SECTION', 2, 'HEADER', 9, '$INSUNITS', 70, 1, 0, 'ENDSEC', 0, 'SECTION', 2, 'ENTITIES', 0, 'CIRCLE', 8, '0', 10, 1, 20, 1, 40, 0.5, 0, 'ENDSEC', 0, 'EOF');
   const I = O.leggiDXF(inch); assert.strictEqual(I.entita[0].r, 12.7); assert.ok(I.avvisi.some(a => /pollici/.test(a)));
   assert.ok(O.leggiDXF('ciao').errore); assert.ok(O.leggiDXF(g(0, 'SECTION', 2, 'ENTITIES', 0, 'ENDSEC', 0, 'EOF')).errore);
+});
+
+// ===== 2.39.0: parametri, quote, QR, PDF =====
+prova('parametri nominati nelle espressioni', () => {
+  const r = O.impostaParametri([{ n: 'L', v: '80' }, { n: 'H', v: 'L/2' }, { n: 'ax', v: '1' }, { n: 'pi', v: '3' }, { n: 'L', v: '5' }, { n: 'k', v: 'boh' }]);
+  assert.strictEqual(r.errori.length, 4);
+  vicino(O.espressione('L/2+H'), 80); vicino(O.espressione('l*2'), 160); vicino(O.espressione('sqrt(L-H-4)'), 6);
+  assert.ok(isNaN(O.espressione('K+1')));
+  const p = O.puntoDaTesto('L;H', null); assert.strictEqual(p.x, 80); assert.strictEqual(p.y, 40);
+  assert.ok(O.nomeParametroValido('spess') && !O.nomeParametroValido('sin') && !O.nomeParametroValido('9a') && !O.nomeParametroValido('max'));
+  O.impostaParametri([]); assert.ok(isNaN(O.espressione('L')));
+});
+prova('quote: lunghezza, angolo, orizzontale e verticale di un segmento', () => {
+  const q = { id: 1, tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 10 }] };
+  const a = O.quotaSegmentoCAD(q, 1, { lunghezza: 15, segue: true }); assert.deepStrictEqual(a.punti.map(p => [p.x, p.y]), [[0, 0], [15, 0], [15, 10], [25, 10]]);
+  const b = O.quotaSegmentoCAD(q, 1, { lunghezza: 15, segue: false }); assert.deepStrictEqual(b.punti.map(p => [p.x, p.y]), [[0, 0], [15, 0], [10, 10], [20, 10]]);
+  const c = O.quotaSegmentoCAD(q, 2, { angolo: 45, segue: true }); vicino(c.punti[2].x, 10 + 10 * Math.cos(Math.PI / 4), 0.002); vicino(c.punti[3].x - c.punti[2].x, 10, 1e-6);
+  const d = O.quotaSegmentoCAD({ tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 10, y: 3 }] }, 1, { orienta: 'H' }); assert.strictEqual(d.punti[1].y, 0); vicino(d.punti[1].x, Math.hypot(10, 3), 0.002);
+  assert.ok(O.quotaSegmentoCAD(q, 0, { lunghezza: 5 }).errore); assert.ok(O.quotaSegmentoCAD(q, 1, { lunghezza: 0 }).errore);
+  assert.ok(O.quotaSegmentoCAD({ tipo: 'poli', chiuso: false, lav: [], punti: [{ x: 0, y: 0 }, { x: 10, y: 0, tratto: 'ccw', r: 6 }] }, 1, { lunghezza: 5 }).errore);
+  const Q = O.quoteCAD([{ id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 80, y1: 50 }, { id: 2, tipo: 'cerchio', cx: 5, cy: 5, r: 4.25 }, q]);
+  assert.deepStrictEqual(Q.map(x => x.testo), ['80', '50', 'Ø8,5', '10', '10', '10']);
+});
+prova('QR: struttura e limiti', () => {
+  const r = O.qrMatrice('Ciao'); assert.strictEqual(r.versione, 1); assert.strictEqual(r.n, 21);
+  const fin = (m, r0, c0) => { for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) { const e = i === 0 || i === 6 || j === 0 || j === 6 || (i >= 2 && i <= 4 && j >= 2 && j <= 4) ? 1 : 0; if (m[r0 + i][c0 + j] !== e) return false; } return true; };
+  assert.ok(fin(r.m, 0, 0) && fin(r.m, 0, 14) && fin(r.m, 14, 0)); assert.strictEqual(r.m[13][8], 1);
+  const g = O.qrMatrice('x'.repeat(858)); assert.strictEqual(g.versione, 20); assert.strictEqual(g.n, 97);
+  assert.ok(O.qrMatrice('x'.repeat(859)).errore);
+  assert.strictEqual(O.qrMatrice('àè').byte, 4);
+  assert.deepStrictEqual(O.qrMatrice('prova 123').m, O.qrMatrice('prova 123').m);
+});
+prova('PDF: struttura, tabella xref, solo ASCII', () => {
+  const E = [{ id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 80, y1: 50, r: 5, lav: [] }, { id: 2, tipo: 'cerchio', cx: 15, cy: 25, r: 4.25, lav: [] }, { id: 3, tipo: 'punto', x: 70, y: 10, lav: [] }];
+  const t = O.scriviPDF(E, { titolo: 'Piastra (1) \\ à € 中', righe: ['Materiale: C45'], quote: true, qr: O.qrMatrice('G0 X1'), data: '2026-01-01' });
+  assert.ok(t.startsWith('%PDF-1.4') && t.trim().endsWith('%%EOF')); assert.ok(!/[^\x00-\x7f]/.test(t));
+  const sx = Number(/startxref\n(\d+)/.exec(t)[1]); assert.ok(t.slice(sx).startsWith('xref'));
+  const righe = t.slice(sx).split('\n').filter(l => /^\d{10} 00000 n/.test(l));
+  righe.forEach((l, i) => assert.ok(t.slice(Number(l.slice(0, 10))).startsWith((i + 1) + ' 0 obj'), 'oggetto ' + (i + 1)));
+  const len = Number(/\/Length (\d+)/.exec(t)[1]), ini = t.indexOf('stream\n') + 7; assert.strictEqual(t.slice(ini + len, ini + len + 10), 'endstream\n'.slice(0, 10));
+  assert.ok(t.includes('\\(1\\)') && t.includes('\\340') && t.includes('\\200'));
+  assert.ok(O.scriviPDF([], {}).startsWith('%PDF'));
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

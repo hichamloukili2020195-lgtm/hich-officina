@@ -343,7 +343,31 @@ public class MainActivity extends Activity {
                 if (Build.VERSION.SDK_INT >= 29) {
                     ContentValues cv = new ContentValues();
                     cv.put(MediaStore.MediaColumns.DISPLAY_NAME, nome);
-                    cv.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+                    cv.put(MediaStore.MediaColumns.MIME_TYPE, nome.toLowerCase().endsWith(".pdf") ? "application/pdf" : "text/plain");
+                    cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Hich-Officina");
+                    Uri u = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                    if (u == null) throw new Exception("cartella Download non disponibile");
+                    try (OutputStream o = getContentResolver().openOutputStream(u)) { o.write(dati); }
+                    return "Salvato in Download/Hich-Officina/" + nome;
+                }
+                File cartella = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                File f = new File(cartella, nome);
+                try (OutputStream o = new FileOutputStream(f)) { o.write(dati); }
+                return "Salvato in " + f.getAbsolutePath();
+            } catch (Exception e) {
+                return "Non salvato: " + e.getMessage();
+            }
+        }
+
+        /** Salva un file binario (immagine) dato in base64 in Download/Hich-Officina. */
+        @JavascriptInterface
+        public String salvaBase64(String nome, String b64, String tipo) {
+            try {
+                byte[] dati = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentValues cv = new ContentValues();
+                    cv.put(MediaStore.MediaColumns.DISPLAY_NAME, nome);
+                    cv.put(MediaStore.MediaColumns.MIME_TYPE, tipo == null || tipo.isEmpty() ? "application/octet-stream" : tipo);
                     cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Hich-Officina");
                     Uri u = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
                     if (u == null) throw new Exception("cartella Download non disponibile");

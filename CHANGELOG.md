@@ -2,6 +2,16 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.39.0 - Fase 2c CAD: parametri, quote, punti toccando, PDF, PNG e QR
+- **Punti toccando il disegno**: in Modifica, accanto ai campi dei punti c'e "Tocca": centro di rotazione e scala, asse di simmetria, centro della serie, spostamento da punto a punto. Il pannello si nasconde, tocchi il punto (con l'aggancio) e torna con i numeri scritti.
+- **Parametri**: dai un nome a una misura (L = 80, h = L/2) nel pannello; vale in ogni campo numerico, nel tastierino Digita (con i tasti dei nomi) e in Modifica. Il nome non puo contenere la x.
+- **Quote**: il pulsante Quote mostra sul disegno lunghezze dei lati, larghezza e altezza dei rettangoli, diametri, raggi. Nuova operazione **Quota segmento** (in Modifica): cambia lunghezza o angolo del segmento che arriva a un punto, oppure lo rende orizzontale o verticale; il resto del profilo segue o resta fermo.
+- **Esporta PDF** (A4, in scala, con cartiglio e quote) e **PNG**, scritti da noi senza librerie. Nel PDF c'e anche il QR del programma, se ci sta.
+- **QR del programma**: codice QR scritto da noi (fino a 858 byte) per portare il testo del programma su un altro telefono. Se e troppo lungo lo dice.
+- Android: salvataggio dei file immagine in Download/Hich-Officina e tipo giusto per i PDF.
+- Non fatto: vincoli veri tra gli elementi (parallelo, tangente, uguale) che si riapplicano da soli; le quote cambiano la geometria una volta, non restano legate.
+- Prove: parametri, quote, QR (letto con un lettore esterno nelle prove di sviluppo), PDF (struttura e indici), interfaccia.
+
 ## 2.38.0 - Fase 2b CAD: modifiche al disegno, layer e DXF
 - **Finestra**: nuovo strumento per scegliere piu elementi trascinando un rettangolo (da sinistra a destra = solo quelli tutti dentro; da destra a sinistra = anche quelli toccati). Un tocco aggiunge o toglie un elemento.
 - **Modifica** (pulsante in basso, o pressione lunga): sposta, ruota, scala, specchia (asse verticale, orizzontale o due punti), serie in fila, serie in cerchio, parallela (fuori/dentro o a sinistra/destra), raccordo e smusso su un vertice o su tutti, taglia/estendi, angolo vivo tra due profili aperti, layer. Si scrivono i numeri anche come espressioni (`50/2+3`); gli errori sono scritti in chiaro; si puo tenere l'originale (Copia).

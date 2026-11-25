@@ -1638,6 +1638,59 @@ const server = http.createServer((q, r) => {
     ok(!lett.errore && lett.n >= 5, 'DXF riletto: ' + JSON.stringify(lett));
     ok(await pg.isVisible('#cad-dxf-imp') || true, 'pulsanti DXF nel pannello');
   }
+
+  // ===== 2.39.0: parametri, tocca sul disegno, quota segmento, quote, PDF, PNG, QR =====
+  {
+    await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [
+      { id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 80, y1: 50, r: 0, lav: [{ op: 'contorno', prof: 5, lato: 'esterno' }] },
+      { id: 2, tipo: 'cerchio', cx: 10, cy: 10, r: 3, lav: [{ op: 'foro', passante: true }] },
+      { id: 3, tipo: 'poli', chiuso: false, punti: [{ x: 100, y: 20 }, { x: 120, y: 20 }, { x: 120, y: 40 }], lav: [] }]; c.S.prossimo = 4; c.S.nascosti = []; c.S.parametri = []; c.S.strum = 'sel'; c.multi = []; c.sel = null; c.aggiorna(); c.adatta(); c.disegna(); });
+    const ent3 = () => pg.evaluate(() => App.cadStato.S.entita);
+    // parametri dal pannello
+    await pg.evaluate(() => { document.querySelector('#cad-parametri').open = true; });
+    await pg.click('#cad-par-nuovo'); await pg.fill('.cad-par-n >> nth=0', 'L'); await pg.fill('.cad-par-v >> nth=0', '30');
+    await pg.click('#cad-par-nuovo'); await pg.fill('.cad-par-n >> nth=1', 'h'); await pg.fill('.cad-par-v >> nth=1', 'L/2');
+    ok(await pg.evaluate(() => App.O.espressione('L+h')) === 45, 'parametri L=30 e h=L/2');
+    await pg.fill('.cad-par-n >> nth=1', 'ax'); ok((await pg.textContent('#cad-par-msg')).includes('Nome non valido'), 'nome con la x rifiutato');
+    await pg.fill('.cad-par-n >> nth=1', 'h');
+    // sposta usando i parametri
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 2; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.fill('#cad-mod-dx', 'L'); await pg.fill('#cad-mod-dy', 'h*2'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(60);
+    let E3 = await ent3(); ok(E3.find(e => e.id === 2).cx === 40 && E3.find(e => e.id === 2).cy === 40, 'sposta con i parametri: ' + JSON.stringify(E3.find(e => e.id === 2)));
+    // Digita: chip del parametro
+    await pg.click('#cad-digita'); ok(await pg.isVisible('.cad-dg-extra [aria-label="Parametro L"]'), 'chip del parametro nel tastierino'); await pg.evaluate(() => document.querySelector('.cad-digita').remove());
+    // ruota col centro toccato sul disegno
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 2; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-ruota'); await pg.click('#cad-mod-tocca-c');
+    ok(await pg.evaluate(() => getComputedStyle(document.querySelector('.cad-mod')).display === 'none'), 'il pannello si nasconde per toccare');
+    const pt = await pg.evaluate(() => { const r = document.querySelector('.cad-tela').getBoundingClientRect(), s = App.cadStato; return [r.left + s.X(0), r.top + s.Y(0)]; });
+    await pg.mouse.click(pt[0], pt[1]); await pg.waitForTimeout(80);
+    ok(await pg.evaluate(() => getComputedStyle(document.querySelector('.cad-mod')).display !== 'none'), 'il pannello torna');
+    ok(Math.abs(Number(await pg.inputValue('#cad-mod-cx'))) < 1.5 && Math.abs(Number(await pg.inputValue('#cad-mod-cy'))) < 1.5, 'centro preso dal tocco: ' + await pg.inputValue('#cad-mod-cx') + ';' + await pg.inputValue('#cad-mod-cy'));
+    await pg.click('#cad-mod-x');
+    // quota segmento: il segmento 1 del profilo aperto diventa 30 con il resto che segue
+    await pg.evaluate(() => { App.cadStato.multi = []; App.cadStato.sel = 3; App.cadStato.aggiorna(); });
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-quota'); await pg.click('#cad-mod-ok');
+    ok((await pg.textContent('#cad-mod-msg')).includes('tocca un suo punto'), 'senza vertice scelto: messaggio chiaro');
+    await pg.click('#cad-mod-x');
+    await pg.evaluate(() => { const c = App.cadStato; c.sel = 3; c.aggiorna(); });
+    // il vertice si sceglie col tocco sulla maniglia
+    const man = await pg.evaluate(() => { const r = document.querySelector('.cad-tela').getBoundingClientRect(), s = App.cadStato; return [r.left + s.X(120), r.top + s.Y(20)]; });
+    await pg.mouse.click(man[0], man[1]); await pg.waitForTimeout(80);
+    await pg.click('#cad-modifica'); await pg.click('#cad-op-quota'); await pg.fill('#cad-mod-len', 'L'); await pg.click('#cad-mod-ok'); await pg.waitForTimeout(60);
+    E3 = await ent3(); const pp = E3.find(e => e.id === 3).punti;
+    ok(pp[1].x === 130 && pp[2].x === 130 && pp[2].y === 40, 'quota: segmento di 30 e il resto segue: ' + JSON.stringify(pp));
+    // quote visibili e PDF/PNG/QR
+    await pg.evaluate(() => window.scrollTo(0, 0)); await pg.click('#cad-quote'); ok(await pg.evaluate(() => App.cadStato.S.quote === true), 'quote accese');
+    const dl = async sel => { const [d] = await Promise.all([pg.waitForEvent('download'), pg.evaluate(s => document.querySelector(s).click(), sel)]); const f = await d.path(); return { nome: d.suggestedFilename(), dati: require('fs').readFileSync(f) }; };
+    const pdf = await dl('#cad-pdf'); ok(pdf.nome === 'disegno.pdf' && pdf.dati.slice(0, 5).toString() === '%PDF-', 'PDF scaricato');
+    const png = await dl('#cad-png'); ok(png.nome === 'disegno.png' && png.dati[0] === 0x89 && png.dati.slice(1, 4).toString() === 'PNG', 'PNG scaricato');
+    await pg.evaluate(() => document.querySelector('#cad-qr').click()); await pg.waitForTimeout(80);
+    ok(await pg.isVisible('.cad-qr'), 'finestra del QR');
+    const qrMsg = await pg.textContent('#cad-qr-msg'); ok(/byte|Scrivi|materiale|Elemento|lavorazion/i.test(qrMsg), 'QR: messaggio ' + qrMsg.slice(0, 80));
+    await pg.click('#cad-qr-x');
+    await pg.click('#cad-quote');
+  }
   await largo('CAD con Digita');
 
   await b.close(); server.close();

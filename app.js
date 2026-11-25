@@ -224,8 +224,18 @@
   }
   function scarica(nome, testo) {
     if (ANDROID) { try { avviso(ANDROID.salvaFile(nome, testo)); return; } catch (e) { /* sotto */ } }
-    const blob = new Blob([testo], { type: 'text/plain' });
+    const blob = new Blob([testo], { type: /\.pdf$/i.test(nome) ? 'application/pdf' : 'text/plain' });
     const a = el('a', { href: URL.createObjectURL(blob), download: nome });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    avviso('Salvato ' + nome);
+  }
+  /** Salva un file binario dato in base64 (immagini): nell'APK in Download/Hich-Officina, nel browser come scaricamento. */
+  function scaricaBin(nome, b64, tipo) {
+    if (ANDROID && ANDROID.salvaBase64) { try { avviso(ANDROID.salvaBase64(nome, b64, tipo || 'application/octet-stream')); return; } catch (e) { /* sotto */ } }
+    const bin = atob(b64), dati = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) dati[i] = bin.charCodeAt(i);
+    const a = el('a', { href: URL.createObjectURL(new Blob([dati], { type: tipo || 'application/octet-stream' })), download: nome });
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 3000);
     avviso('Salvato ' + nome);
@@ -448,8 +458,8 @@
   const App = {
     migra, hash, chiedi, conferma, SCHEMA,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
-    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.38.0'
+    avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, scaricaBin, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
+    schermi: {}, param: {}, VERSIONE: '2.39.0'
   };
   window.App = App;
 

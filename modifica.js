@@ -268,7 +268,60 @@
     }).map(e => e.id);
   }
 
-  const Mod = { trasformaCAD: trasforma, serieLineare, seriePolare, offsetCAD: offset, angoloCAD: angolo, tagliaEstendiCAD: tagliaEstendi, unisciAngoloCAD: unisciAngolo, entitaInFinestra };
+
+  // ---------- quote e allineamenti ----------
+  /**
+   * Cambia un segmento retto di un profilo: il segmento che arriva al vertice i (dal vertice i-1; per i = 0 in un profilo chiuso, quello dall'ultimo).
+   * o = {lunghezza, angolo (gradi, assoluto), orienta: 'H' | 'V', segue (i vertici dopo si spostano uguale: la forma resta)}. Ritorna l'entita nuova o {errore}.
+   */
+  function quotaSegmento(e, i, o) {
+    o = o || {};
+    if (e.tipo !== 'poli') return { errore: 'Le quote dei segmenti si cambiano sui profili.' };
+    const P = e.punti, n = P.length;
+    const prec = i > 0 ? i - 1 : (e.chiuso ? n - 1 : -1);
+    if (!(i >= 0 && i < n) || prec < 0) return { errore: 'Scegli un vertice che abbia un segmento prima di se (non il primo punto di un profilo aperto).' };
+    if (P[i].tratto === 'cw' || P[i].tratto === 'ccw') return { errore: 'Questo tratto e un arco: cambia il raggio o i punti.' };
+    const a = { x: num(P[prec].x), y: num(P[prec].y) }, b = { x: num(P[i].x), y: num(P[i].y) };
+    let dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy);
+    if (o.orienta === 'H' || o.orienta === 'V') { const L0 = L; dx = o.orienta === 'H' ? (dx < 0 ? -L0 : L0) : 0; dy = o.orienta === 'V' ? (dy < 0 ? -L0 : L0) : 0; }
+    if (o.angolo !== undefined && o.angolo !== null) { if (!isFinite(Number(o.angolo))) return { errore: 'Angolo non valido.' }; const ang = Number(o.angolo) * RAD; dx = Math.cos(ang) * L; dy = Math.sin(ang) * L; }
+    if (o.lunghezza !== undefined && o.lunghezza !== null) {
+      const nl = Number(o.lunghezza);
+      if (!(nl > 0)) return { errore: 'La lunghezza deve essere maggiore di zero.' };
+      const cur = Math.hypot(dx, dy);
+      if (cur < 1e-9) return { errore: 'Il segmento ha lunghezza zero: scegli prima una direzione (angolo, H o V).' };
+      dx *= nl / cur; dy *= nl / cur;
+    }
+    const nuovo = { x: a.x + dx, y: a.y + dy }, delta = { x: nuovo.x - b.x, y: nuovo.y - b.y };
+    const nu = copia(e); delete nu.id;
+    const muovi = k => { nu.punti[k].x = r3(num(nu.punti[k].x) + delta.x); nu.punti[k].y = r3(num(nu.punti[k].y) + delta.y); };
+    if (i === 0) muovi(0); else { muovi(i); if (o.segue) for (let k = i + 1; k < n; k++) muovi(k); }
+    if (i === 0 && o.segue) for (let k = 1; k < n; k++) muovi(k);
+    return nu;
+  }
+  /** Le quote da mostrare sul disegno: [{tipo:'lin'|'dia'|'raggio', x0,y0,x1,y1 (punti misurati), testo, e (id)}]. */
+  function quote(entita) {
+    const out = [], f = v => String(r3(v)).replace('.', ',');
+    (entita || []).forEach(e => {
+      if (e.tipo === 'rett') {
+        const x0 = Math.min(num(e.x0), num(e.x1)), x1 = Math.max(num(e.x0), num(e.x1)), y0 = Math.min(num(e.y0), num(e.y1)), y1 = Math.max(num(e.y0), num(e.y1));
+        out.push({ tipo: 'lin', x0, y0, x1, y1: y0, testo: f(x1 - x0), lato: 'sotto', e: e.id }, { tipo: 'lin', x0: x1, y0, x1, y1, testo: f(y1 - y0), lato: 'destra', e: e.id });
+      } else if (e.tipo === 'cerchio') out.push({ tipo: 'dia', x0: num(e.cx), y0: num(e.cy), x1: num(e.r), y1: 0, testo: 'Ø' + f(2 * num(e.r)), e: e.id });
+      else if (e.tipo === 'asola') out.push({ tipo: 'lin', x0: num(e.x1), y0: num(e.y1), x1: num(e.x2), y1: num(e.y2), testo: f(Math.hypot(num(e.x2) - num(e.x1), num(e.y2) - num(e.y1))) + ' x ' + f(num(e.w)), lato: 'sopra', e: e.id });
+      else if (e.tipo === 'poli') {
+        const P = e.punti || [], n = P.length;
+        for (let i = 1; i <= (e.chiuso ? n : n - 1); i++) {
+          const a = P[i - 1], b = P[i % n];
+          if (b.tratto === 'cw' || b.tratto === 'ccw') { out.push({ tipo: 'raggio', x0: num(b.x), y0: num(b.y), x1: num(a.x), y1: num(a.y), testo: 'R' + f(Math.abs(num(b.r))), e: e.id }); continue; }
+          const L = Math.hypot(num(b.x) - num(a.x), num(b.y) - num(a.y));
+          if (L > 1e-9) out.push({ tipo: 'lin', x0: num(a.x), y0: num(a.y), x1: num(b.x), y1: num(b.y), testo: f(L), lato: 'sopra', e: e.id });
+        }
+      }
+    });
+    return out;
+  }
+
+  const Mod = { trasformaCAD: trasforma, serieLineare, seriePolare, offsetCAD: offset, angoloCAD: angolo, tagliaEstendiCAD: tagliaEstendi, unisciAngoloCAD: unisciAngolo, entitaInFinestra, quotaSegmentoCAD: quotaSegmento, quoteCAD: quote };
   Object.assign(O, Mod);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);
