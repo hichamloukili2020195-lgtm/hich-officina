@@ -282,6 +282,11 @@ const server = http.createServer((q, r) => {
   await pg.setInputFiles('#f-foto', { name: 'pezzo.png', mimeType: 'image/png', buffer: png });
   await pg.waitForTimeout(400);
   ok((await pg.$$eval('.foto-griglia img', x => x.length)) === 1, 'foto non aggiunta');
+  await pg.click('.foto-griglia .foto >> nth=0'); await pg.waitForTimeout(100);
+  await pg.click('.foto-chips .chip[data-dida="Morsa"]'); await pg.waitForTimeout(100);
+  ok((await pg.textContent('.foto-dida')) === 'Morsa', 'didascalia della foto');
+  await pg.fill('#f-sporg', '12'); await pg.waitForTimeout(40);
+  await pg.click('.chip:text-is("Centro del pezzo")').catch(() => {});
   await foto('14-pezzo');
   await pg.click('text=Controlla le misure'); await pg.waitForTimeout(60);
   await pg.fill('#f-mis0', '20,01');
@@ -296,6 +301,8 @@ const server = http.createServer((q, r) => {
   await pg.click('text=Foglio di attrezzaggio'); await pg.waitForTimeout(300);
   const fp = await pg.$eval('.anteprima-foglio', f => f.srcdoc);
   ok(fp.includes('Flangia prova') && fp.includes('data:image') && fp.includes('20,021'), 'foglio del pezzo incompleto');
+  ok(fp.includes('Serraggio e origine') && fp.includes('<svg') && fp.includes('X0 Y0'), 'foglio: schema dell\'origine');
+  ok(fp.includes('<figcaption>Morsa</figcaption>') && fp.includes('12 mm'), 'foglio: foto con didascalia e sporgenza dal serraggio');
   // tolleranze scritte a mano
   const tol = await pg.evaluate(() => [App.leggiTolleranza(20, 'H7'), App.leggiTolleranza(10, '±0,05'), App.leggiTolleranza(10, '+0,1 -0,05'), App.leggiTolleranza(10, '0/-0.02'), App.leggiTolleranza(10, 'boh').errore ? 'e' : 'x']);
   ok(JSON.stringify(tol) === JSON.stringify([{ sup: 0.021, inf: 0 }, { sup: 0.05, inf: -0.05 }, { sup: 0.1, inf: -0.05 }, { sup: 0, inf: -0.02 }, 'e']), 'tolleranze: ' + JSON.stringify(tol));
@@ -671,7 +678,7 @@ const server = http.createServer((q, r) => {
     await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
     ok((await pg.textContent('#lav-costo')).includes('€'), 'costo del pezzo');
     await pg.click('#lav-foglio'); await pg.waitForTimeout(200);
-    ok((await pg.evaluate(() => location.hash)) === '#foglio' && (await pg.evaluate(() => App.param.foglio.html)).includes('Utensili:'), 'foglio di attrezzaggio dal lavoro');
+    ok((await pg.evaluate(() => location.hash)) === '#foglio' && (await pg.evaluate(() => App.param.foglio.html)).includes('Sequenza delle lavorazioni'), 'foglio di attrezzaggio dal lavoro');
     await pg.goBack(); await pg.waitForTimeout(150);
     // salva con un nome, duplica, riapri
     await pg.click('.lav-passi button[data-passo="0"]'); await pg.waitForTimeout(60);
@@ -1375,6 +1382,15 @@ const server = http.createServer((q, r) => {
   ok((await pg.evaluate(() => App.lavoroStato.S.fresa.forme[0].smusso)) === 1, 'smusso scelto');
   await pg.click('#lav-avanti'); await pg.waitForTimeout(200);
   ok((await pg.$$eval('.lav-fase', x => x.map(e => e.dataset.chiave))).some(k => /^Smusso C1 tasca/.test(k)), 'fase di smusso della tasca');
+
+  // ===== 2.35.0: foglio di attrezzaggio completo dal lavoro guidato =====
+  await vai('lavoro'); await pg.click('.lav-passi button[data-passo="0"]'); await pg.click('.lav-macchina[data-modo="fresa"]'); await pg.waitForTimeout(100);
+  await pg.click('.lav-modello[data-modello="piastraTasca"]'); await pg.waitForTimeout(100);
+  if (await pg.isVisible('.dialogo-box')) { await pg.click('.dialogo-box .pul:text-is("Usa il modello")'); await pg.waitForTimeout(100); }
+  await pg.evaluate(() => App.lavoroStato.vaiPasso(3)); await pg.waitForTimeout(300);
+  await pg.click('#lav-foglio'); await pg.waitForTimeout(400);
+  const fl = await pg.$eval('.anteprima-foglio', f => f.srcdoc);
+  ok(fl.includes('Sequenza delle lavorazioni') && fl.includes('Serraggio e origine') && /serve almeno \d+ mm/.test(fl) && fl.includes('vista dall'), 'foglio del lavoro guidato: sequenza, schema e sporgenza minima');
 
   // ===== 2.34.0: velocita reale, righe, confronto col disegno, lato B, profilo interno =====
   await vai('lavoro'); await pg.waitForTimeout(100);

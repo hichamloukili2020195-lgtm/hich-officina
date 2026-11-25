@@ -489,8 +489,10 @@
         corpo.appendChild(el('div', { class: 'lav-utensili' }, r.utensili.map(u => el('div', { class: 'lav-ut' }, [el('b', { testo: 'T' + u.t }), el('span', { testo: u.uso })]))));
         corpo.appendChild(el('button', { class: 'pul sec', id: 'lav-foglio', html: A.icona('salva') + 'Foglio di attrezzaggio', onclick: () => {
           const g = L().grezzo, mt = A.materiale(S.mat || 0);
-          const note = 'Utensili: ' + r.utensili.map(u => 'T' + u.t + ' ' + u.uso).join('; ');
-          const pz = { nome: S.modo === 'tornio' ? 'ALBERO' : 'PIASTRA', materiale: mt ? mt.n : '', grezzo: S.modo === 'tornio' ? 'barra Ø' + fmt(num(g.dg)) : fmt(num(g.lx)) + ' x ' + fmt(num(g.ly)) + ' x ' + fmt(num(g.lz)), origine: S.modo === 'tornio' ? 'Z0 sulla faccia di testa, X sull\'asse' : 'Spigolo in basso a sinistra, Z0 sulla faccia finita', misure: (prop.misure || []).map(x => ({ nome: x.nome, nominale: x.nominale, toll: x.toll })), note, foto: [] };
+          const note = '';   // la sequenza delle lavorazioni sta gia nel foglio
+          const pz = { nome: S.modo === 'tornio' ? 'ALBERO' : 'PIASTRA', materiale: mt ? mt.n : '', grezzo: S.modo === 'tornio' ? 'barra Ø' + fmt(num(g.dg)) : fmt(num(g.lx)) + ' x ' + fmt(num(g.ly)) + ' x ' + fmt(num(g.lz)), origine: S.modo === 'tornio' ? 'Z0 sulla faccia di testa, X sull\'asse' : 'Spigolo in basso a sinistra, Z0 sulla faccia finita', misure: (prop.misure || []).map(x => ({ nome: x.nome, nominale: x.nominale, toll: x.toll })), note, foto: [], modo: S.modo,
+            dim: S.modo === 'tornio' ? { dg: num(g.dg), lg: num(g.lg) || (prop.punti ? -Math.min(...prop.punti.map(q => Number(q.z))) + 5 : 0) } : { lx: num(g.lx), ly: num(g.ly), lz: num(g.lz) },
+            fasi: prop.fasi.filter(f => !((L().scelte || {}).spente || {})[f.chiave]).map(f => ({ titolo: String(f.titolo).replace(/ T\d+$/, ''), t: f.c.t, dati: S.modo === 'tornio' ? 'Vc ' + fmt(f.c.vc, 0) + ' · f ' + fmt(f.c.f, 3) : 'S' + fmt(f.c.n, 0) + ' · F' + fmt(f.c.f, 0) })) };
           const html = O.htmlFoglio(pz, [{ righe: r.righe, nome: pz.nome, tipo: S.modo }], []);
           A.param.foglio = { titolo: 'Attrezzaggio ' + pz.nome, html, nome: 'attrezzaggio-' + String(pz.nome).replace(/[^A-Za-z0-9_-]+/g, '_') + '.html' };
           A.vai('foglio');

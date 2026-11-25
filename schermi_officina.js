@@ -117,7 +117,7 @@
       m.append(el('div', { class: 'sez', testo: 'Dati del pezzo' }), pan);
       A.modulo(pan, [{ id: 'nome', et: 'Nome', tipo: 'testo' }, { id: 'disegno', et: 'Disegno / codice', tipo: 'testo' },
         { id: 'materiale', et: 'Materiale', tipo: 'testo' }, { id: 'grezzo', et: 'Grezzo', sub: 'es. 100 x 60 x 25 oppure D40 x 80', tipo: 'testo' },
-        { id: 'origine', et: 'Origine', tipo: 'testo', largo: true }, { id: 'fissaggio', et: 'Fissaggio', sub: 'morsa, griffe, attrezzatura...', tipo: 'testo', largo: true },
+        { id: 'origine', et: 'Origine', tipo: 'testo', largo: true }, { id: 'origTipo', et: 'Posizione dell\'origine (schema nel foglio)', tipo: 'scelta', scelte: ORIGINI }, { id: 'fissaggio', et: 'Fissaggio', sub: 'morsa, griffe, attrezzatura...', tipo: 'testo', largo: true }, { id: 'sporg', et: 'Sporgenza dal serraggio', u: 'mm', sub: 'quanto il pezzo esce dalla morsa o dalle griffe' },
         { id: 'note', et: 'Note', tipo: 'area', righe: 4 }], p, () => {});
       // programmi collegati
       m.appendChild(el('div', { class: 'sez', testo: 'Programmi' }));
@@ -156,12 +156,14 @@
         (p.foto || []).forEach(id => {
           const img = el('img', { alt: 'Foto del pezzo', loading: 'lazy' });
           A.Foto.prendi(id).then(d => { if (d) img.src = d; });
-          fotoBox.appendChild(el('button', { class: 'foto', 'aria-label': 'Apri la foto', onclick: () => apriFoto(id, img.src) }, [img]));
+          const dd = (p.dida || {})[id];
+          fotoBox.appendChild(el('button', { class: 'foto', 'aria-label': 'Apri la foto' + (dd ? ': ' + dd : ''), onclick: () => apriFoto(id, img.src) }, [img, dd ? el('span', { class: 'foto-dida', testo: dd }) : null].filter(Boolean)));
         });
       };
       const apriFoto = (id, src) => {
         const vel = el('div', { class: 'velo', onclick: e => { if (e.target === vel) vel.remove(); } }, [
           el('img', { src, alt: 'Foto del pezzo' }),
+          el('div', { class: 'chips foto-chips', role: 'group', 'aria-label': 'Didascalia della foto' }, [''].concat(DIDA).map(t => el('button', { class: 'chip' + (((p.dida || {})[id] || '') === t ? ' attiva' : ''), 'data-dida': t, testo: t || 'Nessuna', onclick: () => { p.dida = p.dida || {}; if (t) p.dida[id] = t; else delete p.dida[id]; A.salva(); vel.remove(); disegnaFoto(); } }))),
           el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', testo: 'Chiudi', onclick: () => vel.remove() }),
             el('button', { class: 'pul peric', html: A.icona('cestino') + 'Elimina', onclick: () => {
               if (!conferma('foto' + id, 'Premi ancora per eliminare la foto')) return;
@@ -243,25 +245,58 @@
   };
 
   // ----- foglio di attrezzaggio -----
+  const DIDA = ['Morsa', 'Origine', 'Utensili', 'Pezzo', 'Altro'];
+  const ORIGINI = [['bs', 'Angolo in basso a sinistra'], ['as', 'Angolo in alto a sinistra'], ['c', 'Centro del pezzo']];
+  /** Schema dell'origine in SVG: dall'alto per la fresa, di lato per il tornio. */
+  function schemaOrigine(p) {
+    const nums = String(p.grezzo || '').replace(/,/g, '.').match(/\d+(?:\.\d+)?/g) || [];
+    const d = p.dim || {};
+    if (p.modo === 'tornio') {
+      const dg = Number(d.dg) || Number(nums[0]) || 40, lg = Number(d.lg) || Number(nums[1]) || 80, k = Math.min(200 / lg, 80 / dg), w = lg * k, h = dg * k, x0 = 60, y0 = 20;
+      return '<svg viewBox="0 0 340 130" width="340" height="130" role="img" aria-label="Schema dell\'origine al tornio"><rect x="' + x0 + '" y="' + y0 + '" width="' + w + '" height="' + h + '" fill="#dfe8f5" stroke="#1f3a66"/>' +
+        '<rect x="14" y="' + (y0 - 8) + '" width="' + (x0 - 14) + '" height="' + (h + 16) + '" fill="#bbb" stroke="#555"/><text x="18" y="' + (y0 + h / 2 + 3) + '" font-size="9" fill="#333">griffe</text>' +
+        '<line x1="8" y1="' + (y0 + h / 2) + '" x2="' + (x0 + w + 30) + '" y2="' + (y0 + h / 2) + '" stroke="#999" stroke-dasharray="6 3 1 3"/>' +
+        '<line x1="' + (x0 + w) + '" y1="' + (y0 - 12) + '" x2="' + (x0 + w) + '" y2="' + (y0 + h + 12) + '" stroke="#d33" stroke-width="1.6"/><text x="' + (x0 + w - 10) + '" y="' + (y0 + h + 24) + '" font-size="10" fill="#d33">Z0 faccia</text>' +
+        '<text x="' + (x0 + w + 6) + '" y="' + (y0 + h / 2 - 4) + '" font-size="9" fill="#555">asse X0</text>' +
+        '<text x="' + (x0 + w / 2 - 22) + '" y="' + (y0 + 12) + '" font-size="9" fill="#1f3a66">Ø' + dg + ' · L' + lg + '</text></svg>';
+    }
+    const lx = Number(d.lx) || Number(nums[0]) || 100, ly = Number(d.ly) || Number(nums[1]) || 60, k = Math.min(220 / lx, 110 / ly), w = lx * k, h = ly * k, x0 = 50, y0 = 14;
+    const tipo = ORIGINI.some(q => q[0] === p.origTipo) ? p.origTipo : 'bs';
+    const ox = tipo === 'c' ? x0 + w / 2 : x0, oy = tipo === 'as' ? y0 : tipo === 'c' ? y0 + h / 2 : y0 + h;
+    const dirY = tipo === 'as' ? 1 : -1;
+    return '<svg viewBox="0 0 340 150" width="340" height="150" role="img" aria-label="Schema dell\'origine alla fresa"><rect x="' + x0 + '" y="' + y0 + '" width="' + w + '" height="' + h + '" fill="#dfe8f5" stroke="#1f3a66"/>' +
+      '<line x1="' + ox + '" y1="' + oy + '" x2="' + (ox + 46) + '" y2="' + oy + '" stroke="#d33" stroke-width="2"/><text x="' + (ox + 48) + '" y="' + (oy + 4) + '" font-size="11" fill="#d33">X</text>' +
+      '<line x1="' + ox + '" y1="' + oy + '" x2="' + ox + '" y2="' + (oy + dirY * 46) + '" stroke="#d33" stroke-width="2"/><text x="' + (ox - 4) + '" y="' + (oy + dirY * 56) + '" font-size="11" fill="#d33">Y</text>' +
+      '<circle cx="' + ox + '" cy="' + oy + '" r="4" fill="#d33"/><text x="' + (ox + 7) + '" y="' + (oy + (dirY < 0 ? 14 : -6)) + '" font-size="10" fill="#d33">X0 Y0</text>' +
+      '<text x="' + (x0 + w + 10) + '" y="' + (y0 + 12) + '" font-size="9" fill="#555">vista dall\'alto</text><text x="' + (x0 + w + 10) + '" y="' + (y0 + 25) + '" font-size="9" fill="#555">' + lx + ' x ' + ly + '</text><text x="' + (x0 + w + 10) + '" y="' + (y0 + 38) + '" font-size="9" fill="#555">Z0 sopra</text></svg>';
+  }
   function htmlFoglio(p, programmi, foto) {
     const tab = utensili();
     const st = 'body{font:12px/1.4 system-ui,sans-serif;color:#111;margin:16px}h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;margin:16px 0 6px;border-bottom:2px solid #1f7aff;padding-bottom:2px}' +
       'table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef2f8;font-size:11px}' +
       '.dati td:first-child{width:28%;font-weight:600}.foto{display:flex;flex-wrap:wrap;gap:8px}.foto img{width:48%;max-height:260px;object-fit:contain;border:1px solid #ccc}' +
-      '.piccolo{color:#555;font-size:11px}@page{margin:12mm}';
+      '.piccolo{color:#555;font-size:11px}@page{margin:12mm}.schema{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:6px}figure.fg{margin:0;width:48%;break-inside:avoid}figure.fg img{width:100%;max-height:260px;object-fit:contain;border:1px solid #ccc}figcaption{font-size:11px;font-weight:600;margin-top:2px}.corto{color:#b00020;font-weight:700}.grup{break-inside:avoid}';
     let h = '<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Attrezzaggio ' + esc(p.nome || '') + '</title><style>' + st + '</style></head><body>';
     h += '<h1>Foglio di attrezzaggio: ' + esc(p.nome || '') + '</h1><div class="piccolo">Hich-Officina · ' + esc(new Date().toLocaleDateString('it-IT')) + '</div>';
-    h += '<h2>Pezzo</h2><table class="dati">' + [['Disegno / codice', p.disegno], ['Materiale', p.materiale], ['Grezzo', p.grezzo], ['Origine', p.origine], ['Fissaggio', p.fissaggio]]
+    h += '<h2>Pezzo</h2><table class="dati">' + [['Disegno / codice', p.disegno], ['Materiale', p.materiale], ['Grezzo', p.grezzo]]
       .map(([a, b]) => '<tr><td>' + a + '</td><td>' + esc(b || '') + '</td></tr>').join('') + '</table>';
+    h += '<h2>Serraggio e origine</h2><table class="dati">' + [['Fissaggio', p.fissaggio], ['Sporgenza dal serraggio', p.sporg ? p.sporg + ' mm' : ''], ['Origine', p.origine]]
+      .map(([a, b]) => '<tr><td>' + a + '</td><td>' + esc(b || '') + '</td></tr>').join('') + '</table><div class="schema">' + schemaOrigine(p) + '</div>';
+    if ((p.fasi || []).length) {
+      h += '<h2>Sequenza delle lavorazioni</h2><table><tr><th>N.</th><th>Lavorazione</th><th>T</th><th>Dati di taglio</th><th>Fatta</th></tr>' + p.fasi.map((f, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(f.titolo || '') + '</td><td>' + esc(f.t === undefined ? '' : 'T' + f.t) + '</td><td>' + esc(f.dati || '') + '</td><td style="width:44px"></td></tr>').join('') + '</table>';
+    }
     programmi.forEach(pr => {
       const r = O.eseguiISO((pr.iso || pr.righe).join('\n'), { modo: pr.tipo === 'tornio' ? 'tornio' : pr.tipo ? 'fresa' : 'auto' });
       const L = r.limiti, q = k => (L[k].minLavoro === null ? '—' : fmt(L[k].minLavoro, 3) + ' / ' + fmt(L[k].maxLavoro, 3));
       h += '<h2>Programma ' + esc(pr.nome || '') + (pr.titolo ? ' · ' + esc(pr.titolo) : '') + '</h2>';
       h += '<table class="dati"><tr><td>Tempo stimato</td><td>' + fmt(r.tempo, 1) + ' min</td></tr><tr><td>Quote di lavoro X</td><td>' + q('x') + '</td></tr>' +
         (r.modo === 'tornio' ? '' : '<tr><td>Quote di lavoro Y</td><td>' + q('y') + '</td></tr>') + '<tr><td>Quote di lavoro Z</td><td>' + q('z') + '</td></tr></table>';
-      h += '<table style="margin-top:6px"><tr><th>T</th><th>Utensile</th><th>Lunghezza</th><th>S</th><th>F</th><th>Montato</th></tr>' + r.utensili.map(u => {
-        const d = tab.find(x => Number(x.t) === u.t);
-        return '<tr><td><b>' + u.t + '</b></td><td>' + esc(d ? A.descrUt(d) : (u.commento || '')) + '</td><td>' + (d && d.l ? fmt(O.num(d.l)) + ' mm' : '') + '</td><td>' + u.s.join(', ') + '</td><td>' + u.f.map(x => fmt(x, 3)).join(', ') + '</td><td style="width:60px"></td></tr>';
+      const fr = r.modo !== 'tornio', zmin = {};
+      if (fr) r.segmenti.forEach(sg => { if (!sg.rapido) zmin[sg.t] = Math.min(zmin[sg.t] === undefined ? 0 : zmin[sg.t], sg.z0, sg.z); });
+      h += '<table style="margin-top:6px"><tr><th>T</th><th>Utensile</th><th>Sporgenza' + (fr ? ' (minima)' : '') + '</th><th>S</th><th>F</th><th>Montato</th></tr>' + r.utensili.map(u => {
+        const d = tab.find(x => Number(x.t) === u.t), serve = fr && zmin[u.t] < 0 ? Math.ceil(-zmin[u.t] + 3) : 0, ha = d && d.l ? O.num(d.l) : 0;
+        const sp = (ha ? fmt(ha) + ' mm' : '') + (serve ? (ha ? ' · ' : '') + 'serve almeno ' + serve + ' mm' : '') + (serve && ha && ha < serve ? ' <span class="corto">TROPPO CORTO</span>' : '');
+        return '<tr><td><b>' + u.t + '</b></td><td>' + esc(d ? A.descrUt(d) : (u.commento || '')) + '</td><td>' + sp + '</td><td>' + u.s.join(', ') + '</td><td>' + u.f.map(x => fmt(x, 3)).join(', ') + '</td><td style="width:60px"></td></tr>';
       }).join('') + '</table>';
       if (r.avvisi.length) h += '<p class="piccolo">' + esc(r.avvisi.slice(0, 6).join(' · ')) + '</p>';
     });
@@ -272,15 +307,21 @@
       }).join('') + '</table>';
     }
     if (p.note) h += '<h2>Note</h2><p>' + esc(p.note).replace(/\n/g, '<br>') + '</p>';
-    if (foto.length) h += '<h2>Foto</h2><div class="foto">' + foto.map(f => '<img src="' + f + '" alt="">').join('') + '</div>';
+    if (foto.length) {
+      // le foto con la didascalia (Morsa, Origine, Utensili, Pezzo, Altro) in quest'ordine; foto = [dataURL] oppure [{src, dida}]
+      const F = foto.map(f => (typeof f === 'string' ? { src: f, dida: '' } : f));
+      const ord = DIDA.concat(['']);
+      F.sort((a, b) => ord.indexOf(DIDA.includes(a.dida) ? a.dida : '') - ord.indexOf(DIDA.includes(b.dida) ? b.dida : ''));
+      h += '<h2>Foto</h2><div class="foto">' + F.map(f => '<figure class="fg"><img src="' + f.src + '" alt="' + esc(f.dida || 'Foto') + '">' + (f.dida ? '<figcaption>' + esc(f.dida) + '</figcaption>' : '') + '</figure>').join('') + '</div>';
+    }
     return h + '</body></html>';
   }
   async function foglio(p) {
     const salvati = A.mem.salvati || [];
     const programmi = (p.programmi || []).map(id => salvati.find(x => x.id === id)).filter(Boolean);
     const foto = [];
-    for (const id of (p.foto || [])) { const d = await A.Foto.prendi(id); if (d) foto.push(d); }
-    const html = htmlFoglio(p, programmi, foto);
+    for (const id of (p.foto || [])) { const d = await A.Foto.prendi(id); if (d) foto.push({ src: d, dida: (p.dida || {})[id] || '' }); }
+    const html = htmlFoglio(Object.assign({ modo: /^\s*D\s*\d/i.test(p.grezzo || '') || /^\s*(barra|Ø)/i.test(p.grezzo || '') ? 'tornio' : 'fresa' }, p), programmi, foto);
     A.param.foglio = { titolo: 'Attrezzaggio ' + (p.nome || ''), html, nome: 'attrezzaggio-' + String(p.nome || 'pezzo').replace(/[^A-Za-z0-9_-]+/g, '_') + '.html' };
     A.vai('foglio');
   }
@@ -290,7 +331,7 @@
     A.param.foglio = { titolo: 'Attrezzaggio ' + L.nome, html, nome: 'attrezzaggio-' + String(L.nome).replace(/[^A-Za-z0-9_-]+/g, '_') + '.html' };
     A.vai('foglio');
   };
-  O.htmlFoglio = htmlFoglio;
+  O.htmlFoglio = htmlFoglio; O.schemaOrigine = schemaOrigine;
   A.schermi.foglio = {
     titolo: 'Foglio di attrezzaggio', preferibile: false,
     render(m) {

@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.35.0 - Foglio di attrezzaggio completo
+- **Foto con didascalia**: apri una foto del pezzo e scegli Morsa, Origine, Utensili, Pezzo o Altro. Nel foglio le foto stanno in quest'ordine, ognuna con la sua didascalia; la didascalia si vede anche sulla miniatura.
+- **Serraggio e origine**: nuovi campi "Sporgenza dal serraggio" e "Posizione dell'origine" (angolo in basso, in alto o centro). Nel foglio c'e lo schema dell'origine: dall'alto per la fresa (X0 Y0 e assi), di lato per il tornio (griffe, asse e Z0 sulla faccia).
+- **Sporgenza minima degli utensili** (fresa): per ogni utensile il foglio scrive quanto deve sporgere (profondita del lavoro piu 3 mm) e segna in rosso "TROPPO CORTO" se la sporgenza della tabella utensili non basta.
+- **Sequenza delle lavorazioni** nel foglio del lavoro guidato, con utensile, dati di taglio e una casella "Fatta" da spuntare a mano.
+- Il foglio si stampa, si salva in PDF o si condivide (WhatsApp, email) come prima.
+
 ## 2.34.0 - Simulazione con morsa e mandrino, confronto col disegno, lato B, profili interni
 - **Simulazione in tempo reale**: velocita "Reale", "Reale x5", "Reale x20" con il tempo che scorre (anche a meta di un movimento lungo). Tocca una riga del programma e la simulazione va li; "Riga prima" e "Riga dopo".
 - **Morsa, mandrino e portautensile**: le ganasce della morsa (fresa), il mandrino con tre griffe (tornio) e il portautensile si vedono in 2D e in 3D. Urti segnalati: fresa contro le ganasce, portautensile contro le ganasce o il pezzo (con la sporgenza della tabella utensili), utensile contro le griffe, lavori oltre la sporgenza dal mandrino. In "Controlla un programma" si scrivono sporgenza dalla morsa, Ø del portautensile e sporgenza dal mandrino; nel lavoro guidato sono ipotizzate.
