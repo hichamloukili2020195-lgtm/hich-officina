@@ -487,12 +487,18 @@
         });
         if (t === 'cil') {
           const d = num(b.x);
-          const passi = O.FILETTI_GROSSI.filter(f => f[0] === d).concat(O.FILETTI_FINI.filter(f => f[0] === d)).map(f => f[1]);
-          const lv = { fil: b.fil || '', gola: b.gola || '', toll: b.toll || '' };
+          const lv = { gola: b.gola || '', toll: b.toll || '' };
           editor.appendChild(el('div', { class: 'sez', testo: 'Lavorazioni su questa linea' }));
           const panL = el('div', { class: 'pannello' });
           editor.appendChild(panL);
-          A.modulo(panL, [{ id: 'fil', et: 'Filetto', tipo: 'scelta', scelte: [['', 'nessuno']].concat(passi.map(p => [String(p), 'M' + fmt(d) + ' x ' + fmt(p) + (p === O.passoGrosso(d) ? ' (grosso)' : ' (fine)')])).concat(passi.length ? [] : [['1', 'passo 1'], ['1.5', 'passo 1,5'], ['2', 'passo 2']]) },
+          editor.insertBefore(A.sceltaFiletto({ d, fil: b.fil, filFam: b.filFam, filNome: b.filNome }, { id: 'd-fil', d, cambia: F => {
+            if (!F) { delete b.fil; delete b.filFam; delete b.filNome; A.salva(); tutto(); return; }
+            if (Math.abs(F.d - d) > 0.001) { cambiaD(Math.round(F.d * 1000) / 1000); A.avviso('Diametro portato a ' + fmt(F.d, 3) + ' per il filetto ' + F.nome); }
+            b.fil = String(F.p); b.filFam = F.fam; b.filNome = F.nome;
+            if (!b.gola && i < S.punti.length - 1 && num(S.punti[i + 1].x) > F.d) { b.gola = String(Math.max(3, Math.round(2 * F.p * 10) / 10)); A.avviso('Aggiunta la gola di scarico larga ' + b.gola); }
+            A.salva(); tutto();
+          } }), panL);
+          A.modulo(panL, [
             { id: 'gola', et: 'Gola di scarico alla fine', sub: 'larghezza; vuoto = niente', u: 'mm' },
             { id: 'toll', et: 'Tolleranza', sub: 'es. h6, ±0,02', tipo: 'testo' }], lv, id => {
             if (id === 'fil') { if (lv.fil) b.fil = lv.fil; else delete b.fil; if (lv.fil && !b.gola && i < S.punti.length - 1 && num(S.punti[i + 1].x) > d) { b.gola = String(Math.max(3, Math.round(2 * num(lv.fil) * 10) / 10)); A.avviso('Aggiunta la gola di scarico larga ' + b.gola); } A.salva(); tutto(); return; }

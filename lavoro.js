@@ -261,6 +261,21 @@
    * Il programma dalle fasi proposte, con quelle spente tolte e le correzioni applicate.
    * scelte = {spente: {chiave: true}, correzioni: {chiave: {n, f, vc}}}. Ritorna {righe, errore, tempo, utensili, avvisi}.
    */
+  /** Le passate che si possono scegliere in una fase: [{id, et, u, v (valore proposto)}]. */
+  function passateDi(f) {
+    const c = f.c || {}, out = [];
+    if (f.op === 'filetto' || f.op === 'filettoInt') out.push({ id: 'np', et: 'Passate del filetto', u: 'n.', v: Math.max(1, Math.round(Number(c.n) || 6)) });
+    else if (pos(num(c.ap))) out.push({ id: 'ap', et: f.op === 'sfacciatura' ? 'Passata in Z' : /profilo|interna|cilindr/i.test(f.op) && !c.d ? 'Passata radiale' : 'Passata in Z', u: 'mm', v: num(c.ap) });
+    if (pos(num(c.q)) && /G83|G73/.test(String(c.ciclo || ''))) out.push({ id: 'q', et: 'Beccata (Q)', u: 'mm', v: num(c.q) });
+    return out;
+  }
+  /** Profondita di ogni passata di un filetto (mm sul raggio, una per passata): per mostrarla all'operatore. */
+  function passateFilettoLavoro(f, n) {
+    const c = f.c || {}, h = pos(num(c.h)) ? num(c.h) : 0.613343 * (num(c.p) || 1), np = Math.max(1, Math.round(n || c.n || 6));
+    const out = []; let prima = 0;
+    for (let i = 1; i <= np; i++) { const pr = h * Math.sqrt(i / np); out.push(Math.round((pr - prima) * 1000) / 1000); prima = pr; }
+    return out;
+  }
   function programmaLavoro(prop, scelte, comuni) {
     scelte = scelte || {};
     const sp = scelte.spente || {}, cor = scelte.correzioni || {};
@@ -269,6 +284,10 @@
       if (pos(num(k.n))) { c.n = num(k.n); if (c.giri) c.giri = num(k.n); }
       if (pos(num(k.f))) c.f = num(k.f);
       if (pos(num(k.vc))) c.vc = num(k.vc);
+      // spessore delle passate scelto dall'operatore: profondita di passata, passate del filetto, beccata della foratura
+      if (pos(num(k.ap)) && pos(num(c.ap))) c.ap = num(k.ap);
+      if (pos(num(k.np)) && (f.op === 'filetto' || f.op === 'filettoInt')) c.n = Math.max(1, Math.min(60, Math.round(num(k.np))));
+      if (pos(num(k.q)) && pos(num(c.q))) c.q = num(k.q);
       return Object.assign({}, f, { c });
     });
     if (!fasi.length) return { errore: 'Tutte le lavorazioni sono spente.' };
@@ -316,7 +335,7 @@
     return { tempoPezzo: tempo, lavorazione: lav, materiale: mat, pezzo: lav + mat, pezzi: n, lotto: (lav + mat) * n, tempoLotto: tempo * n };
   }
 
-  const Lavoro = { puntiTornio, entitaFresa, proponiLavoro, programmaLavoro, MODELLI_LAVORO: MODELLI, costoPezzo };
+  const Lavoro = { puntiTornio, entitaFresa, proponiLavoro, programmaLavoro, passateDi, passateFilettoLavoro, MODELLI_LAVORO: MODELLI, costoPezzo };
   Object.assign(O, Lavoro);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

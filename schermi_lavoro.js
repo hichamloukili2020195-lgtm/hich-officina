@@ -22,6 +22,36 @@
   const NOMI_FORMA = Object.fromEntries(FORME.map(f => [f[0], f[1]]));
   const MASCHI = [[3, .5], [4, .7], [5, .8], [6, 1], [8, 1.25], [10, 1.5], [12, 1.75], [16, 2], [20, 2.5]];
 
+  /**
+   * Scelta del filetto per gruppi (metrico grosso, fine, gas, NPT, UNC, UNF...): prima il gruppo, poi la misura.
+   * o: il tratto con d (o di), fil, filFam, filNome. opz: {id, d (diametro attuale), cambia(F | null)} con F = {fam, nome, d, p}.
+   * Le misure piu vicine al diametro sono a portata di dito; le altre stanno in "Tutte le misure".
+   */
+  const gruppiAperti = {};
+  A.sceltaFiletto = (o, opz) => {
+    const id = opz.id, box = el('div', { class: 'fil-scelta', id });
+    const d = Number(opz.d) || 0;
+    const ridisegna = () => {
+      box.innerHTML = '';
+      const grp = gruppiAperti[id] !== undefined ? gruppiAperti[id] : O.gruppoFiletto(o);
+      const chip = (t, on, fn, cid, tit) => el('button', { class: 'chip' + (on ? ' attiva' : ''), type: 'button', id: cid, testo: t, title: tit || t, onclick: fn });
+      box.appendChild(el('div', { class: 'lav-et', testo: 'Filetto' + (Number(o.fil) > 0 ? ': ' + (o.filNome || 'M' + fmt(Number(o.d !== undefined ? o.d : o.di)) + 'x' + fmt(Number(o.fil))) : '') }));
+      box.appendChild(el('div', { class: 'chips lav-chips fil-gruppi', role: 'group', 'aria-label': 'Gruppo del filetto' }, [chip('No', !grp, () => { gruppiAperti[id] = ''; opz.cambia(null); }, id + '-no')]
+        .concat(O.GRUPPI_FILETTO.map(([k, t]) => chip(t, grp === k, () => { gruppiAperti[id] = k; ridisegna(); }, id + '-g-' + k)))));
+      if (!grp) return;
+      const G = O.filettiGruppo(grp, d, 8);
+      const scelto = r => Number(o.fil) > 0 && Math.abs(r.p - Number(o.fil)) < 1e-9 && Math.abs(r.d - Number(o.d !== undefined ? o.d : o.di)) < 0.01;
+      const usa = r => { delete gruppiAperti[id]; opz.cambia({ fam: grp, nome: r.nome, d: r.d, p: r.p }); };
+      box.appendChild(el('div', { class: 'chips lav-chips fil-misure', role: 'group', 'aria-label': 'Misura del filetto' }, G.vicine.map((r, i) => chip(r.nome, scelto(r), () => usa(r), id + '-m-' + i, r.nome + ' · Ø' + fmt(r.d, 3) + ' · passo ' + fmt(r.p, 3)))));
+      const tutte = el('select', { id: id + '-tutte', 'aria-label': 'Tutte le misure del gruppo' }, [el('option', { value: '', testo: 'Tutte le misure (' + G.righe.length + ')…' })].concat(G.righe.map((r, i) => el('option', { value: String(i), testo: r.nome + ' · Ø' + fmt(r.d, 3) + ' · passo ' + fmt(r.p, 3) }))));
+      tutte.addEventListener('change', () => { const r = G.righe[Number(tutte.value)]; if (tutte.value !== '' && r) usa(r); });
+      box.appendChild(el('div', { class: 'ctrl' }, [tutte]));
+      if (d > 0 && G.vicine.length && !G.vicine.some(r => Math.abs(r.d - d) < 0.6)) box.appendChild(el('p', { class: 'leggenda', testo: 'Nessuna misura del gruppo vale Ø' + fmt(d, 2) + ': scegliendone una il diametro del tratto cambia.' }));
+    };
+    ridisegna();
+    return box;
+  };
+
   function nuovaForma(tipo, g) {
     const cx = (num(g.lx) || 100) / 2, cy = (num(g.ly) || 60) / 2;
     if (tipo === 'tasca') return { tipo, cx, cy, lx: Math.round(cx * 0.6), ly: Math.round(cy * 0.6), r: 5, prof: 5 };
@@ -54,8 +84,13 @@
       const indietro = el('button', { class: 'pul sec', id: 'lav-indietro', testo: 'Indietro', onclick: () => vaiPasso(S.passo - 1) });
       const avanti = el('button', { class: 'pul', id: 'lav-avanti', testo: 'Avanti', onclick: () => vaiPasso(S.passo + 1) });
       const barra = el('div', { class: 'lav-barra' }, [indietro, avanti]);
-      const disegnoBox = el('div', { class: 'lav-disegno' }, [tela]);
-      m.append(passi, el('div', { class: 'lav-grid' }, [disegnoBox, corpo]), barra);
+      const radiceLav = el('div', { class: 'lav-radice' });
+      const bPieno = el('button', { class: 'chip', id: 'lav-pieno', type: 'button', testo: 'Schermo intero', onclick: () => { const on = A.schermoPieno(radiceLav, () => disegna()); bPieno.textContent = on ? 'Esci' : 'Schermo intero'; bRuota.hidden = !on; } });
+      const bRuota = el('button', { class: 'chip', id: 'lav-ruota', type: 'button', testo: 'Ruota', hidden: true, onclick: () => { const o = A.ruotaSchermo(() => disegna()); bRuota.textContent = o === 'libero' ? 'Ruota' : o === 'orizzontale' ? 'Orizzontale' : 'Verticale'; } });
+      const barraDis = el('div', { class: 'chips lav-barra-dis', hidden: true }, [bPieno, bRuota]);
+      const disegnoBox = el('div', { class: 'lav-disegno' }, [tela, barraDis]);
+      radiceLav.append(el('div', { class: 'lav-grid' }, [disegnoBox, corpo]));
+      m.append(passi, radiceLav, barra);
       document.body.classList.add('con-lav-barra');
       PASSI.forEach(([id, t], i) => passi.appendChild(el('li', {}, [el('button', { 'data-passo': i, 'aria-label': 'Passo ' + (i + 1) + ': ' + t, onclick: () => vaiPasso(i) }, [el('span', { class: 'n', testo: String(i + 1) }), el('span', { class: 't', testo: t })])])));
       const vaiPasso = i => {
@@ -75,6 +110,38 @@
         zone.length = 0;
         g.font = '600 11px system-ui'; g.textAlign = 'center';
         if (S.modo === 'tornio') disegnaTornio(g, W, H); else disegnaFresa(g, W, H);
+        if (S.passo === 2) disegnaPercorsoFase(g, W, H);
+      };
+      // ----- passo 3: il percorso della lavorazione scelta, sopra il disegno -----
+      let trasf = null;
+      const cachePerc = {};
+      const percorsoFase = f => {
+        const cor = ((L().scelte || {}).correzioni || {})[f.chiave] || {}, chiave = f.chiave + JSON.stringify(cor);
+        if (cachePerc[chiave]) return cachePerc[chiave];
+        let P = [];
+        try {
+          const c = Object.assign({}, f.c);
+          if (num(cor.ap) > 0 && num(c.ap) > 0) c.ap = num(cor.ap);
+          if (num(cor.np) > 0) c.n = Math.round(num(cor.np));
+          const r = S.modo === 'tornio' ? O.gcodeTornio(f.op, c) : O.gcodeFresa(f.op, c);
+          P = (r && r.percorso) || [];
+        } catch (e) { P = []; }
+        return (cachePerc[chiave] = P);
+      };
+      const disegnaPercorsoFase = (g, W) => {
+        if (!trasf || !prop || !prop.fasi) return;
+        const f = prop.fasi.find(x => x.chiave === S.faseScelta);
+        if (!f) return;
+        const P = percorsoFase(f), X = trasf.X, Y = trasf.Y, tor = trasf.tor;
+        const pt = (a, b) => (tor ? [X(b), Y(a / 2)] : [X(a), Y(b)]);
+        g.save(); g.lineWidth = 1.6;
+        [true, false].forEach(rap => {
+          g.beginPath(); g.setLineDash(rap ? [4, 4] : []); g.strokeStyle = rap ? col('--tenue') : col('--avviso'); g.globalAlpha = rap ? 0.7 : 0.95;
+          P.forEach(m => { if (!!m.rapido !== rap) return; const a = tor ? pt(m.x0, m.z0) : pt(m.x0, m.y0), b = tor ? pt(m.x, m.z) : pt(m.x, m.y); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); });
+          g.stroke();
+        });
+        g.restore();
+        quota(g, String(f.titolo).replace(/ T\d+$/, ''), W / 2, 14, col('--avviso'));
       };
       const quota = (g, t, x, y, c) => { g.font = '600 11px system-ui'; const w = g.measureText(t).width + 8; g.fillStyle = col('--pannello'); g.globalAlpha = 0.85; g.fillRect(x - w / 2, y - 9, w, 15); g.globalAlpha = 1; g.fillStyle = c || col('--testo'); g.fillText(t, x, y + 2); };
       const disegnaTornio = (g, W, H) => {
@@ -84,6 +151,7 @@
         const zMin = -lung - 6, zMax = 4, rMax = dg / 2 + 3;
         const sc = Math.min((W - 24) / (zMax - zMin), (H - 56) / (2 * rMax));
         const largo = (zMax - zMin) * sc, X = z => (W + largo) / 2 - (zMax - z) * sc, Y = r => H / 2 - r * sc;
+        trasf = { tor: true, X, Y };
         // grezzo e asse
         g.fillStyle = col('--tenue'); g.globalAlpha = 0.14; g.fillRect(X(zMin + 2), Y(dg / 2), X(0) - X(zMin + 2), dg * sc); g.globalAlpha = 1;
         g.strokeStyle = col('--tenue'); g.setLineDash([10, 4, 2, 4]); g.beginPath(); g.moveTo(4, Y(0)); g.lineTo(W - 4, Y(0)); g.stroke(); g.setLineDash([]);
@@ -115,6 +183,7 @@
         const m0 = 30, sc = Math.min((W - 2 * m0) / lx, (H - 2 * m0) / ly);
         const ox = (W - lx * sc) / 2, oy = (H + ly * sc) / 2;
         const X = x => ox + x * sc, Y = y => oy - y * sc;
+        trasf = { tor: false, X, Y };
         g.fillStyle = col('--campo'); g.strokeStyle = col('--bordo'); g.lineWidth = 1.5;
         g.fillStyle = col('--accento'); g.globalAlpha = 0.12; g.fillRect(X(0), Y(ly), lx * sc, ly * sc); g.globalAlpha = 1;
         g.strokeStyle = F.grezzo.contorna ? col('--accento2') : col('--tenue'); g.lineWidth = F.grezzo.contorna ? 2.2 : 1.2; g.strokeRect(X(0), Y(ly), lx * sc, ly * sc);
@@ -221,18 +290,6 @@
           el('button', { class: 'icona-pul', 'aria-label': 'Elimina ' + w.nome, html: A.icona('cestino'), onclick: async () => { if (!(await A.conferma('Eliminare il lavoro?', '"' + w.nome + '" viene tolto dall\'elenco.', 'Elimina', true))) return; A.mem.lavori = salvati.filter(x => x.id !== w.id); A.salva(); tutto(); } })])));
       };
       const interruttore = (testo, on, cambia, id) => el('button', { class: 'lav-int' + (on ? ' on' : ''), role: 'switch', 'aria-checked': on ? 'true' : 'false', id, onclick: () => cambia(!on) }, [el('span', { class: 't', testo }), el('span', { class: 'sw', 'aria-hidden': 'true' })]);
-      /** Tutti i filetti del tornio, per famiglia: o e il tratto (o l'interno) con fil/filFam/filNome. */
-      const sceltaFiletto = (o, id, scegli) => {
-        const fam = O.filettiTornio ? O.filettiTornio() : [];
-        const sel = el('select', { class: 'lav-altro-fil', id, 'aria-label': 'Altro filetto' }, [el('option', { value: '', testo: 'Altro filetto (gas, NPT, UNC, Whitworth, trapezio…)' })].concat(fam.map(f => {
-          const g = document.createElement('optgroup'); g.label = f.nomeFam;
-          f.righe.forEach(r => g.appendChild(el('option', { value: f.fam + '|' + r.nome, testo: r.nome + ' · Ø' + fmt(r.d, 3) + ' · passo ' + fmt(r.p, 3) })));
-          return g;
-        })));
-        sel.value = o.filFam && o.filNome ? o.filFam + '|' + o.filNome : '';
-        sel.addEventListener('change', () => { if (!sel.value) return; const [fm, nome] = sel.value.split('|'); const f = fam.find(x => x.fam === fm), r = f && f.righe.find(x => x.nome === nome); if (r) scegli({ fam: fm, nome, d: r.d, p: r.p }); });
-        return el('div', { class: 'ctrl' }, [sel]);
-      };
       const chips = (valori, attuale, cambia, etichetta) => el('div', { class: 'chips lav-chips', role: 'group', 'aria-label': etichetta }, valori.map(([v, t]) => el('button', { class: 'chip' + (String(attuale) === String(v) ? ' attiva' : ''), testo: t, onclick: () => cambia(v) })));
 
       // ----- passo 2: forma -----
@@ -266,10 +323,10 @@
             ed.appendChild(campi);
             if (t.tipo === 'arco') ed.appendChild(chips([['bombato', 'Bombato'], ['incavato', 'Incavato']], t.forma || 'bombato', v => { t.forma = v; ri(); }, 'Forma dell\'arco'));
             if ((t.tipo || 'cil') === 'cil') {
-              const d = num(t.d), pg = O.passoGrosso(d);
-              const passi = Array.from(new Set([pg].concat(O.FILETTI_FINI.filter(f => f[0] === d).map(f => f[1])))).filter(p => p > 0);
-              ed.append(el('div', { class: 'lav-et', testo: 'Filetto' }), chips([['', 'No']].concat(passi.map(p => [p, 'M' + fmt(d) + 'x' + fmt(p)])), t.filFam ? '' : (t.fil || ''), v => { delete t.filFam; delete t.filNome; if (v) { t.fil = v; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * v * 10) / 10); } else delete t.fil; ri(); }, 'Filetto'));
-              ed.appendChild(sceltaFiletto(t, 'lav-altro-fil-' + i, F => { t.d = F.d; t.fil = F.p; t.filFam = F.fam; t.filNome = F.nome; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * F.p * 10) / 10); ri(); }));
+              ed.appendChild(A.sceltaFiletto(t, { id: 'lav-fil-' + i, d: num(t.d), cambia: F => {
+                if (!F) { delete t.fil; delete t.filFam; delete t.filNome; ri(); return; }
+                t.d = F.d; t.fil = F.p; t.filFam = F.fam; t.filNome = F.nome; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * F.p * 10) / 10); ri();
+              } }));
               ed.append(el('div', { class: 'lav-et', testo: 'Gola di scarico alla fine' }), chips([['', 'No'], [3, '3 mm'], [4, '4 mm'], [5, '5 mm'], [6, '6 mm']], t.gola || '', v => { if (v) t.gola = v; else delete t.gola; ri(); }, 'Gola'));
               ed.append(el('div', { class: 'lav-et', testo: 'Tolleranza' }), chips([['', 'No'], ['h6', 'h6'], ['h7', 'h7'], ['g6', 'g6'], ['f7', 'f7'], ['k6', 'k6'], ['js6', 'js6']], t.toll || '', v => { if (v) t.toll = v; else delete t.toll; ri(); }, 'Tolleranza'));
               const tutte = [];
@@ -314,8 +371,9 @@
                 el('button', { class: 'chip' + (t.tipo === 'cono' ? ' attiva' : ''), testo: t.tipo === 'cono' ? 'Cono' : 'Cilindro', onclick: () => { t.tipo = t.tipo === 'cono' ? 'cil' : 'cono'; A.salva(); tutto(); } }),
                 el('button', { class: 'icona-pul', 'aria-label': 'Togli il tratto interno ' + (k + 2), html: svg(IC.x), onclick: () => { I.altri.splice(k, 1); A.salva(); tutto(); } })])));
               corpo.append(el('button', { class: 'pul sec', id: 'lav-agg-int', html: svg(IC.piu) + 'Tratto interno piu in fondo', onclick: () => { const u = I.altri[I.altri.length - 1]; const dPrec = u ? num(u.d) : num(I.di); I.altri.push({ tipo: 'cil', d: Math.max(num(T.foroD) + 2, dPrec - 6), l: 8 }); A.salva(); tutto(); } }));
-              corpo.append(el('div', { class: 'lav-et', testo: 'Filetto interno' }), chips([['', 'No'], [O.passoGrosso(num(I.di)) || 1.5, 'M' + fmt(num(I.di)) + 'x' + fmt(O.passoGrosso(num(I.di)) || 1.5)]], I.filFam ? '' : (I.fil || ''), v => { delete I.filFam; delete I.filNome; if (v) I.fil = v; else delete I.fil; A.salva(); tutto(); }, 'Filetto interno'),
-                sceltaFiletto(I, 'lav-altro-fil-int', F => { I.di = F.d; I.fil = F.p; I.filFam = F.fam; I.filNome = F.nome; A.salva(); tutto(); }));
+              const filI = A.sceltaFiletto(I, { id: 'lav-fil-int', d: num(I.di), cambia: F => { if (!F) { delete I.fil; delete I.filFam; delete I.filNome; } else { I.di = F.d; I.fil = F.p; I.filFam = F.fam; I.filNome = F.nome; } A.salva(); tutto(); } });
+              const etI = filI.querySelector('.lav-et'); if (etI) etI.textContent = etI.textContent.replace(/^Filetto/, 'Filetto interno');
+              corpo.append(filI);
               if (num(I.fil) > 0) corpo.append(interruttore('Gola di scarico in fondo al filetto', I.scarico !== false, v => { I.scarico = v; A.salva(); tutto(); }, 'lav-scarico-int'));
               corpo.append(interruttore('Gola interna', !!I.golaOn, v => { I.golaOn = v; I.gola = I.gola || { z: 5, b: 3, d: r1(num(I.di) + 3) }; A.salva(); tutto(); }, 'lav-gola-int'));
               if (I.golaOn) { I.gola = I.gola || {}; corpo.append(el('div', { class: 'lav-campi' }, [A.campoNum(I.gola, 'z', 'Distanza dalla faccia', 'mm', agg2), A.campoNum(I.gola, 'b', 'Larghezza', 'mm', agg2), A.campoNum(I.gola, 'd', 'Ø del fondo', 'mm', agg2)])); }
@@ -393,20 +451,42 @@
           corpo.append(el('div', { class: 'lav-et', testo: 'Come scrivere il programma' }), chips([['passate', 'A passate'], ['ciclo', 'Con cicli fissi']], L().metodo === 'ciclo' ? 'ciclo' : 'passate', v => { L().metodo = v; prop = null; A.salva(); tutto(); }, 'Metodo del programma'));
           corpo.appendChild(el('p', { class: 'leggenda', testo: L().metodo === 'ciclo' ? 'Cicli fissi: G71/G70 profilo, G72 sfacciatura, G74 foratura, G75 gole e troncatura, G76 filetti. Programma corto, da controllare sul manuale della macchina.' : 'A passate: ogni movimento scritto per esteso, va bene su ogni controllo.' }));
         }
-        corpo.appendChild(el('p', { class: 'leggenda', testo: 'Proposte dalle regole di officina. Spegni quelle che non servono; giri e avanzamento si possono correggere.' }));
+        corpo.appendChild(el('p', { class: 'leggenda', testo: 'Proposte dalle regole di officina. Tocca una lavorazione per vederne il percorso sul disegno e correggere giri, avanzamento e passate; spegni quelle che non servono.' }));
+        if (!prop.fasi.some(f => f.chiave === S.faseScelta)) S.faseScelta = (prop.fasi[0] || {}).chiave;
+        const scegliFase = (chiave, card) => {
+          S.faseScelta = chiave; A.salva();
+          corpo.querySelectorAll('.lav-fase').forEach(x => x.classList.toggle('aperta', x === card));
+          disegna();
+        };
         prop.fasi.forEach((f, i) => {
           const on = !sc.spente[f.chiave];
           const c = sc.correzioni[f.chiave] = sc.correzioni[f.chiave] || {};
           const tornio = prop.modo === 'tornio';
-          const card = el('div', { class: 'lav-fase' + (on ? '' : ' spenta'), 'data-chiave': f.chiave }, [
+          const card = el('div', { class: 'lav-fase' + (on ? '' : ' spenta') + (f.chiave === S.faseScelta ? ' aperta' : ''), 'data-chiave': f.chiave }, [
             el('div', { class: 'lav-fase-testa' }, [el('span', { class: 'num', testo: String(i + 1) }), el('span', { class: 't' }, [el('b', { testo: String(f.titolo).replace(/ T\d+$/, '') }), el('small', { testo: 'T' + f.c.t + (tornio ? ' · Vc ' + fmt(f.c.vc, 0) + ' · f ' + fmt(f.c.f, 3) : ' · S' + fmt(f.c.n, 0) + ' · F' + fmt(f.c.f, 0)) })]),
               interruttore('', on, v => { if (v) delete sc.spente[f.chiave]; else sc.spente[f.chiave] = true; A.salva(); tutto(); }, null)])]);
           card.querySelector('.lav-int').setAttribute('aria-label', 'Lavorazione ' + (i + 1) + ' accesa');
+          const testaF = card.querySelector('.lav-fase-testa');
+          testaF.setAttribute('role', 'button'); testaF.setAttribute('tabindex', '0'); testaF.setAttribute('aria-label', 'Mostra la lavorazione ' + (i + 1) + ' sul disegno');
+          testaF.addEventListener('click', e => { if (e.target.closest('.lav-int')) return; scegliFase(f.chiave, card); });
           if (on) {
             const agg = () => { A.salva(); riassunto(); };
             card.appendChild(el('div', { class: 'lav-campi due' }, tornio
               ? [A.campoNum(c, 'vc', 'Vc (vuoto = ' + fmt(f.c.vc, 0) + ')', 'm/min', agg), A.campoNum(c, 'f', 'Avanzamento (vuoto = ' + fmt(f.c.f, 3) + ')', 'mm/giro', agg)]
               : [A.campoNum(c, 'n', 'Giri (vuoto = ' + fmt(f.c.n, 0) + ')', 'giri', agg), A.campoNum(c, 'f', 'Avanzamento (vuoto = ' + fmt(f.c.f, 0) + ')', 'mm/min', agg)]));
+            // spessore delle passate: profondita di passata, passate del filetto, beccata
+            const PS = O.passateDi ? O.passateDi(f) : [];
+            if (PS.length) {
+              const info = el('p', { class: 'leggenda lav-passate-info' });
+              const aggP = () => { agg(); scriviInfo(); };
+              const scriviInfo = () => {
+                const fil = PS.find(q => q.id === 'np');
+                if (fil) { const L = O.passateFilettoLavoro(f, num(c.np) > 0 ? num(c.np) : fil.v); info.textContent = L.length + ' passate: la prima ' + fmt(L[0], 3) + ' mm, l\'ultima ' + fmt(L[L.length - 1], 3) + ' mm sul raggio (piu una a vuoto).'; }
+                else { const q = PS[0]; const v = num(c[q.id]) > 0 ? num(c[q.id]) : q.v; info.textContent = q.et + ': ' + fmt(v, 2) + ' mm' + (num(c[q.id]) > 0 ? ' (scelta da te)' : ' (proposta dal materiale)') + '.'; }
+              };
+              card.appendChild(el('div', { class: 'lav-campi due lav-passate' }, PS.map(q => A.campoNum(c, q.id, q.et + ' (vuoto = ' + fmt(q.v, q.u === 'n.' ? 0 : 2) + ')', q.u, aggP))));
+              card.appendChild(info); scriviInfo();
+            }
           }
           corpo.appendChild(card);
         });
@@ -509,7 +589,8 @@
         else if (S.passo === 1) { if (S.daDisegno) corpo.appendChild(el('div', { class: 'info avviso', id: 'lav-dal-disegno' }, [el('div', { html: A.icona('avviso') }), el('div', {}, [el('b', { testo: 'Pezzo preso dal disegno. ' }), document.createTextNode('Ricontrolla le quote con il disegno in mano, poi Avanti. '), el('button', { class: 'pul sec', style: 'padding:6px 10px;margin-top:6px', testo: 'Ho controllato', onclick: () => { S.daDisegno = false; A.salva(); tutto(); } })])])); if (S.modo === 'tornio') passoFormaTornio(); else passoFormaFresa(); if (S.ultimoTolto && S.ultimoTolto.modo === S.modo) corpo.appendChild(el('button', { class: 'pul sec', id: 'lav-ripristina', testo: 'Ripristina l\'ultimo eliminato', onclick: () => { lista().splice(Math.min(S.ultimoTolto.i, lista().length), 0, S.ultimoTolto.x); S.ultimoTolto = null; A.salva(); tutto(); } })); }
         else if (S.passo === 2) passoLavorazioni();
         else passoProgramma();
-        disegnoBox.hidden = S.passo >= 2;
+        disegnoBox.hidden = S.passo >= 3;
+        barraDis.hidden = S.passo !== 2;
         indietro.disabled = S.passo === 0;
         avanti.hidden = S.passo === 3;
         avanti.textContent = S.passo === 2 ? 'Crea il programma' : 'Avanti';

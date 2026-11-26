@@ -139,7 +139,31 @@
     return FAMIGLIE.filter(f => TORNIO[f.id]).map(f => ({ fam: f.id, nomeFam: f.nome + ' (' + f.angolo + ')', righe: f.righe().filter(r => Number(r.d) > 0 && Number(r.p) > 0).map(r => ({ nome: r.nome, d: Number(r.d), p: Number(r.p) })) }));
   }
 
-  const Filetti = { FILETTI_FAMIGLIE: FAMIGLIE, FILETTI_ETICHETTE: ETICHETTE, righeFamiglia, datiFiletto, filettiTornio };
+  /** I gruppi di filetti da scegliere al tornio, nell'ordine dell'officina. */
+  const GRUPPI = [['m', 'Metrico grosso'], ['mf', 'Metrico fine'], ['g', 'Gas G'], ['r', 'Gas conico R'], ['npt', 'NPT'], ['unc', 'UNC'], ['unf', 'UNF'], ['unef', 'UNEF'],
+    ['bsw', 'Whitworth BSW'], ['bsf', 'Whitworth BSF'], ['tr', 'Trapezio Tr'], ['acme', 'ACME'], ['pg', 'Pg']];
+  /**
+   * Le misure di un gruppo, quelle vicine al diametro d per prime. Ritorna {righe:[{nome, d, p}] (tutte, in ordine di tabella),
+   * vicine:[...] (le n piu vicine a d; senza d le prime n)}.
+   */
+  function filettiGruppo(fam, d, n) {
+    const f = FAMIGLIE.find(x => x.id === fam && TORNIO[x.id]);
+    if (!f) return { righe: [], vicine: [] };
+    const righe = f.righe().filter(r => Number(r.d) > 0 && Number(r.p) > 0).map(r => ({ nome: r.nome, d: Number(r.d), p: Number(r.p) }));
+    const k = n > 0 ? n : 8, dd = Number(d);
+    const vicine = dd > 0 ? righe.map((r, i) => ({ r, i, s: Math.abs(r.d - dd) })).sort((a, b) => a.s - b.s || a.i - b.i).slice(0, k).sort((a, b) => a.i - b.i).map(x => x.r) : righe.slice(0, k);
+    return { righe, vicine };
+  }
+  /** Il gruppo di un filetto gia scelto: {fam} se c'e, altrimenti metrico grosso o fine dal passo. */
+  function gruppoDi(o) {
+    if (o && o.filFam && TORNIO[o.filFam]) return o.filFam;
+    if (!(Number(o && o.fil) > 0)) return '';
+    const d = Number(o.d !== undefined ? o.d : o.di);
+    const g = (O.FILETTI_GROSSI || []).find(x => x[0] === d);
+    return g && Math.abs(g[1] - Number(o.fil)) < 1e-9 ? 'm' : 'mf';
+  }
+
+  const Filetti = { GRUPPI_FILETTO: GRUPPI, filettiGruppo, gruppoFiletto: gruppoDi, FILETTI_FAMIGLIE: FAMIGLIE, FILETTI_ETICHETTE: ETICHETTE, righeFamiglia, datiFiletto, filettiTornio };
   Object.assign(O, Filetti);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

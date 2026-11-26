@@ -705,3 +705,18 @@ body.cad-pieno .cad-digita,.cad.pieno .cad-digita{bottom:0}
 .cerca-globale-testa{display:flex;gap:8px;align-items:center;position:sticky;top:0;background:var(--fondo,#0b1220);padding-bottom:8px}
 .cerca-globale-testa input{flex:1;min-width:0;min-height:52px;font-size:18px;padding:0 12px;border-radius:12px;border:1px solid var(--bordo,#334);background:var(--pannello,#16203a);color:var(--testo,#eee)}
 #b-cerca{margin-left:auto}
+.sim-box{position:relative}
+.sim-sez{position:absolute;top:8px;right:8px;z-index:2;min-height:40px}
+/* 2.44.0: passo Lavorazioni comodo sul telefono */
+.lav-barra-dis{margin:6px 0 0}
+.lav-fase-testa{cursor:pointer}
+.lav-fase:not(.aperta) .lav-campi,.lav-fase:not(.aperta) .lav-passate-info{display:none}
+.lav-fase.aperta{outline:2px solid var(--avviso);outline-offset:-2px}
+.lav-radice.pieno{position:fixed;inset:0;z-index:40;background:var(--fondo);padding:8px max(8px,env(safe-area-inset-right)) 8px max(8px,env(safe-area-inset-left))}
+.lav-radice.pieno .lav-grid{display:grid;height:100%;grid-template-rows:minmax(0,55%) minmax(0,45%);gap:8px}
+.lav-radice.pieno .lav-disegno{position:static;display:flex;flex-direction:column;min-height:0;padding:0}
+.lav-radice.pieno .lav-tela{flex:1;height:auto;min-height:0}
+.lav-radice.pieno .lav-corpo{overflow:auto;min-height:0;padding-bottom:12px}
+.lav-radice.pieno .lav-corpo .lav-latob,.lav-radice.pieno .lav-titolo{display:none}
+@media (orientation:landscape){.lav-radice.pieno .lav-grid{grid-template-rows:none;grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr)}}
+body.cad-pieno .lav-barra,body.cad-pieno .lav-passi{display:none}

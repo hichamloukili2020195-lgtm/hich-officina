@@ -545,16 +545,18 @@ const server = http.createServer((q, r) => {
   await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '20', z: '0', smusso: '1' }, { x: '20', z: '-25' }, { x: '30', z: '-25' }, { x: '30', z: '-45' }, { x: '40', z: '-45' }]; App.salva(); });
   await vai('home'); await vai('disegno'); await pg.waitForTimeout(80);
   await pg.click('.linea-testo:has-text("Cilindro Ø20 lungo 25")'); await pg.waitForTimeout(40);
-  await pg.selectOption('#f-fil', '2.5'); await pg.waitForTimeout(60);
+  ok(await pg.$('#d-fil-g-m') && await pg.$('#d-fil-g-npt') && await pg.$('#d-fil-g-unf'), 'gruppi dei filetti nel disegno del tornio');
+  await pg.click('#d-fil-g-m'); await pg.waitForTimeout(60);
+  await pg.click('#d-fil .fil-misure .chip:text-is("M20")'); await pg.waitForTimeout(80);
   let pl = await pg.evaluate(() => App.mem.disegno.punti[2]);
-  ok(pl.fil === '2.5' && Number(pl.gola) >= 3, 'filetto e gola sulla linea: ' + JSON.stringify(pl));
+  ok(pl.fil === '2.5' && pl.filFam === 'm' && Number(pl.gola) >= 3, 'filetto e gola sulla linea: ' + JSON.stringify(pl));
   await pg.click('.linea-testo:has-text("Cilindro Ø30 lungo 20")'); await pg.waitForTimeout(40);
   await pg.fill('#f-toll', 'h6'); await pg.waitForTimeout(40);
   ok((await pg.textContent('.elenco-linee')).includes('filetto M20x2,5') && (await pg.textContent('.elenco-linee')).includes('h6'), 'lavorazioni nell\'elenco');
   await foto('31-disegno-filetto');
   await pg.click('text=Crea il programma'); await pg.waitForTimeout(120);
   const lst = await pg.textContent('.listato');
-  ok(lst.includes('(FASE 3: FILETTO M20X2.5') && lst.includes('G75') === false && lst.includes('X29.994'), 'programma con profilo, gola e filetto');
+  ok(lst.includes('(FASE 3: FILETTO M20') && lst.includes('G75') === false && lst.includes('X29.994'), 'programma con profilo, gola e filetto');
   // angolo da una foto: immagine fatta qui con un fianco a 60 gradi
   await vai('angolo'); await pg.waitForTimeout(80);
   const png64 = await pg.evaluate(() => { const c = document.createElement('canvas'); c.width = 800; c.height = 600; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 800, 600);
@@ -596,7 +598,8 @@ const server = http.createServer((q, r) => {
     await pg.click('.tast-k[aria-label="2"]'); await pg.click('.tast-k[aria-label="5"]'); await pg.click('.tast-k[aria-label="Conferma"]'); await pg.waitForTimeout(40);
     let tr = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti);
     ok(tr.length === 1 && tr[0].d === '20' && tr[0].l === '25', 'tratto a quote col tastierino: ' + JSON.stringify(tr));
-    await pg.click('.lav-card.aperta .chip:text-is("M20x2,5")'); await pg.waitForTimeout(30);
+    await pg.click('.lav-card.aperta .fil-gruppi .chip:text-is("Metrico grosso")'); await pg.waitForTimeout(30);
+    await pg.click('.lav-card.aperta .fil-misure .chip:text-is("M20")'); await pg.waitForTimeout(30);
     await pg.click('#lav-agg-tratto'); await pg.waitForTimeout(40);
     await pg.click('.tast-k[aria-label="Cancella tutto"]'); await pg.click('.tast-k[aria-label="3"]'); await pg.click('.tast-k[aria-label="0"]'); await pg.click('.tast-k[aria-label="Campo dopo"]'); await pg.waitForTimeout(30);
     await pg.click('.tast-k[aria-label="2"]'); await pg.click('.tast-k[aria-label="0"]'); await pg.click('.tast-k[aria-label="Conferma"]'); await pg.waitForTimeout(30);
@@ -1344,10 +1347,12 @@ const server = http.createServer((q, r) => {
   await pg.evaluate(() => { const S = App.lavoroStato.S; S.tornio.tratti = [{ tipo: 'cil', d: 20, l: 20 }, { tipo: 'cil', d: 30, l: 20 }]; S.tornio.foroD = ''; S.aperta = 0; App.lavoroStato.tutto(); });
   await pg.waitForTimeout(80);
   if ((await pg.getAttribute('.lav-card[data-i="0"] .lav-card-apri', 'aria-expanded')) !== 'true') { await pg.click('.lav-card[data-i="0"] .lav-card-apri'); await pg.waitForTimeout(80); }
-  ok(await pg.$('#lav-altro-fil-0'), 'scelta di tutti i filetti nel tratto');
-  const opz = await pg.$$eval('#lav-altro-fil-0 optgroup', x => x.map(g => g.label));
-  ok(opz.length === 13 && opz.some(t => /Gas G/.test(t)) && opz.some(t => /NPT/.test(t)) && opz.some(t => /Trapezio/.test(t)), 'famiglie dei filetti: ' + opz.join(','));
-  await pg.selectOption('#lav-altro-fil-0', 'g|G 1/2'); await pg.waitForTimeout(100);
+  ok(await pg.$('#lav-fil-0'), 'scelta dei filetti per gruppi nel tratto');
+  const opz = await pg.$$eval('#lav-fil-0 .fil-gruppi .chip', x => x.map(g => g.textContent));
+  ok(opz.length === 14 && opz.includes('Metrico grosso') && opz.includes('Metrico fine') && opz.includes('Gas G') && opz.includes('NPT') && opz.includes('UNF') && opz.includes('Trapezio Tr'), 'gruppi dei filetti: ' + opz.join(','));
+  await pg.click('#lav-fil-0-g-g'); await pg.waitForTimeout(80);
+  ok((await pg.$$eval('#lav-fil-0 .fil-misure .chip', x => x.map(c => c.textContent))).includes('G 1/2'), 'misure gas vicine al diametro 20');
+  await pg.click('#lav-fil-0 .fil-misure .chip:text-is("G 1/2")'); await pg.waitForTimeout(100);
   let tr0 = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0]);
   ok(tr0.filFam === 'g' && tr0.filNome === 'G 1/2' && Math.abs(tr0.d - 20.955) < 1e-6 && Math.abs(tr0.fil - 1.814) < 1e-6, 'filetto gas scelto: ' + JSON.stringify(tr0));
   // foro filettato in asse e gola frontale
@@ -1855,6 +1860,47 @@ const server = http.createServer((q, r) => {
     const [dd] = await Promise.all([pg.waitForEvent('download'), pg.click('#pezzo-condividi')]); ok(dd.suggestedFilename() === 'scheda-flangia.txt', 'condividi la scheda del pezzo: ' + dd.suggestedFilename());
     await pg.click('#pezzo-qr'); const [d3] = await Promise.all([pg.waitForEvent('download'), pg.click('#qr-condividi')]); ok(d3.suggestedFilename() === 'etichetta-flangia.png', 'condividi l\'etichetta');
     await pg.click('#qr-x');
+  }
+
+  // ===== 2.44.0: filetti per gruppi, passate, passo Lavorazioni comodo, simulazione del tornio =====
+  {
+    await vai('lavoro'); await pg.waitForTimeout(150);
+    await pg.evaluate(() => { const S = App.lavoroStato.S; S.modo = 'tornio'; S.tornio = { grezzo: { dg: 40, lg: 80 }, tratti: [{ tipo: 'cil', d: 20, l: 25 }, { tipo: 'cil', d: 30, l: 20 }], troncatura: true, smussoTesta: 'C0.5', scelte: {} }; S.passo = 1; S.aperta = 0; App.lavoroStato.tutto(); });
+    await pg.waitForTimeout(100);
+    if ((await pg.getAttribute('.lav-card[data-i="0"] .lav-card-apri', 'aria-expanded')) !== 'true') { await pg.click('.lav-card[data-i="0"] .lav-card-apri'); await pg.waitForTimeout(80); }
+    // metrico fine dall'elenco completo
+    await pg.click('#lav-fil-0-g-mf'); await pg.waitForTimeout(60);
+    const vic = await pg.$$eval('#lav-fil-0 .fil-misure .chip', x => x.map(c => c.textContent));
+    ok(vic.includes('M20x1.5') && vic.length <= 8, 'metrico fine: misure vicine a Ø20: ' + vic.join(','));
+    await pg.click('#lav-fil-0 .fil-misure .chip:text-is("M20x1.5")'); await pg.waitForTimeout(80);
+    let t0 = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0]);
+    ok(t0.filFam === 'mf' && t0.fil === 1.5 && t0.d === 20, 'M20x1,5 scelto: ' + JSON.stringify(t0));
+    await pg.click('#lav-fil-0-g-unf'); await pg.waitForTimeout(60);
+    const tutteOpz = await pg.$$eval('#lav-fil-0-tutte option', x => x.length); ok(tutteOpz > 20, 'tutte le misure UNF: ' + tutteOpz);
+    await pg.selectOption('#lav-fil-0-tutte', '14'); await pg.waitForTimeout(80);
+    t0 = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0]);
+    ok(t0.filFam === 'unf' && /UNF/.test(t0.filNome), 'misura dall\'elenco completo: ' + t0.filNome);
+    await pg.click('#lav-fil-0-no'); await pg.waitForTimeout(60);
+    ok(!(await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0].fil)), 'filetto tolto');
+    await pg.click('#lav-fil-0-g-m'); await pg.click('#lav-fil-0 .fil-misure .chip:text-is("M20")'); await pg.waitForTimeout(80);
+    // passo 3: disegno, scelta della lavorazione, passate
+    await pg.evaluate(() => App.lavoroStato.vaiPasso(2)); await pg.waitForTimeout(200);
+    ok(await pg.isVisible('.lav-tela') && await pg.isVisible('#lav-pieno'), 'al passo Lavorazioni si vede il disegno con Schermo intero');
+    const chF = await pg.evaluate(() => { const c = [...document.querySelectorAll('.lav-fase')].find(x => /Filetto/.test(x.textContent)); c.querySelector('.lav-fase-testa').click(); return c.dataset.chiave; });
+    await pg.waitForTimeout(100);
+    ok(await pg.evaluate(k => App.lavoroStato.S.faseScelta === k && document.querySelector('.lav-fase.aperta').dataset.chiave === k, chF), 'lavorazione scelta col tocco');
+    ok(await pg.evaluate(() => document.querySelectorAll('.lav-fase.aperta').length === 1 && [...document.querySelectorAll('.lav-fase:not(.aperta) .lav-campi')].every(c => getComputedStyle(c).display === 'none')), 'solo la scheda scelta mostra i campi');
+    const info = await pg.textContent('.lav-fase.aperta .lav-passate-info'); ok(/passate: la prima/.test(info), 'passate del filetto spiegate: ' + info);
+    await pg.evaluate(() => { const i = document.querySelector('.lav-fase.aperta .lav-passate input'); if (i) { i.value = '12'; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); } });
+    await pg.waitForTimeout(100);
+    const cor = await pg.evaluate(k => App.lavoroStato.S.tornio.scelte.correzioni[k], chF);
+    ok(cor && Number(cor.np) === 12, 'passate del filetto scelte: ' + JSON.stringify(cor));
+    // schermo intero
+    await pg.click('#lav-pieno'); await pg.waitForTimeout(150);
+    ok(await pg.evaluate(() => document.body.classList.contains('cad-pieno') && document.querySelector('.lav-radice').classList.contains('pieno')), 'passo Lavorazioni a schermo intero');
+    ok(await pg.isVisible('#lav-ruota'), 'Ruota a schermo intero');
+    await pg.click('#lav-pieno'); await pg.waitForTimeout(100);
+    ok(!(await pg.evaluate(() => document.body.classList.contains('cad-pieno'))), 'uscita dallo schermo intero');
   }
   await largo('CAD con Digita');
 

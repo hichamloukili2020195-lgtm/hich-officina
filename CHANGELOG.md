@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.44.0 - Filetti per gruppi, spessore delle passate, simulazione del tornio piu vera, lavorazioni comode sul telefono
+- **Filetti per gruppi** (Disegna e lavora e disegno del tornio): prima il gruppo (metrico grosso, metrico fine, gas G, gas conico R, NPT, UNC, UNF, UNEF, Whitworth BSW e BSF, trapezio, ACME, Pg), poi la misura. Le misure vicine al diametro del tratto sono a portata di dito, le altre in "Tutte le misure". Se la misura scelta ha un altro diametro, il tratto si adegua (e il programma lo dice).
+- **Spessore delle passate**: al passo Lavorazioni ogni lavorazione mostra e fa cambiare la passata (in Z o radiale), le passate del filetto (con la profondita della prima e dell'ultima) e la beccata dei fori. Nel CAD della fresa: "Passata in Z" per contorno, tasca libera e asola. Vuoto = valore proposto dal materiale.
+- **Simulazione del tornio come in macchina**: mandrino a sinistra e asse Z orizzontale, pezzo intero (non piu tagliato a spicchio; "Sezione: si" per vedere l'interno), griffe che girano, testa, bancale, torretta con portautensile e inserto. Nella vista di sezione il pezzo e intero (sopra e sotto l'asse) con le griffe sui due lati e l'utensile con inserto e portautensile.
+- **Grafica**: materiali metallici e luce da officina nella vista 3D; tavola sotto il pezzo alla fresa.
+- **Passo Lavorazioni sul telefono**: il disegno resta visibile e mostra il percorso della lavorazione toccata; le schede sono compatte (campi solo in quella scelta). "Schermo intero" e "Ruota": disegno grande a sinistra e lavorazioni a destra con il telefono in orizzontale.
+- Prove: gruppi e misure dei filetti, passate (filetto, sgrossatura, CAD), passo Lavorazioni a schermo intero, interfaccia.
+
 ## 2.43.0 - Ricerca ovunque, scorciatoie dell'icona, condividere con un tocco
 - **Ricerca in tutta l'app**: la lente in alto (su ogni schermata) apre la ricerca su programmi, pezzi (anche per cliente e commessa), materiali, filetti (M10), tolleranze (H7 25), codici G e M, utensili, schermate e calcolatori. Nuovo: equivalenze dei materiali (`C45`, `1.4301`, `304`) e conversione delle durezze (`45 HRC`, `392 HV`). Esc o Chiudi per uscire.
 - **Scorciatoie sull'icona** (tieni premuta l'icona dell'app): CAD, Calcoli, Nuovo programma, Controlla. Funzionano anche con l'app gia aperta. Le stesse quattro per la versione installabile dal sito.

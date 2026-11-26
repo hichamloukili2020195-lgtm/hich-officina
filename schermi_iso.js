@@ -390,7 +390,7 @@
         let mx = Infinity, Mx = -Infinity, my = Infinity, My = -Infinity;
         for (let i = 0; i < pts.length; i++) { const q = pts[i]; if (q[0] < mx) mx = q[0]; if (q[0] > Mx) Mx = q[0]; if (q[1] < my) my = q[1]; if (q[1] > My) My = q[1]; }
         if (conMat()) {
-          const gr = mat.tipo === 'tornio' ? [[2 * mat.R, 0, mat.zTop], [0, 0, mat.zBot]] : [[mat.x0, mat.y0, 0], [mat.x1, mat.y1, -mat.lz]];
+          const gr = mat.tipo === 'tornio' ? [[2 * mat.R, 0, mat.zTop], [0, 0, mat.zBot], [-2 * mat.R, 0, mat.zTop]] : [[mat.x0, mat.y0, 0], [mat.x1, mat.y1, -mat.lz]];
           gr.forEach(q => { const w = f(q[0], q[1], q[2]); if (w[0] < mx) mx = w[0]; if (w[0] > Mx) Mx = w[0]; if (w[1] < my) my = w[1]; if (w[1] > My) My = w[1]; });
         }
         proj = { f, mx, Mx, my, My };
@@ -431,7 +431,7 @@
         // vista 3D vera (three.js) al posto del disegno 2D
         const tre = N && sv.vista === 'iso' && puo3d() && (v3 || (v3 = A.crea3D(telaBox, mat)));
         cv.style.display = tre ? 'none' : '';
-        if (v3) { v3.canvas.style.display = tre ? '' : 'none'; v3.hint.style.display = tre ? '' : 'none'; }
+        if (v3) { v3.canvas.style.display = tre ? '' : 'none'; v3.hint.style.display = tre ? '' : 'none'; const bs = telaBox.querySelector('#sim-sez3d'); if (bs) bs.style.display = tre ? '' : 'none'; }
         if (tre) {
           const { cur: c3, px: p3 } = posizione();
           mat.vaiA(k);

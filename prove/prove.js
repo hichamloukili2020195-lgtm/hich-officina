@@ -1457,4 +1457,44 @@ prova('equivalenze dei materiali', () => {
   assert.strictEqual(O.equivalenze('c45')[0].numero, '1.0503'); assert.strictEqual(O.equivalenze('1.4301')[0].usa, '304'); assert.ok(O.equivalenze('4140').some(r => r.en === '42CrMo4'));
   assert.ok(O.equivalenze('alluminio').length >= 4); assert.ok(O.equivalenze('').length >= 20); assert.strictEqual(O.equivalenze('zzzz').length, 0); assert.ok(O.equivalenze('X5 CrNi').length >= 1);
 });
+
+// ===== 2.44.0: filetti per gruppi, spessore delle passate =====
+prova('filetti per gruppi: misure vicine al diametro', () => {
+  assert.strictEqual(O.GRUPPI_FILETTO.length, 13); assert.deepStrictEqual(O.GRUPPI_FILETTO.slice(0, 3).map(g => g[0]), ['m', 'mf', 'g']);
+  const m = O.filettiGruppo('m', 20, 5); assert.deepStrictEqual(m.vicine.map(r => r.nome), ['M16', 'M18', 'M20', 'M22', 'M24']); assert.ok(m.righe.length > 15);
+  assert.ok(O.filettiGruppo('mf', 20, 8).vicine.every(r => Math.abs(r.d - 20) <= 6)); assert.ok(O.filettiGruppo('mf', 20, 8).vicine.some(r => r.nome === 'M20x1.5'));
+  assert.ok(O.filettiGruppo('g', 21, 3).vicine.some(r => r.nome === 'G 1/2'));
+  assert.ok(O.filettiGruppo('npt', 0, 4).vicine.length === 4); assert.strictEqual(O.filettiGruppo('zzz', 20).righe.length, 0);
+  assert.strictEqual(O.gruppoFiletto({ d: 20, fil: 2.5 }), 'm'); assert.strictEqual(O.gruppoFiletto({ d: 20, fil: 1.5 }), 'mf'); assert.strictEqual(O.gruppoFiletto({ di: 20, fil: 2.5 }), 'm');
+  assert.strictEqual(O.gruppoFiletto({ d: 21, fil: 1.8, filFam: 'g' }), 'g'); assert.strictEqual(O.gruppoFiletto({ d: 20 }), '');
+});
+prova('spessore delle passate: passate del filetto e passata di sgrossatura scelte', () => {
+  const mt = O.MATERIALI[4];
+  const T = { modo: 'tornio', grezzo: { dg: 40, lg: 80 }, tratti: [{ tipo: 'cil', d: 20, l: 25, fil: 2.5, gola: 4 }, { tipo: 'cil', d: 30, l: 20 }], troncatura: true };
+  const p = O.proponiLavoro(T, { mat: mt, nmax: 3000 }); assert.ok(!p.errore, p.errore);
+  const fil = p.fasi.find(f => f.op === 'filetto'), prof = p.fasi.find(f => f.op === 'profilo');
+  const pf = O.passateDi(fil); assert.strictEqual(pf[0].id, 'np'); assert.ok(pf[0].v >= 5);
+  const pp = O.passateDi(prof); assert.strictEqual(pp[0].id, 'ap'); assert.ok(pp[0].v > 0);
+  const L = O.passateFilettoLavoro(fil, 10); assert.strictEqual(L.length, 10); assert.ok(L[0] > L[9]); vicino(L.reduce((a, b) => a + b, 0), fil.c.h, 0.002);
+  const conta = r => r.righe.filter(x => /^G32\b/.test(x)).length;
+  const base = O.programmaLavoro(p, {}, { num: 1 });
+  const piu = O.programmaLavoro(p, { correzioni: { [fil.chiave]: { np: 14 } } }, { num: 1 });
+  assert.ok(conta(piu) > conta(base), conta(piu) + ' contro ' + conta(base));
+  assert.strictEqual(conta(piu), 15);   // 14 passate e una a vuoto
+  const g1 = r => r.righe.filter(x => /^G1 X/.test(x)).length;
+  const fine = O.programmaLavoro(p, { correzioni: { [prof.chiave]: { ap: 0.5 } } }, { num: 1 });
+  assert.ok(g1(fine) > g1(base), 'passata piu sottile = piu passate');
+  const fasiF = O.programmaLavoro(p, { correzioni: { [fil.chiave]: { np: 999 } } }, { num: 1 }).fasi; assert.strictEqual(fasiF.find(f => f.op === 'filetto').c.n, 60);
+  // fresa: beccata della foratura e passata della tasca
+  const F = { modo: 'fresa', grezzo: { lx: 100, ly: 60, lz: 20 }, forme: [{ tipo: 'tasca', cx: 50, cy: 30, lx: 40, ly: 20, r: 5, prof: 6 }, { tipo: 'foro', x: 10, y: 10, d: 8.5, foro: 'foro', passante: true }] };
+  const q = O.proponiLavoro(F, { mat: mt, nmax: 8000 }); assert.ok(!q.errore, q.errore);
+  const tasca = q.fasi.find(f => /tasca/i.test(f.op)); assert.ok(O.passateDi(tasca).some(x => x.id === 'ap'));
+});
+prova('CAD fresa: passata in Z scritta nella lavorazione', () => {
+  const E = [{ id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 60, y1: 40, r: 0, lav: [{ op: 'contorno', prof: 6, lato: 'esterno', ap: 1.5 }] }];
+  const p = O.pianificaCAD({ fz: 6, entita: E }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }); assert.ok(!p.errore, p.errore);
+  assert.strictEqual(p.fasi[0].c.ap, 1.5);
+  E[0].lav[0].ap = 20; assert.strictEqual(O.pianificaCAD({ fz: 6, entita: E }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }).fasi[0].c.ap, 6);
+  delete E[0].lav[0].ap; assert.ok(O.pianificaCAD({ fz: 6, entita: E }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }).fasi[0].c.ap !== 1.5);
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

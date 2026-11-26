@@ -1109,14 +1109,14 @@
       const editLav = (e, l, i) => {
         const casella = el('div', { class: 'cad-lav ' + l.op });
         const testa = el('div', { class: 'cad-lav-testa' }, [el('b', { testo: O.CAD_NOMI_LAV[l.op] }), el('button', { class: 'icona-pul', 'aria-label': 'Togli la lavorazione ' + O.CAD_NOMI_LAV[l.op], html: A.icona('cestino'), onclick: () => { ricorda(); e.lav.splice(i, 1); anteprima = null; A.salva(); aggiorna(); } })]);
-        const v = { prof: l.prof === undefined ? '' : String(l.prof), lato: l.lato || 'esterno', d: l.d === undefined ? '' : String(l.d), passante: !!l.passante, passo: l.passo || '', toll: l.toll || '', smusso: l.smusso === undefined ? '' : String(l.smusso) };
+        const v = { prof: l.prof === undefined ? '' : String(l.prof), lato: l.lato || 'esterno', d: l.d === undefined ? '' : String(l.d), passante: !!l.passante, passo: l.passo || '', toll: l.toll || '', smusso: l.smusso === undefined ? '' : String(l.smusso), ap: l.ap === undefined ? '' : String(l.ap) };
         const campi = [];
         if (l.op === 'contorno') {
           const aperto = e.tipo === 'poli' && !e.chiuso;
           campi.push({ id: 'lato', et: 'Fresa', tipo: 'scelta', scelte: aperto ? [['sinistra', 'A sinistra della linea (G41)'], ['destra', 'A destra della linea (G42)'], ['centro', 'Sulla linea, senza compensazione']] : [['esterno', 'Fuori dal disegno (il pezzo e dentro)'], ['interno', 'Dentro il disegno'], ['centro', 'Sulla linea, senza compensazione']] },
-            { id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = scelta dalla tabella utensili', u: 'mm' });
-        } else if (l.op === 'tasca') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = la piu grande che ci sta', u: 'mm' });
-        else if (l.op === 'asola') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = dalla tabella', u: 'mm' });
+            { id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = scelta dalla tabella utensili', u: 'mm' }, { id: 'ap', et: 'Passata in Z', sub: 'vuoto = dal materiale', u: 'mm' });
+        } else if (l.op === 'tasca') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = la piu grande che ci sta', u: 'mm' }, { id: 'ap', et: 'Passata in Z', sub: 'vuoto = dal materiale (tasche libere)', u: 'mm' });
+        else if (l.op === 'asola') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro fresa', sub: 'vuoto = dalla tabella', u: 'mm' }, { id: 'ap', et: 'Passata in Z', sub: 'vuoto = dal materiale', u: 'mm' });
         else if (l.op === 'incisione') campi.push({ id: 'prof', et: 'Profondita', u: 'mm' }, { id: 'd', et: 'Diametro della punta', sub: 'vuoto = dalla tabella', u: 'mm' });
         else if (l.op === 'isola') { /* nessun campo */ }
         else {
@@ -1135,6 +1135,7 @@
           if (campi.some(c => c.id === 'passo')) l.passo = v.passo;
           if (campi.some(c => c.id === 'toll')) l.toll = v.toll;
           if (campi.some(c => c.id === 'smusso')) l.smusso = v.smusso === '' ? undefined : num(v.smusso);
+          if (campi.some(c => c.id === 'ap')) l.ap = v.ap === '' || !(num(v.ap) > 0) ? undefined : num(v.ap);
           if (e.tipo === 'punto' && /^(foro|maschio|alesato)$/.test(l.op)) S.ultimoForo = JSON.parse(JSON.stringify(l));
           anteprima = null; A.salva(); if (id === 'passante') aggiorna();
         });

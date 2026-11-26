@@ -87,7 +87,10 @@
       cx.putImageData(im, 0, 0);
       const sx = P2(0, 0, mat.zBot), dx = P2(0, 0, mat.zTop), top = P2(mat.R * 2, 0, 0), bas = P2(0, 0, 0);
       g.imageSmoothingEnabled = false;
-      g.drawImage(cv, Math.min(sx[0], dx[0]), top[1], Math.abs(dx[0] - sx[0]), bas[1] - top[1]);
+      const x0 = Math.min(sx[0], dx[0]), w = Math.abs(dx[0] - sx[0]), h = bas[1] - top[1];
+      g.drawImage(cv, x0, top[1], w, h);
+      // il pezzo intero: la meta sotto l'asse e lo specchio di quella sopra
+      g.save(); g.translate(0, 2 * bas[1]); g.scale(1, -1); g.globalAlpha = 0.86; g.drawImage(cv, x0, top[1], w, h); g.restore();
       return;
     }
     const { nx, ny, h, x0, y0, x1, y1, lz, cella } = mat;
@@ -146,8 +149,9 @@
     const rett = (a, b) => { const x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]), w = Math.abs(b[0] - a[0]), h = Math.abs(b[1] - a[1]); g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); };
     if (mat.tipo === 'tornio' && mat.mandrino) {
       const { zM, R } = mat.mandrino;
-      rett(P2(2 * R, 0, zM), P2(2 * (R + 25), 0, zM - 25));                 // griffa
-      g.fillStyle = 'rgba(90,100,120,0.6)'; rett(P2(0, 0, zM - 25), P2(2 * (R + 50), 0, zM - 65));   // corpo del mandrino
+      rett(P2(2 * R, 0, zM), P2(2 * (R + 25), 0, zM - 25));                 // griffe, sopra e sotto
+      rett(P2(-2 * R, 0, zM), P2(-2 * (R + 25), 0, zM - 25));
+      g.fillStyle = 'rgba(90,100,120,0.6)'; rett(P2(-2 * (R + 50), 0, zM - 25), P2(2 * (R + 50), 0, zM - 65));   // corpo del mandrino
     } else if (mat.ganasce && mat.ganasce.length) {
       mat.ganasce.forEach(q => {
         if (c.vista === 'xy') rett(P2(q.x0, q.y1, 0), P2(q.x1, q.y0, 0));
@@ -166,9 +170,10 @@
     g.fillStyle = amb; g.strokeStyle = amb;
     if (c.modo === 'tornio') {
       const tip = (dz, dr) => P2(2 * (px[0] / 2 + dr), 0, px[2] + dz);
-      const poli = [tip(0, 0), tip(14, 0), tip(14, 7), tip(0, 7)];
-      g.globalAlpha = 0.45; g.beginPath(); g.moveTo(poli[0][0], poli[0][1]); poli.slice(1).forEach(q => g.lineTo(q[0], q[1])); g.closePath(); g.fill();
-      g.globalAlpha = 1; g.lineWidth = 2; g.stroke();
+      const forma = (pts, fill, stroke, alpha) => { g.globalAlpha = alpha; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); pts.slice(1).forEach(q => g.lineTo(q[0], q[1])); g.closePath(); g.fillStyle = fill; g.fill(); g.globalAlpha = 1; g.lineWidth = 1.5; g.strokeStyle = stroke; g.stroke(); };
+      // portautensile (grigio) e inserto rombico (ambra) con la punta sul punto programmato
+      forma([tip(3, 6), tip(17, 6), tip(17, 42), tip(3, 42)], 'rgba(110,120,140,0.85)', 'rgba(210,220,235,0.9)', 0.9);
+      forma([tip(0, 0), tip(8, 3), tip(6, 10), tip(-2, 7)], amb, amb, 0.85);
       const p = P2(...px); g.beginPath(); g.arc(p[0], p[1], 4, 0, Math.PI * 2); g.fill();
       g.restore(); return;
     }

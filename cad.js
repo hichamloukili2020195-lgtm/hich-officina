@@ -109,7 +109,7 @@
           if (!(w > 0) || !(prof > 0)) { nErrore = 'Elemento ' + (k + 1) + ': scrivi larghezza e profondita dell\'asola.'; return; }
           const u = utFresa(num(lav.d), w, { d: 6, z: 3, t: 7 });
           const dt = fresa(u.d, u.z);
-          fasi.push({ op: 'asola', titolo: 'Asola ' + r3(w) + ' D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, x1: num(e.x1), y1: num(e.y1), x2: num(e.x2), y2: num(e.y2), w, prof, ap: Math.max(0.5, Math.min(dt.ap || 2, prof)) }) });
+          fasi.push({ op: 'asola', titolo: 'Asola ' + r3(w) + ' D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, x1: num(e.x1), y1: num(e.y1), x2: num(e.x2), y2: num(e.y2), w, prof, ap: (num(lav.ap) > 0 ? Math.min(num(lav.ap), prof) : Math.max(0.5, Math.min(dt.ap || 2, prof))) }) });
           return;
         }
         if (!(prof > 0)) { nErrore = 'Elemento ' + (k + 1) + ': scrivi la profondita.'; return; }
@@ -140,7 +140,7 @@
           const dt = fresa(u.d, u.z);
           const punti = pr.punti.map(p => Object.assign({}, p));
           fasi.push({ op: 'profilo', staccoFinale: pr.chiuso && lato === 'esterno', titolo: 'Contorno ' + (lato === 'interno' ? 'interno' : lato === 'esterno' ? 'esterno' : lato) + ' D' + u.d + ' T' + u.t,
-            c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti, chiuso: pr.chiuso, lato, prof, ap: Math.max(0.5, Math.min(dt.ap || 2, prof)) }) });
+            c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti, chiuso: pr.chiuso, lato, prof, ap: (num(lav.ap) > 0 ? Math.min(num(lav.ap), prof) : Math.max(0.5, Math.min(dt.ap || 2, prof))) }) });
         }
       });
     });
@@ -194,7 +194,7 @@
       const max = Math.min(b.x1 - b.x0, b.y1 - b.y0) / 2;
       const u = utFresa(num(t.lav.d), Math.min(max, 12), { d: 8, z: 3, t: 7 });
       const dt = fresa(u.d, u.z);
-      const ap = Math.max(0.5, Math.min(dt.ap || 2, t.prof));
+      const ap = num(t.lav.ap) > 0 ? Math.min(num(t.lav.ap), t.prof) : Math.max(0.5, Math.min(dt.ap || 2, t.prof));
       const punti = pr.punti.map(p => Object.assign({}, p));
       fasi.push({ op: 'tascaLibera', titolo: 'Tasca libera D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti, prof: t.prof, ap, ae: dt.ae, sovra: 0.2, isole: (t.isole || []).map(i => profiloDi(i.e).punti.map(p => Object.assign({}, p))) }) });
       fasi.push({ op: 'profilo', titolo: 'Finitura tasca D' + u.d + ' T' + u.t, c: Object.assign({}, base, { t: u.t, d: u.d, n: dt.n, f: dt.f, punti: punti.map(p => Object.assign({}, p)), chiuso: true, lato: 'interno', prof: t.prof, ap, soloFondo: true }) });
