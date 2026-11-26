@@ -905,9 +905,23 @@
           A.avviso(ids.length + ' elementi letti dal DXF' + (r.avvisi.length ? '. ' + r.avvisi.join(' ') : '') + '. Controlla le quote.');
         }, '.dxf,.DXF,text/plain,application/dxf,image/vnd.dxf');
       };
-      const esportaDXF = () => {
+      const esportaDXF = cond => {
         if (!S.entita.length) { A.avviso('Il disegno e vuoto.'); return; }
-        A.scarica('disegno.dxf', O.scriviDXF(vis()));
+        if (cond === true) A.condividiFile('disegno.dxf', O.scriviDXF(vis()), 'application/dxf'); else A.scarica('disegno.dxf', O.scriviDXF(vis()));
+      };
+      // condividere con un tocco: un menu con le quattro cose che si mandano a un collega
+      let condBox = null;
+      const apriCondividi = () => {
+        if (condBox) { condBox.remove(); condBox = null; }
+        const box = condBox = el('div', { class: 'cad-digita cad-mod cad-cond', role: 'dialog', 'aria-label': 'Condividi' });
+        const chiudi = () => { box.remove(); condBox = null; };
+        const voce = (id, t, sub, fn) => el('button', { class: 'pul sec', id, type: 'button', html: '<b>' + t + '</b><br><small>' + sub + '</small>', style: 'text-align:left;margin:4px 0', onclick: () => { chiudi(); fn(); } });
+        box.append(el('div', { class: 'cad-dg-testa' }, [el('b', { class: 'cad-dg-tit', testo: 'Condividi il disegno' }), el('button', { class: 'cad-dg-x', id: 'cad-cond-x', type: 'button', 'aria-label': 'Chiudi', testo: '\u2715', onclick: chiudi })]),
+          voce('cad-cond-pdf', 'PDF del disegno', 'in scala, con cartiglio e quote', () => esportaPDF(true)),
+          voce('cad-cond-png', 'Immagine PNG', 'da guardare sul telefono', () => esportaPNG(true)),
+          voce('cad-cond-dxf', 'File DXF', 'per un altro programma di disegno', () => esportaDXF(true)),
+          voce('cad-cond-iso', 'Programma ISO', 'il testo del programma calcolato', () => { const pr = testoProgramma(); if (pr.errore) { A.avviso(pr.errore); return; } A.condividiFile('disegno.nc', pr.testo, 'text/plain'); }));
+        cv.parentNode.parentNode.appendChild(box);
       };
 
       // ----- 2.39.0: parametri, quote visibili, PDF, PNG, QR -----
@@ -921,15 +935,16 @@
         return { testo: r.righe.join('\n') + '\n', righe: r.righe.length };
       };
       const intestazione = () => { const m = A.materiale(S.mat || 0); return { titolo: S.titolo || 'Disegno', righe: ['Materiale: ' + (m ? m.n : '-'), 'Spessore del pezzo: ' + (S.fz || '-') + ' mm', 'Elementi: ' + vis().length + (S.nascosti && S.nascosti.length ? ' (layer nascosti: ' + S.nascosti.join(', ') + ')' : '')], data: new Date().toISOString().slice(0, 10) }; };
-      const esportaPDF = () => {
+      const esportaPDF = cond => {
         if (!vis().length) { A.avviso('Il disegno e vuoto.'); return; }
         const pr = testoProgramma(); let qr = null;
         if (!pr.errore) { const q = O.qrMatrice(pr.testo); if (!q.errore) qr = q; }
         const t = O.scriviPDF(vis(), Object.assign(intestazione(), { quote: !!S.quote, qr }));
+        if (cond === true) { A.condividiFile('disegno.pdf', t, 'application/pdf'); return; }
         A.scarica('disegno.pdf', t);
         if (!qr) A.avviso('PDF salvato' + (pr.errore ? ' (senza QR: ' + pr.errore + ')' : ' (senza QR: programma troppo lungo)'));
       };
-      const esportaPNG = () => {
+      const esportaPNG = cond => {
         const L = vis(); const b = O.limitiCAD(L);
         if (!b) { A.avviso('Il disegno e vuoto.'); return; }
         const W = 1600, marg = 70, bw = Math.max(b.x1 - b.x0, 1), bh = Math.max(b.y1 - b.y0, 1), sc = Math.min((W - 2 * marg) / bw, 1200 / bh), H = Math.round(bh * sc + 2 * marg + 60);
@@ -945,7 +960,7 @@
         if (S.quote) { g.font = '600 22px monospace'; g.fillStyle = '#1d3fbf'; g.textAlign = 'center'; O.quoteCAD(L).forEach(d => { const mx0 = d.tipo === 'lin' ? (d.x0 + d.x1) / 2 : d.x0, my0 = d.tipo === 'lin' ? (d.y0 + d.y1) / 2 : d.y0; g.fillText(d.testo, px(mx0) + (d.lato === 'destra' ? 34 : 0), py(my0) + (d.lato === 'sotto' ? 28 : -10)); }); }
         g.font = '600 24px sans-serif'; g.fillStyle = '#333'; g.textAlign = 'left';
         g.fillText('Hich-Officina - ' + intestazione().righe[0] + ' - spessore ' + (S.fz || '-') + ' mm - quote in mm, da controllare', marg, H - 24);
-        A.scaricaBin('disegno.png', c.toDataURL('image/png').split(',')[1], 'image/png');
+        if (cond === true) A.condividiBin('disegno.png', c.toDataURL('image/png').split(',')[1], 'image/png'); else A.scaricaBin('disegno.png', c.toDataURL('image/png').split(',')[1], 'image/png');
       };
       let qrBox = null;
       const mostraQR = () => {
@@ -964,6 +979,7 @@
         }
         cv.parentNode.parentNode.appendChild(box);
       };
+      const bCond = el('button', { class: 'cad-b', id: 'cad-condividi', 'aria-label': 'Condividi PDF, immagine, DXF o programma', html: icoSvg('<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>') + '<span>Condividi</span>', onclick: () => apriCondividi() });
       const bQuote = el('button', { class: 'cad-b', id: 'cad-quote', 'aria-label': 'Mostra le quote', html: icoSvg('<path d="M4 7v10M20 7v10M4 12h16"/><path d="M7 9l-3 3 3 3M17 9l3 3-3 3"/>') + '<span>Quote</span>', onclick: () => { S.quote = !S.quote; A.salva(); aggiorna(); } });
       const pannelloParametri = () => {
         const box = el('details', { class: 'cad-par', id: 'cad-parametri' }, [el('summary', { testo: 'Parametri (L, H...)' })]);
@@ -983,7 +999,7 @@
         box.open = !!S.parOpen; box.addEventListener('toggle', () => { S.parOpen = box.open; });
         return box;
       };
-      azioni.append(bUndo, bRedo, bDigita, bMod, bQuote, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
+      azioni.append(bUndo, bRedo, bDigita, bMod, bQuote, bCond, bFine, bChiudi, bAdatta, bSnap, bMir, bPan, bRuota, bPieno);
 
       // ----- pannello: lavorazioni dell'entita scelta, dati del pezzo, crea -----
       const OP_TESTO = { isola: ['Isola', 'Resta in piedi dentro una tasca'], incisione: ['Incisione', 'Linee a profondita fissa con una fresa piccola'], contorno: ['Contorno', 'Taglia lungo la linea con G41/G42'], tasca: ['Tasca', 'Svuota l\'interno'], foro: ['Foro', 'Centrino, punta e smusso'], maschio: ['Maschio', 'Foro filettato'], alesato: ['Alesato', 'Foro con alesatore'], asola: ['Asola', 'Fresa a spirale lungo la linea'] };
@@ -1025,6 +1041,7 @@
           el('button', { class: 'pul sec', id: 'cad-percorso', html: A.icona('modifica') + 'Mostra il percorso', onclick: () => calcola(false, msg) }),
           el('button', { class: 'pul', id: 'cad-crea', html: A.icona('codice') + 'Crea il programma', onclick: () => calcola(true, msg) })]));
         pannello.appendChild(pannelloParametri());
+        pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', id: 'cad-condividi-pannello', html: A.icona('condividi') + 'Condividi PDF, DXF, immagine o programma', onclick: () => apriCondividi() })]));
         pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'cad-pdf', testo: 'Esporta PDF', onclick: () => esportaPDF() }), el('button', { class: 'pul sec', id: 'cad-png', testo: 'Esporta PNG', onclick: () => esportaPNG() }), el('button', { class: 'pul sec', id: 'cad-qr', testo: 'QR del programma', onclick: () => mostraQR() })]));
         pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'cad-dxf-imp', testo: 'Importa DXF', onclick: () => importaDXF() }), el('button', { class: 'pul sec', id: 'cad-dxf-esp', testo: 'Esporta DXF', onclick: () => esportaDXF() })]));
         pannello.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', testo: 'Carica un disegno di prova', onclick: () => { ricorda(); S.entita = ESEMPIO(); S.prossimo = 10; sel = null; anteprima = null; adattato = false; A.salva(); aggiorna(); adatta(); disegna(); } })]));

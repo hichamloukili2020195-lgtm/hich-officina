@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sc_cad">CAD</string>
+    <string name="sc_cad_l">Disegna e programma</string>
+    <string name="sc_calcoli">Calcoli</string>
+    <string name="sc_calcoli_l">Calcolatrice di taglio</string>
+    <string name="sc_programma">Nuovo programma</string>
+    <string name="sc_programma_l">Nuovo programma ISO</string>
+    <string name="sc_apri">Controlla</string>
+    <string name="sc_apri_l">Controlla e simula un programma</string>
+</resources>

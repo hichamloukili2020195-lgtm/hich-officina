@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.43.0 - Ricerca ovunque, scorciatoie dell'icona, condividere con un tocco
+- **Ricerca in tutta l'app**: la lente in alto (su ogni schermata) apre la ricerca su programmi, pezzi (anche per cliente e commessa), materiali, filetti (M10), tolleranze (H7 25), codici G e M, utensili, schermate e calcolatori. Nuovo: equivalenze dei materiali (`C45`, `1.4301`, `304`) e conversione delle durezze (`45 HRC`, `392 HV`). Esc o Chiudi per uscire.
+- **Scorciatoie sull'icona** (tieni premuta l'icona dell'app): CAD, Calcoli, Nuovo programma, Controlla. Funzionano anche con l'app gia aperta. Le stesse quattro per la versione installabile dal sito.
+- **Condividi con un tocco**: nel CAD un menu con PDF del disegno, immagine PNG, file DXF e programma ISO; sul pezzo la scheda (cliente, commessa, stato, origine, fissaggio, note, programmi) e l'etichetta con il codice QR. Si manda con il menu di Android (WhatsApp, posta, Drive...); nel browser il file si scarica.
+- Corretto: nel CAD la riga dei pulsanti del pannello poteva allargare la pagina oltre lo schermo.
+- Prove: ricerca globale, scorciatoie (schermate esistenti, manifesti), condivisioni, interfaccia.
+
 ## 2.42.0 - Fase 4: durezze, equivalenze dei materiali, commesse, etichetta QR
 - **Durezze** (Tabelle > Durezze): converti HRC, HV e HB e ottieni la resistenza a trazione approssimata (3,45 x HB). Valori indicativi per acciai, da 20 a 65 HRC; HB solo fino a 50 HRC; fuori campo lo dice.
 - **Equivalenze dei materiali** (Tabelle > Equivalenze materiali): sigla EN, numero materiale e sigla americana piu vicina per acciai, inox, ghise, alluminio, ottone e titanio. Cerca per qualsiasi sigla. Sono equivalenze indicative: vale il certificato del materiale.

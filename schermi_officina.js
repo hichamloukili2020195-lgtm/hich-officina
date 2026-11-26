@@ -141,7 +141,8 @@
       for (let r = 0; r < q.n; r++) for (let c = 0; c < q.n; c++) if (q.m[r][c]) g.fillRect((c + 4) * k, (r + 4) * k, k, k);
       g.font = '600 18px sans-serif'; g.textAlign = 'center'; righe.forEach((t, i) => g.fillText(t.slice(0, 40), tela.width / 2, (q.n + 8) * k + 12 + i * 24));
       carta.appendChild(tela);
-      carta.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', id: 'qr-salva', html: A.icona('salva') + 'Salva come immagine', onclick: () => A.scaricaBin('etichetta-' + String(p.nome || 'pezzo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png', tela.toDataURL('image/png').split(',')[1], 'image/png') })]));
+      const nomePng = 'etichetta-' + String(p.nome || 'pezzo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png';
+      carta.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', id: 'qr-condividi', html: A.icona('condividi') + 'Condividi', onclick: () => A.condividiBin(nomePng, tela.toDataURL('image/png').split(',')[1], 'image/png') }), el('button', { class: 'pul sec', id: 'qr-salva', html: A.icona('salva') + 'Salva come immagine', onclick: () => A.scaricaBin('etichetta-' + String(p.nome || 'pezzo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png', tela.toDataURL('image/png').split(',')[1], 'image/png') })]));
     }
     carta.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'qr-x', testo: 'Chiudi', onclick: chiudi })]));
     document.body.appendChild(box);
@@ -157,7 +158,11 @@
         { id: 'materiale', et: 'Materiale', tipo: 'testo' }, { id: 'grezzo', et: 'Grezzo', sub: 'es. 100 x 60 x 25 oppure D40 x 80', tipo: 'testo' },
         { id: 'origine', et: 'Origine', tipo: 'testo', largo: true }, { id: 'origTipo', et: 'Posizione dell\'origine (schema nel foglio)', tipo: 'scelta', scelte: ORIGINI }, { id: 'fissaggio', et: 'Fissaggio', sub: 'morsa, griffe, attrezzatura...', tipo: 'testo', largo: true }, { id: 'sporg', et: 'Sporgenza dal serraggio', u: 'mm', sub: 'quanto il pezzo esce dalla morsa o dalle griffe' },
         { id: 'note', et: 'Note', tipo: 'area', righe: 4 }], p, () => {});
-      m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'pezzo-qr', html: A.icona('galleria') + 'Etichetta con codice QR', onclick: () => etichettaQR(p) })]));
+      m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'pezzo-qr', html: A.icona('galleria') + 'Etichetta con codice QR', onclick: () => etichettaQR(p) }),
+        el('button', { class: 'pul sec', id: 'pezzo-condividi', html: A.icona('condividi') + 'Condividi la scheda', onclick: () => {
+          const righe = [p.nome || 'Pezzo', p.cliente ? 'Cliente: ' + p.cliente : '', p.commessa ? 'Commessa: ' + p.commessa : '', p.stato ? 'Stato: ' + ((STATI.find(x => x[0] === p.stato) || [])[1] || p.stato) : '', p.quantita ? 'Quantita: ' + p.quantita : '', p.disegno ? 'Disegno / codice: ' + p.disegno : '', p.materiale ? 'Materiale: ' + p.materiale : '', p.grezzo ? 'Grezzo: ' + p.grezzo : '', p.origine ? 'Origine: ' + p.origine : '', p.fissaggio ? 'Fissaggio: ' + p.fissaggio : '', p.note ? 'Note: ' + p.note : '', 'Programmi: ' + (p.programmi || []).map(id => ((A.mem.salvati || []).find(x => x.id === id) || {}).nome).filter(Boolean).join(', ')].filter(Boolean);
+          A.condividi('scheda-' + String(p.nome || 'pezzo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.txt', righe.join('\n') + '\n\n(Dati indicativi: controllali prima di lavorare)');
+        } })]));
       // programmi collegati
       m.appendChild(el('div', { class: 'sez', testo: 'Programmi' }));
       const progBox = el('div', { class: 'elenco' });
@@ -478,6 +483,14 @@
       A.CODICI.filter(([c]) => c.split(/[/…]/).map(x => x.trim()).some(x => x === L + n || (x.includes('…') ? false : false)) || (c === 'G54…G59' && L === 'G' && n >= 54 && n <= 59))
         .forEach(([c, d]) => metti(c, d, () => { A.sezione('tabelleVista').tab = 'codici'; A.salva(); A.vai('tabelle'); }));
     }
+    // durezze: 45 HRC, 392 HV, 286 HB
+    m = /^(\d+(?:\.\d+)?)\s*(HRC|HV|HB)$/.exec(T);
+    if (m && O.convertiDurezza) {
+      const r = O.convertiDurezza(m[2], m[1]);
+      if (!r.errore) metti(m[1] + ' ' + m[2] + ' = ' + [r.HRC !== null ? fmt(r.HRC, 1) + ' HRC' : '', r.HV !== null ? r.HV + ' HV' : '', r.HB !== null ? r.HB + ' HB' : ''].filter(Boolean).join(' · '), 'Conversione indicativa per acciai' + (r.Rm ? ' · Rm circa ' + r.Rm + ' MPa' : ''), () => { const V = A.sezione('tabelleVista'); V.tab = 'durezze'; V.durScala = m[2]; V.durValore = m[1]; A.salva(); A.vai('tabelle'); });
+    }
+    // equivalenze dei materiali: C45, 1.4301, 304
+    if (O.equivalenze && t.length >= 2) O.equivalenze(t).slice(0, 4).forEach(r => metti(r.en + ' · ' + r.numero + ' · ' + r.usa, 'Equivalenza indicativa · ' + r.famiglia, () => { const V = A.sezione('tabelleVista'); V.tab = 'equivalenze'; V.cercaEq = t; A.salva(); A.vai('tabelle'); }));
     const qq = t.toLowerCase();
     // materiali
     A.materiali().forEach((x, i) => {
@@ -495,6 +508,6 @@
     pezzi().forEach(p => { if ((p.nome + ' ' + (p.disegno || '') + ' ' + (p.materiale || '') + ' ' + (p.cliente || '') + ' ' + (p.commessa || '') + ' ' + (p.note || '')).toLowerCase().includes(qq)) metti(p.nome, 'Pezzo' + (p.disegno ? ' · ' + p.disegno : '') + (p.cliente ? ' · ' + p.cliente : '') + (p.commessa ? ' · comm. ' + p.commessa : ''), () => { A.param.pezzo = p.id; A.vai('pezzo'); }); });
     (A.mem.macro || []).forEach((mc, i) => { if ((mc.nome + ' ' + mc.num).toLowerCase().includes(qq)) metti(mc.nome, 'Macro O' + mc.num, () => { A.param.macro = { i }; A.vai('macroModifica'); }); });
     O.MACRO_MODELLI.forEach(mc => { if ((mc.nome + ' ' + mc.num).toLowerCase().includes(qq)) metti(mc.nome, 'Modello di macro O' + mc.num, () => { A.param.macro = { modello: mc.id }; A.vai('macroModifica'); }); });
-    return out.slice(0, 15);
+    return out.slice(0, 20);
   };
 })();

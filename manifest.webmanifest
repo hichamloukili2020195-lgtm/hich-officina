@@ -10,8 +10,43 @@
   "background_color": "#0b1220",
   "theme_color": "#0b1220",
   "icons": [
-    { "src": "icone/icona-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icone/icona-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icone/icona-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icone/icona-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icone/icona-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icone/icona-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "CAD",
+      "short_name": "CAD",
+      "url": "./app.html#cad"
+    },
+    {
+      "name": "Calcolatrice di taglio",
+      "short_name": "Calcoli",
+      "url": "./app.html#calcoli"
+    },
+    {
+      "name": "Nuovo programma ISO",
+      "short_name": "Programma",
+      "url": "./app.html#programma"
+    },
+    {
+      "name": "Controlla e simula",
+      "short_name": "Controlla",
+      "url": "./app.html#apri"
+    }
   ]
 }

@@ -240,6 +240,17 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 3000);
     avviso('Salvato ' + nome);
   }
+  /** Condivide un file binario (immagine) dato in base64. */
+  async function condividiBin(nome, b64, tipo) {
+    if (ANDROID && ANDROID.condividiBase64) { try { ANDROID.condividiBase64(nome, b64, tipo || 'application/octet-stream'); return; } catch (e) { /* sotto */ } }
+    try {
+      const bin = atob(b64), dati = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) dati[i] = bin.charCodeAt(i);
+      const file = new File([dati], nome, { type: tipo || 'application/octet-stream' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: nome }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    scaricaBin(nome, b64, tipo);
+  }
   async function condividi(nome, testo) {
     if (ANDROID) { try { ANDROID.condividi(nome, testo); return; } catch (e) { /* sotto */ } }
     try {
@@ -458,9 +469,10 @@
   const App = {
     migra, hash, chiedi, conferma, SCHEMA,
     persPost: i => ({ cambio: i.ppCambio, m8: i.ppM8, m9: i.ppM9, fine: i.ppFine, g43: i.ppG43 !== false, percento: i.ppPercento !== false, commenti: i.ppCommenti, decimali: i.ppDec, passoN: i.ppPasso, iniziali: i.ppIni, finali: i.ppFin }),
+    condividiBin,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, scaricaBin, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.42.0'
+    schermi: {}, param: {}, VERSIONE: '2.43.0'
   };
   window.App = App;
 
@@ -630,12 +642,34 @@
     }
   };
 
+  /** Ricerca in tutta l'app: lente in testata, finestra sopra qualunque schermata. */
+  App.apriCerca = () => {
+    document.querySelectorAll('.cerca-globale').forEach(x => x.remove());
+    const chiudi = () => { box.remove(); document.removeEventListener('keydown', tasto); };
+    const tasto = e => { if (e.key === 'Escape') chiudi(); };
+    const campo = el('input', { id: 'f-cerca-globale', type: 'search', placeholder: 'Cerca: M10, H7 25, 316, G83, T5, un pezzo...', autocomplete: 'off', spellcheck: 'false', enterkeyhint: 'search', 'aria-label': 'Cerca in tutta l\'app' });
+    const ris = el('div', { class: 'elenco', id: 'cerca-globale-ris' });
+    const box = el('div', { class: 'cerca-globale', role: 'dialog', 'aria-label': 'Ricerca' }, [
+      el('div', { class: 'cerca-globale-testa' }, [campo, el('button', { class: 'pul sec', id: 'cerca-globale-x', type: 'button', testo: 'Chiudi', onclick: chiudi })]), ris]);
+    const mostra2 = () => {
+      const q = campo.value.trim(); ris.innerHTML = '';
+      if (q.length < 2) { ris.appendChild(el('div', { class: 'vuoto', testo: 'Scrivi almeno due lettere: programmi, pezzi, materiali, filetti, tolleranze, codici G e M, utensili, durezze, schermate.' })); return; }
+      const L = App.cerca ? App.cerca(q) : [];
+      if (!L.length) ris.appendChild(el('div', { class: 'vuoto', testo: 'Niente per "' + q + '".' }));
+      L.forEach(r => ris.appendChild(el('button', { class: 'voce', onclick: () => { chiudi(); r.vai(); } }, [el('span', { class: 't' }, [el('b', { testo: r.titolo }), el('small', { testo: r.sotto })]), el('span', { html: icona('avanti') })])));
+    };
+    campo.addEventListener('input', mostra2);
+    document.addEventListener('keydown', tasto);
+    document.body.appendChild(box); mostra2(); campo.focus();
+  };
+
   // ----- avvio (dopo che tutti gli script hanno registrato le schermate) -----
   document.addEventListener('DOMContentLoaded', () => {
     applicaTema();
     document.querySelectorAll('[data-ic]').forEach(s => { s.outerHTML = icona(s.dataset.ic); });
     $('b-indietro').innerHTML = icona('indietro');
     $('b-indietro').addEventListener('click', App.indietro);
+    $('b-cerca').addEventListener('click', () => { vibra(8); App.apriCerca(); });
     document.querySelectorAll('#barra button, #b-imp').forEach(b => b.addEventListener('click', () => { vibra(8); App.vai(b.dataset.vai); }));
     mostra();
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {

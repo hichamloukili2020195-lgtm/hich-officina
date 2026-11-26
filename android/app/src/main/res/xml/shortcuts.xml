@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="cad" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/sc_cad" android:shortcutLongLabel="@string/sc_cad_l">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="it.hich.officina" android:targetClass="it.hich.officina.MainActivity" android:data="hich://vai/cad" />
+    </shortcut>
+    <shortcut android:shortcutId="calcoli" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/sc_calcoli" android:shortcutLongLabel="@string/sc_calcoli_l">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="it.hich.officina" android:targetClass="it.hich.officina.MainActivity" android:data="hich://vai/calcoli" />
+    </shortcut>
+    <shortcut android:shortcutId="programma" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/sc_programma" android:shortcutLongLabel="@string/sc_programma_l">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="it.hich.officina" android:targetClass="it.hich.officina.MainActivity" android:data="hich://vai/programma" />
+    </shortcut>
+    <shortcut android:shortcutId="apri" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/sc_apri" android:shortcutLongLabel="@string/sc_apri_l">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="it.hich.officina" android:targetClass="it.hich.officina.MainActivity" android:data="hich://vai/apri" />
+    </shortcut>
+</shortcuts>

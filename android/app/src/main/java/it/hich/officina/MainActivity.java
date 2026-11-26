@@ -140,7 +140,27 @@ public class MainActivity extends Activity {
         setContentView(web);
         margini();
         if (stato != null) web.restoreState(stato);
-        else web.loadUrl("file:///android_asset/www/index.html");
+        else web.loadUrl("file:///android_asset/www/index.html" + destinazione(getIntent()));
+    }
+
+    /** Le scorciatoie dell'icona (hich://vai/cad) aprono direttamente quella schermata. */
+    private String destinazione(Intent i) {
+        try {
+            Uri u = i == null ? null : i.getData();
+            if (u != null && "hich".equals(u.getScheme()) && "vai".equals(u.getHost())) {
+                String id = u.getLastPathSegment();
+                if (id != null && id.matches("cad|calcoli|programma|apri")) return "#" + id;
+            }
+        } catch (Exception e) { /* si apre dalla home */ }
+        return "";
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        setIntent(i);
+        String d = destinazione(i);
+        if (!d.isEmpty() && web != null) web.evaluateJavascript("location.hash='" + d.substring(1) + "'", null);
     }
 
     @Override
@@ -413,6 +433,33 @@ public class MainActivity extends Activity {
                 i.putExtra(Intent.EXTRA_TITLE, nome);
                 try { startActivityForResult(i, SALVA_IN); } catch (Exception e) { avviso("Nessuna app per scegliere la cartella"); }
             });
+        }
+
+        /** Condivide un file binario (immagine) dato in base64: lo salva in Download/Hich-Officina e apre il menu Condividi. */
+        @JavascriptInterface
+        public void condividiBase64(String nome, String b64, String tipo) {
+            try {
+                byte[] dati = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                String mime = tipo == null || tipo.isEmpty() ? "application/octet-stream" : tipo;
+                if (Build.VERSION.SDK_INT < 29) { avviso(salvaBase64(nome, b64, tipo)); return; }
+                ContentValues cv = new ContentValues();
+                cv.put(MediaStore.MediaColumns.DISPLAY_NAME, nome);
+                cv.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+                cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Hich-Officina");
+                Uri u = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                if (u == null) throw new Exception("cartella Download non disponibile");
+                try (OutputStream o = getContentResolver().openOutputStream(u)) { o.write(dati); }
+                runOnUiThread(() -> {
+                    Intent i = new Intent(Intent.ACTION_SEND);
+                    i.setType(mime);
+                    i.putExtra(Intent.EXTRA_STREAM, u);
+                    i.putExtra(Intent.EXTRA_SUBJECT, nome);
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(i, "Condividi " + nome));
+                });
+            } catch (Exception e) {
+                avviso("Non condiviso: " + e.getMessage());
+            }
         }
 
         /** Condivide un file vero (salvato in Download/Hich-Officina), non solo il testo. */

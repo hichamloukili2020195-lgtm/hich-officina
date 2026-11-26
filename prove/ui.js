@@ -1815,6 +1815,47 @@ const server = http.createServer((q, r) => {
     const [d] = await Promise.all([pg.waitForEvent('download'), pg.click('#qr-salva')]); ok(d.suggestedFilename() === 'etichetta-flangia.png', 'etichetta salvata: ' + d.suggestedFilename());
     await pg.click('#qr-x'); ok(!(await pg.$('.etichetta-qr')), 'etichetta chiusa');
   }
+
+  // ===== 2.43.0: ricerca ovunque, scorciatoie, condividere con un tocco =====
+  {
+    await vai('tabelle');
+    await pg.click('#b-cerca'); await pg.waitForTimeout(100);
+    ok(await pg.isVisible('#f-cerca-globale'), 'ricerca globale aperta dalla lente');
+    await pg.fill('#f-cerca-globale', 'C45'); await pg.waitForTimeout(100);
+    const r1 = await pg.textContent('#cerca-globale-ris');
+    ok(r1.includes('1.0503') && r1.includes('1045'), 'ricerca: equivalenze di C45');
+    await pg.fill('#f-cerca-globale', '45 hrc'); await pg.waitForTimeout(100);
+    ok((await pg.textContent('#cerca-globale-ris')).includes('446 HV'), 'ricerca: 45 HRC in HV');
+    await pg.click('#cerca-globale-ris .voce >> nth=0'); await pg.waitForTimeout(200);
+    ok(!(await pg.$('.cerca-globale')) && (await pg.textContent('#dur-ris')).includes('446'), 'il risultato apre la tabella delle durezze');
+    await pg.click('#b-cerca'); await pg.keyboard.press('Escape'); ok(!(await pg.$('.cerca-globale')), 'Esc chiude la ricerca');
+    await vai('cad');
+    await pg.click('#b-cerca'); await pg.fill('#f-cerca-globale', 'Calcolatrice'); await pg.waitForTimeout(100);
+    ok((await pg.textContent('#cerca-globale-ris')).toLowerCase().includes('calcolatrice'), 'ricerca delle schermate da qualunque pagina'); await pg.click('#cerca-globale-x');
+    // scorciatoie: file Android e manifesto del sito
+    const fs2 = require('fs'), path2 = require('path');
+    const xml = fs2.readFileSync(path2.join(__dirname, '..', 'android/app/src/main/res/xml/shortcuts.xml'), 'utf8');
+    const dest = [...xml.matchAll(/hich:\/\/vai\/(\w+)/g)].map(x => x[1]);
+    ok(dest.length === 4 && (await pg.evaluate(d => d.every(id => !!App.schermi[id]), dest)), 'scorciatoie Android verso schermate che esistono: ' + dest.join());
+    const man = JSON.parse(fs2.readFileSync(path2.join(__dirname, '..', 'manifest.webmanifest'), 'utf8'));
+    ok((man.shortcuts || []).length === 4 && man.shortcuts.every(s => /^\.\/app\.html#\w+$/.test(s.url)), 'scorciatoie del manifesto web');
+    ok(/launchMode="singleTop"/.test(fs2.readFileSync(path2.join(__dirname, '..', 'android/app/src/main/AndroidManifest.xml'), 'utf8')), 'manifesto Android: singleTop per le scorciatoie');
+    // condividere: CAD
+    await pg.evaluate(() => { const c = App.cadStato; c.S.entita = [{ id: 1, tipo: 'rett', x0: 0, y0: 0, x1: 40, y1: 20, r: 0, lav: [{ op: 'contorno', prof: 5, lato: 'esterno' }] }]; c.S.prossimo = 2; c.S.fz = '10'; c.S.mat = '4'; c.S.parametri = []; c.S.nascosti = []; c.S.strum = 'sel'; c.multi = []; c.sel = null; c.aggiorna(); c.adatta(); c.disegna(); });
+    await pg.evaluate(() => window.scrollTo(0, 0)); await pg.click('#cad-condividi'); await pg.waitForTimeout(80);
+    ok(await pg.isVisible('.cad-cond') && (await pg.$$('.cad-cond .pul')).length === 4, 'menu Condividi del CAD con 4 voci');
+    const dl2 = async id => { const [d] = await Promise.all([pg.waitForEvent('download'), pg.evaluate(i => document.querySelector(i).click(), id)]); return d.suggestedFilename(); };
+    ok((await dl2('#cad-cond-pdf')) === 'disegno.pdf', 'condividi PDF (nel browser si scarica)');
+    await pg.click('#cad-condividi'); ok((await dl2('#cad-cond-png')) === 'disegno.png', 'condividi PNG');
+    await pg.click('#cad-condividi'); ok((await dl2('#cad-cond-dxf')) === 'disegno.dxf', 'condividi DXF');
+    await pg.click('#cad-condividi'); ok((await dl2('#cad-cond-iso')) === 'disegno.nc', 'condividi programma ISO');
+    // condividere: scheda del pezzo ed etichetta
+    await pg.evaluate(() => { App.mem.pezzi = [{ id: 'pa', nome: 'Flangia', disegno: 'FL-100', materiale: 'C45', cliente: 'Rossi', commessa: 'A-1', stato: 'inlav', note: 'x', programmi: [], foto: [], misure: [], controlli: [] }]; App.salva(); App.param.pezzo = 'pa'; App.vai('pezzo'); });
+    await pg.waitForTimeout(200);
+    const [dd] = await Promise.all([pg.waitForEvent('download'), pg.click('#pezzo-condividi')]); ok(dd.suggestedFilename() === 'scheda-flangia.txt', 'condividi la scheda del pezzo: ' + dd.suggestedFilename());
+    await pg.click('#pezzo-qr'); const [d3] = await Promise.all([pg.waitForEvent('download'), pg.click('#qr-condividi')]); ok(d3.suggestedFilename() === 'etichetta-flangia.png', 'condividi l\'etichetta');
+    await pg.click('#qr-x');
+  }
   await largo('CAD con Digita');
 
   await b.close(); server.close();
