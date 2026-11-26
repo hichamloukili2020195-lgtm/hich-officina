@@ -71,7 +71,7 @@
     if (m.materiali !== undefined && !Array.isArray(m.materiali)) delete m.materiali;
     if (Array.isArray(m.materiali) && !m.materiali.length) delete m.materiali;
     if (!m.imp || typeof m.imp !== 'object' || Array.isArray(m.imp)) m.imp = {};
-    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo', 'cad', 'lavoro', 'dalDisegno'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
+    ['valori', 'programma', 'ciclo', 'disegno', 'tolleranze', 'tabelleVista', 'galleriaVista', 'macroVista', 'simVista', 'angolo', 'cad', 'lavoro', 'dalDisegno', 'pezziVista'].forEach(k => { if (m[k] !== undefined && (typeof m[k] !== 'object' || m[k] === null || Array.isArray(m[k]))) delete m[k]; });
     // programmi salvati e pezzi: solo voci complete
     m.salvati = m.salvati.filter(x => x && Array.isArray(x.righe)).map(x => Object.assign({ id: Date.now() + Math.random(), nome: 'O0001', data: '' }, x));
     m.pezzi = m.pezzi.filter(x => x && typeof x === 'object').map(x => Object.assign({ id: 'p' + Date.now() + Math.floor(Math.random() * 1e6), nome: 'Pezzo', programmi: [], foto: [], misure: [], controlli: [] }, x));
@@ -460,7 +460,7 @@
     persPost: i => ({ cambio: i.ppCambio, m8: i.ppM8, m9: i.ppM9, fine: i.ppFine, g43: i.ppG43 !== false, percento: i.ppPercento !== false, commenti: i.ppCommenti, decimali: i.ppDec, passoN: i.ppPasso, iniziali: i.ppIni, finali: i.ppFin }),
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, scaricaBin, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.41.0'
+    schermi: {}, param: {}, VERSIONE: '2.42.0'
   };
   window.App = App;
 

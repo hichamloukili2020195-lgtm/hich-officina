@@ -8,6 +8,7 @@ require('../cad.js');
 require('../modifica.js');
 require('../vincoli.js');
 require('../font.js');
+require('../durezze.js');
 require('../dxf.js');
 require('../qr.js');
 require('../pdf.js');
@@ -1440,5 +1441,20 @@ prova('post personalizzato: cambio utensile, refrigerante, fine, righe, commenti
   const v = O.postProcessor(iso, { linguaggio: 'personalizzato', modo: 'fresa', pers: { m8: '', m9: '', commenti: 'nessuno' } }); assert.ok(!/\bM8\b|\bM9\b|\(/.test(v.righe.join('\n'))); assert.ok(v.righe.includes('G43 H1 Z5'));
   const torn = O.postProcessor(['%', 'O0102 (ALBERO)', 'T0101', 'G96 S200 M3', 'G0 X62 Z2', 'M30', '%'], { linguaggio: 'personalizzato', modo: 'tornio', pers: { cambio: 'T{t} M6' } }); assert.ok(torn.righe.includes('T0101'));
   assert.ok(O.postProcessor(['%', 'O1', 'G65 P9000', 'M30', '%'], { linguaggio: 'personalizzato', modo: 'fresa', pers: {} }).righe.length > 0);
+});
+
+// ===== 2.42.0: durezze ed equivalenze =====
+prova('durezze: conversioni HRC, HV, HB', () => {
+  const a = O.convertiDurezza('HRC', 45); assert.strictEqual(a.HV, 446); assert.strictEqual(a.HB, 421); assert.strictEqual(a.Rm, 1450);
+  const b = O.convertiDurezza('HV', 392); vicino(b.HRC, 40, 0.05); assert.strictEqual(b.HB, 371);
+  const c = O.convertiDurezza('HB', 286); vicino(c.HRC, 30, 0.05); assert.strictEqual(c.HV, 302);
+  const d = O.convertiDurezza('HRC', 60); assert.strictEqual(d.HV, 697); assert.strictEqual(d.HB, null); assert.strictEqual(d.Rm, null);
+  const e = O.convertiDurezza('HRC', 42.5); assert.ok(e.HV > 412 - 5 && e.HV < 424, e.HV);
+  assert.ok(O.convertiDurezza('HRC', 10).errore); assert.ok(O.convertiDurezza('HV', 100).errore); assert.ok(O.convertiDurezza('HB', 600).errore); assert.ok(O.convertiDurezza('HRC', 'x').errore); assert.ok(O.convertiDurezza('HRX', 5).errore);
+  assert.strictEqual(O.convertiDurezza('HRC', '45,0').HV, 446);
+});
+prova('equivalenze dei materiali', () => {
+  assert.strictEqual(O.equivalenze('c45')[0].numero, '1.0503'); assert.strictEqual(O.equivalenze('1.4301')[0].usa, '304'); assert.ok(O.equivalenze('4140').some(r => r.en === '42CrMo4'));
+  assert.ok(O.equivalenze('alluminio').length >= 4); assert.ok(O.equivalenze('').length >= 20); assert.strictEqual(O.equivalenze('zzzz').length, 0); assert.ok(O.equivalenze('X5 CrNi').length >= 1);
 });
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

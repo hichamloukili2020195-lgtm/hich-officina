@@ -81,10 +81,10 @@ Legenda: **C** = c'e, **P** = c'e in parte, **M** = manca.
 | Tolleranze ISO 286 | P (gradi IT01-IT18 e lettere piu usate; mancano le lettere rare) |
 | Tabelle filettature con preforo e dati tornio | C (13 famiglie) |
 | Calcolatori (triangolo, fori su circonferenza, conicita, barra seno, Ra, peso, mm/pollici) | C |
-| Durezze HRC/HB/HV, equivalenze EN/AISI/W.Nr. dei materiali | P (HRC presente nei dati; manca la tabella di conversione e le equivalenze) |
+| Durezze HRC/HB/HV, equivalenze EN/AISI/W.Nr. dei materiali | C (2.42.0) |
 | Preventivo rapido | C |
-| Archivio commesse con foto, note, ricerca | P (pezzi con foto e note; ricerca per cliente/codice debole) |
-| PDF di disegno + G-code + scheda; QR | P (foglio e programmi in PDF/condivisione; disegno e QR mancano) |
+| Archivio commesse con foto, note, ricerca | C (2.42.0: cliente, commessa, stato, ricerca) |
+| PDF di disegno + G-code + scheda; QR | C (PDF del disegno e QR dalla 2.39.0, etichetta QR del pezzo 2.42.0) |
 | Tutto offline | C |
 
 ## 4. Problemi trovati

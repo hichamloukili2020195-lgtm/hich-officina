@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.42.0 - Fase 4: durezze, equivalenze dei materiali, commesse, etichetta QR
+- **Durezze** (Tabelle > Durezze): converti HRC, HV e HB e ottieni la resistenza a trazione approssimata (3,45 x HB). Valori indicativi per acciai, da 20 a 65 HRC; HB solo fino a 50 HRC; fuori campo lo dice.
+- **Equivalenze dei materiali** (Tabelle > Equivalenze materiali): sigla EN, numero materiale e sigla americana piu vicina per acciai, inox, ghise, alluminio, ottone e titanio. Cerca per qualsiasi sigla. Sono equivalenze indicative: vale il certificato del materiale.
+- **Commesse**: ogni pezzo ha cliente, commessa/ordine, stato (da fare, in lavorazione, finito, consegnato) e quantita. L'elenco ha la ricerca su nome, cliente, commessa, codice, materiale, grezzo e note, e il filtro per stato. La ricerca dalla home trova anche cliente e commessa.
+- **Etichetta con codice QR** dal pezzo: nome, cliente, commessa, disegno, materiale e quantita in un QR (si legge con qualsiasi lettore), con le righe di testo sotto; si salva come immagine da stampare.
+- Non fatto: le lettere rare delle tolleranze ISO 286 (a, b, c, s, t, u...): servono le tabelle ufficiali per non rischiare valori sbagliati; le lettere usate in officina ci sono gia.
+- Prove: conversioni delle durezze (andata, ritorno, fuori campo), equivalenze, ricerca e filtri dei pezzi, etichetta QR, interfaccia.
+
 ## 2.41.0 - Fase 3 CAM: isole nelle tasche, incisione di testo, post personalizzato
 - **Isole nelle tasche**: dai la lavorazione **Isola** a un profilo chiuso, a un rettangolo o a un cerchio che sta dentro una tasca. La fresa lo gira intorno: righe di sgrossatura che non entrano nell'isola, un giro di pulizia attorno a ogni isola e la finitura dell'isola a profondita piena. Un'isola fuori da ogni tasca resta solo disegnata e il programma lo scrive nelle note. La tasca rettangolare o circolare con un'isola passa alla tasca libera.
 - **Incisione**: nuova lavorazione per i profili e per il nuovo elemento **Testo**. La fresa segue le linee a profondita fissa (preimpostata 0,3 mm), senza compensazione, con piu passate se serve. Utensile: il piu piccolo della tabella oppure il diametro scritto.

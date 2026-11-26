@@ -73,6 +73,8 @@
   // ----- tabelle -----
   const TAB = {
     filetti() { return ''; },
+    durezze() { return ''; },
+    equivalenze() { return ''; },
     tolleranze(S) {
       const LETT = ['D', 'E', 'F', 'G', 'H', 'JS', 'd', 'e', 'f', 'g', 'h', 'js', 'k', 'm', 'n', 'p'];
       const mt = /^(js|JS|[a-zA-Z])(\d{1,2})$/.exec(S.toll || 'H7') || ['', 'H', '7'];
@@ -175,18 +177,48 @@
     cerca.addEventListener('input', () => { S.cercaFil = cerca.value; disegna(); });
     disegna();
   }
+  // ----- durezze: HRC, HV, HB e resistenza approssimata -----
+  function durezzeDom(S, corpo) {
+    if (!['HRC', 'HV', 'HB'].includes(S.durScala)) S.durScala = 'HRC';
+    if (S.durValore === undefined) S.durValore = '45';
+    const scale = el('div', { class: 'chips' }), campo = el('input', { type: 'text', inputmode: 'decimal', id: 'f-durValore', value: S.durValore, 'aria-label': 'Valore della durezza', autocomplete: 'off' }), ris = el('div', { class: 'pannello', id: 'dur-ris' });
+    const calcola = () => {
+      scale.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.durScala));
+      const r = O.convertiDurezza(S.durScala, S.durValore);
+      if (r.errore) { ris.innerHTML = '<p class="errore">' + esc(r.errore) + '</p>'; return; }
+      const riga = (n, v, u) => '<tr><td>' + n + '</td><td><b>' + (v === null ? '-' : fmt(v, n === 'HRC' ? 1 : 0)) + '</b> ' + (v === null ? '' : u) + '</td></tr>';
+      ris.innerHTML = '<table class="dati">' + riga('HRC', r.HRC, '') + riga('HV', r.HV, '') + riga('HB', r.HB, '') + riga('Rm', r.Rm, 'MPa circa') + '</table>';
+    };
+    ['HRC', 'HV', 'HB'].forEach(k => scale.appendChild(el('button', { class: 'chip', 'data-id': k, testo: k, onclick: () => { S.durScala = k; A.salva(); calcola(); } })));
+    campo.addEventListener('input', () => { S.durValore = campo.value; A.salva(); calcola(); });
+    corpo.append(el('div', { class: 'sez', testo: 'Scala che conosci' }), scale, el('div', { class: 'sez', testo: 'Valore' }), campo, ris,
+      A.info('Conversioni <b>indicative per acciai</b> (da 20 a 65 HRC); HB solo fino a 50 HRC; la resistenza e circa 3,45 x HB. Non vale per alluminio, ottone, ghisa o inox temprato: li serve il certificato del materiale.'));
+    calcola();
+  }
+  // ----- equivalenze dei materiali -----
+  function equivDom(S, corpo) {
+    const cerca = el('input', { type: 'search', id: 'f-cercaEq', placeholder: 'Cerca: C45, 1.4301, 304, alluminio...', value: S.cercaEq || '', 'aria-label': 'Cerca un materiale', autocomplete: 'off' }), lista = el('div', { id: 'eq-lista' });
+    const disegna = () => {
+      const R = O.equivalenze(S.cercaEq || '');
+      lista.innerHTML = R.length ? '<table class="dati"><tr><th>Famiglia</th><th>EN</th><th>N. materiale</th><th>USA</th></tr>' + R.map(r => '<tr><td>' + esc(r.famiglia) + (r.nota ? '<br><small>' + esc(r.nota) + '</small>' : '') + '</td><td><b>' + esc(r.en) + '</b></td><td>' + esc(r.numero) + '</td><td>' + esc(r.usa) + '</td></tr>').join('') + '</table>' : '<p class="vuoto">Niente trovato.</p>';
+    };
+    cerca.addEventListener('input', () => { S.cercaEq = cerca.value; A.salva(); disegna(); });
+    corpo.append(cerca, lista, A.info('Equivalenze <b>indicative</b>: la composizione non coincide sempre al decimale. Per un lavoro serio vale il certificato del materiale.'));
+    disegna();
+  }
+
   A.schermi.tabelle = {
     titolo: 'Tabelle',
     render(m) {
       const S = A.sezione('tabelleVista');
       const chips = el('div', { class: 'chips' }), corpo = el('div');
       m.append(chips, corpo);
-      const nomi = { filetti: 'Filetti', tolleranze: 'Tolleranze', rugosita: 'Rugosita', pollici: 'Pollici', coni: 'Coni', codici: 'Codici G e M', linguaggi: 'Linguaggi macchina' };
+      const nomi = { filetti: 'Filetti', tolleranze: 'Tolleranze', durezze: 'Durezze', equivalenze: 'Equivalenze materiali', rugosita: 'Rugosita', pollici: 'Pollici', coni: 'Coni', codici: 'Codici G e M', linguaggi: 'Linguaggi macchina' };
       const mostra = k => {
         S.tab = TAB[k] ? k : 'filetti'; A.salva();
         chips.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === S.tab));
         corpo.innerHTML = '';
-        if (S.tab === 'filetti') filettiDom(S, corpo); else corpo.innerHTML = TAB[S.tab](S);
+        if (S.tab === 'filetti') filettiDom(S, corpo); else if (S.tab === 'durezze') durezzeDom(S, corpo); else if (S.tab === 'equivalenze') equivDom(S, corpo); else corpo.innerHTML = TAB[S.tab](S);
         corpo.querySelectorAll('[data-toll-l]').forEach(b => b.addEventListener('click', () => { S.tollL = b.dataset.tollL; S.toll = S.tollL + (S.tollG || '7'); mostra('tolleranze'); }));
         corpo.querySelectorAll('[data-toll-g]').forEach(b => b.addEventListener('click', () => { S.tollG = b.dataset.tollG; S.toll = (S.tollL || 'H') + S.tollG; mostra('tolleranze'); }));
       };

@@ -96,11 +96,26 @@
     render(m) {
       const L = pezzi();
       if (!L.length) m.appendChild(el('div', { class: 'vuoto', html: 'Nessun pezzo.<br>Un pezzo tiene insieme programmi, utensili, origine, note, foto e misure da controllare.' }));
-      const lista = el('div', { class: 'elenco' });
-      L.forEach(p => lista.appendChild(el('button', { class: 'elem', onclick: () => { A.param.pezzo = p.id; A.vai('pezzo'); } }, [
-        el('span', { class: 'ic', html: A.icona('galleria') }), el('span', { class: 't' }, [el('b', { testo: p.nome || 'Pezzo' }),
-          el('small', { testo: [p.disegno, p.materiale, (p.programmi || []).length + ' programmi', (p.foto || []).length + ' foto'].filter(Boolean).join(' · ') })]),
-        el('span', { class: 'fine', html: A.icona('avanti') })])));
+      const V = A.sezione('pezziVista');
+      if (!['', ...STATI.map(x => x[0])].includes(V.stato)) V.stato = '';
+      const cerca = el('input', { type: 'search', id: 'f-cercaPezzi', placeholder: 'Cerca: nome, cliente, commessa, codice, materiale, note', value: V.q || '', 'aria-label': 'Cerca un pezzo', autocomplete: 'off' });
+      const chipStato = el('div', { class: 'chips', id: 'pezzi-stati' });
+      const lista = el('div', { class: 'elenco', id: 'pezzi-elenco' });
+      const disegnaL = () => {
+        const q = (V.q || '').trim().toLowerCase();
+        chipStato.querySelectorAll('.chip').forEach(b => b.classList.toggle('attiva', b.dataset.id === V.stato));
+        lista.innerHTML = '';
+        const F = L.filter(p => (!V.stato || (p.stato || 'dafare') === V.stato) && (!q || [p.nome, p.disegno, p.materiale, p.cliente, p.commessa, p.note, p.grezzo].join(' ').toLowerCase().includes(q)));
+        F.forEach(p => lista.appendChild(el('button', { class: 'elem', onclick: () => { A.param.pezzo = p.id; A.vai('pezzo'); } }, [
+          el('span', { class: 'ic', html: A.icona('galleria') }), el('span', { class: 't' }, [el('b', { testo: p.nome || 'Pezzo' }),
+            el('small', { testo: [p.cliente, p.commessa ? 'comm. ' + p.commessa : '', p.disegno, p.materiale, (STATI.find(x => x[0] === (p.stato || 'dafare')) || [])[1], (p.programmi || []).length + ' programmi', (p.foto || []).length + ' foto'].filter(Boolean).join(' · ') })]),
+          el('span', { class: 'fine', html: A.icona('avanti') })])));
+        if (L.length && !F.length) lista.appendChild(el('div', { class: 'vuoto', testo: 'Nessun pezzo corrisponde.' }));
+      };
+      if (L.length > 3) m.appendChild(cerca);
+      if (L.length) { [['', 'Tutti']].concat(STATI).forEach(([k, t]) => chipStato.appendChild(el('button', { class: 'chip', 'data-id': k, testo: t, onclick: () => { V.stato = k; A.salva(); disegnaL(); } }))); m.appendChild(chipStato); }
+      cerca.addEventListener('input', () => { V.q = cerca.value; A.salva(); disegnaL(); });
+      disegnaL();
       m.appendChild(lista);
       m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('piu') + 'Nuovo pezzo', onclick: () => {
         const p = { id: 'p' + Date.now(), nome: 'Pezzo ' + (L.length + 1), disegno: '', materiale: '', grezzo: '', origine: 'G54: spigolo in basso a sinistra, Z0 sulla faccia sopra', fissaggio: '', note: '', programmi: [], foto: [], misure: [], controlli: [], data: oggi() };
@@ -108,6 +123,29 @@
       } })]));
     }
   };
+  /** Etichetta da stampare o salvare: il codice QR con nome, cliente, commessa e codice del pezzo (si legge con qualsiasi lettore). */
+  function etichettaQR(p) {
+    const righe = [p.nome || 'Pezzo', p.cliente ? 'Cliente: ' + p.cliente : '', p.commessa ? 'Commessa: ' + p.commessa : '', p.disegno ? 'Disegno: ' + p.disegno : '', p.materiale ? 'Materiale: ' + p.materiale : '', p.quantita ? 'Quantita: ' + p.quantita : ''].filter(Boolean);
+    const q = O.qrMatrice(righe.join('\n'));
+    document.querySelectorAll('.etichetta-qr').forEach(x => x.remove());
+    const box = el('div', { class: 'etichetta-qr', role: 'dialog', 'aria-label': 'Etichetta con codice QR', style: 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px' });
+    const carta = el('div', { class: 'pannello', style: 'max-width:420px;width:100%;max-height:92vh;overflow:auto;padding:16px' });
+    box.appendChild(carta);
+    const chiudi = () => box.remove();
+    carta.appendChild(el('div', { class: 'sez', testo: 'Etichetta del pezzo' }));
+    if (q.errore) carta.appendChild(el('p', { class: 'errore', id: 'qr-msg', testo: q.errore + ' Accorcia i dati del pezzo.' }));
+    else {
+      const k = 6, tela = el('canvas', { id: 'qr-tela', 'aria-label': 'Codice QR del pezzo', style: 'display:block;margin:8px auto;max-width:100%;background:#fff' });
+      tela.width = (q.n + 8) * k; tela.height = (q.n + 8) * k + 26 * (righe.length + 1);
+      const g = tela.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, tela.width, tela.height); g.fillStyle = '#000';
+      for (let r = 0; r < q.n; r++) for (let c = 0; c < q.n; c++) if (q.m[r][c]) g.fillRect((c + 4) * k, (r + 4) * k, k, k);
+      g.font = '600 18px sans-serif'; g.textAlign = 'center'; righe.forEach((t, i) => g.fillText(t.slice(0, 40), tela.width / 2, (q.n + 8) * k + 12 + i * 24));
+      carta.appendChild(tela);
+      carta.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', id: 'qr-salva', html: A.icona('salva') + 'Salva come immagine', onclick: () => A.scaricaBin('etichetta-' + String(p.nome || 'pezzo').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.png', tela.toDataURL('image/png').split(',')[1], 'image/png') })]));
+    }
+    carta.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'qr-x', testo: 'Chiudi', onclick: chiudi })]));
+    document.body.appendChild(box);
+  }
   A.schermi.pezzo = {
     titolo: 'Pezzo', preferibile: false,
     render(m) {
@@ -115,10 +153,11 @@
       if (!p) { A.vai('pezzi'); return; }
       const pan = el('div', { class: 'pannello' });
       m.append(el('div', { class: 'sez', testo: 'Dati del pezzo' }), pan);
-      A.modulo(pan, [{ id: 'nome', et: 'Nome', tipo: 'testo' }, { id: 'disegno', et: 'Disegno / codice', tipo: 'testo' },
+      A.modulo(pan, [{ id: 'nome', et: 'Nome', tipo: 'testo' }, { id: 'cliente', et: 'Cliente', tipo: 'testo' }, { id: 'commessa', et: 'Commessa / ordine', tipo: 'testo' }, { id: 'stato', et: 'Stato', tipo: 'scelta', scelte: STATI }, { id: 'quantita', et: 'Quantita', sub: 'pezzi da fare', v: 1 }, { id: 'disegno', et: 'Disegno / codice', tipo: 'testo' },
         { id: 'materiale', et: 'Materiale', tipo: 'testo' }, { id: 'grezzo', et: 'Grezzo', sub: 'es. 100 x 60 x 25 oppure D40 x 80', tipo: 'testo' },
         { id: 'origine', et: 'Origine', tipo: 'testo', largo: true }, { id: 'origTipo', et: 'Posizione dell\'origine (schema nel foglio)', tipo: 'scelta', scelte: ORIGINI }, { id: 'fissaggio', et: 'Fissaggio', sub: 'morsa, griffe, attrezzatura...', tipo: 'testo', largo: true }, { id: 'sporg', et: 'Sporgenza dal serraggio', u: 'mm', sub: 'quanto il pezzo esce dalla morsa o dalle griffe' },
         { id: 'note', et: 'Note', tipo: 'area', righe: 4 }], p, () => {});
+      m.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'pezzo-qr', html: A.icona('galleria') + 'Etichetta con codice QR', onclick: () => etichettaQR(p) })]));
       // programmi collegati
       m.appendChild(el('div', { class: 'sez', testo: 'Programmi' }));
       const progBox = el('div', { class: 'elenco' });
@@ -246,6 +285,7 @@
 
   // ----- foglio di attrezzaggio -----
   const DIDA = ['Morsa', 'Origine', 'Utensili', 'Pezzo', 'Altro'];
+  const STATI = [['dafare', 'Da fare'], ['inlav', 'In lavorazione'], ['finito', 'Finito'], ['consegnato', 'Consegnato']];
   const ORIGINI = [['bs', 'Angolo in basso a sinistra'], ['as', 'Angolo in alto a sinistra'], ['c', 'Centro del pezzo']];
   /** Schema dell'origine in SVG: dall'alto per la fresa, di lato per il tornio. */
   function schemaOrigine(p) {
@@ -452,7 +492,7 @@
     (A.CALC || []).forEach(c => { if (c.t.toLowerCase().includes(qq)) metti('Calcolatrice: ' + c.t, 'Calcolatrice di taglio', () => { A.mem.calc = c.id; A.salva(); A.vai('calcoli'); }); });
     // programmi, pezzi, macro
     (A.mem.salvati || []).forEach(p => { if ((p.nome + ' ' + (p.titolo || '')).toLowerCase().includes(qq)) metti(p.nome + ' ' + (p.titolo || ''), 'Programma salvato · ' + p.data, () => { A.param.listato = { righe: p.righe, nome: p.nome, tipo: p.tipo, idSalvato: p.id, iso: p.iso || null, ling: p.ling || 'iso' }; A.vai('listato'); }); });
-    pezzi().forEach(p => { if ((p.nome + ' ' + (p.disegno || '') + ' ' + (p.materiale || '')).toLowerCase().includes(qq)) metti(p.nome, 'Pezzo' + (p.disegno ? ' · ' + p.disegno : ''), () => { A.param.pezzo = p.id; A.vai('pezzo'); }); });
+    pezzi().forEach(p => { if ((p.nome + ' ' + (p.disegno || '') + ' ' + (p.materiale || '') + ' ' + (p.cliente || '') + ' ' + (p.commessa || '') + ' ' + (p.note || '')).toLowerCase().includes(qq)) metti(p.nome, 'Pezzo' + (p.disegno ? ' · ' + p.disegno : '') + (p.cliente ? ' · ' + p.cliente : '') + (p.commessa ? ' · comm. ' + p.commessa : ''), () => { A.param.pezzo = p.id; A.vai('pezzo'); }); });
     (A.mem.macro || []).forEach((mc, i) => { if ((mc.nome + ' ' + mc.num).toLowerCase().includes(qq)) metti(mc.nome, 'Macro O' + mc.num, () => { A.param.macro = { i }; A.vai('macroModifica'); }); });
     O.MACRO_MODELLI.forEach(mc => { if ((mc.nome + ' ' + mc.num).toLowerCase().includes(qq)) metti(mc.nome, 'Modello di macro O' + mc.num, () => { A.param.macro = { modello: mc.id }; A.vai('macroModifica'); }); });
     return out.slice(0, 15);

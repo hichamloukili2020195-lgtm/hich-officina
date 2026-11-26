@@ -1778,6 +1778,43 @@ const server = http.createServer((q, r) => {
     ok(await pg.isVisible('#f-ppCambio') || (await pg.$('#f-ppCambio')) !== null, 'campi del post personalizzato');
     ok(await pg.evaluate(() => !!App.O.LINGUAGGI.personalizzato && App.persPost({ ppCambio: 'T{t} M6', ppDec: 3 }).cambio === 'T{t} M6'), 'linguaggio personalizzato presente');
   }
+
+  // ===== 2.42.0: durezze, equivalenze, commesse, etichetta QR =====
+  {
+    await vai('tabelle');
+    await pg.click('#schermo .chip[data-id="durezze"]'); await pg.waitForTimeout(100);
+    ok((await pg.textContent('#dur-ris')).includes('446'), 'durezze: 45 HRC = 446 HV: ' + (await pg.textContent('#dur-ris')).slice(0, 60));
+    await pg.click('#schermo .chip[data-id="HV"]'); await pg.fill('#f-durValore', '392'); await pg.waitForTimeout(80);
+    ok((await pg.textContent('#dur-ris')).includes('371'), 'durezze: 392 HV = 371 HB');
+    await pg.fill('#f-durValore', '50'); ok((await pg.textContent('#dur-ris')).includes('Fuori campo'), 'durezze fuori campo');
+    await pg.click('#schermo .chip[data-id="equivalenze"]'); await pg.waitForTimeout(100);
+    await pg.fill('#f-cercaEq', '1.4301'); await pg.waitForTimeout(80);
+    ok((await pg.textContent('#eq-lista')).includes('304') && (await pg.textContent('#eq-lista')).includes('X5CrNi18-10'), 'equivalenze: 1.4301');
+    await pg.fill('#f-cercaEq', 'zzzz'); ok((await pg.textContent('#eq-lista')).includes('Niente trovato'), 'equivalenze: niente trovato');
+    // commesse
+    await pg.evaluate(() => { App.mem.pezzi = [
+      { id: 'pa', nome: 'Flangia', disegno: 'FL-100', materiale: 'C45', cliente: 'Rossi Meccanica', commessa: 'A-2041', stato: 'inlav', note: 'tolleranza stretta', programmi: [], foto: [], misure: [], controlli: [] },
+      { id: 'pb', nome: 'Boccola', disegno: 'BC-7', materiale: 'Ottone', cliente: 'Bianchi', commessa: 'B-17', stato: 'finito', note: '', programmi: [], foto: [], misure: [], controlli: [] },
+      { id: 'pc', nome: 'Piastra', disegno: 'PS-1', materiale: 'Alluminio', cliente: 'Rossi Meccanica', commessa: 'A-2050', programmi: [], foto: [], misure: [], controlli: [] },
+      { id: 'pd', nome: 'Albero', disegno: 'AL-9', materiale: '42CrMo4', cliente: 'Verdi', commessa: 'C-1', stato: 'consegnato', programmi: [], foto: [], misure: [], controlli: [] }]; App.mem.pezziVista = {}; App.salva(); });
+    await vai('pezzi');
+    ok((await pg.$$('#pezzi-elenco .elem')).length === 4, 'quattro pezzi in elenco');
+    await pg.fill('#f-cercaPezzi', 'rossi'); await pg.waitForTimeout(80);
+    ok((await pg.$$('#pezzi-elenco .elem')).length === 2, 'ricerca per cliente');
+    await pg.fill('#f-cercaPezzi', 'b-17'); ok((await pg.$$('#pezzi-elenco .elem')).length === 1, 'ricerca per commessa');
+    await pg.fill('#f-cercaPezzi', 'stretta'); ok((await pg.$$('#pezzi-elenco .elem')).length === 1, 'ricerca nelle note');
+    await pg.fill('#f-cercaPezzi', ''); await pg.click('#pezzi-stati .chip[data-id="dafare"]'); await pg.waitForTimeout(80);
+    ok((await pg.$$('#pezzi-elenco .elem')).length === 1, 'filtro per stato (senza stato = da fare)');
+    await pg.click('#pezzi-stati .chip[data-id=""]');
+    ok((await pg.evaluate(() => App.cerca('A-2041').map(r => r.titolo).join())).includes('Flangia'), 'ricerca dalla home per commessa');
+    // etichetta QR
+    await pg.evaluate(() => { App.param.pezzo = 'pa'; App.vai('pezzo'); }); await pg.waitForTimeout(200);
+    ok(await pg.isVisible('#f-cliente') && await pg.isVisible('#f-commessa'), 'campi cliente e commessa');
+    await pg.click('#pezzo-qr'); await pg.waitForTimeout(100);
+    ok(await pg.isVisible('#qr-tela'), 'etichetta QR mostrata');
+    const [d] = await Promise.all([pg.waitForEvent('download'), pg.click('#qr-salva')]); ok(d.suggestedFilename() === 'etichetta-flangia.png', 'etichetta salvata: ' + d.suggestedFilename());
+    await pg.click('#qr-x'); ok(!(await pg.$('.etichetta-qr')), 'etichetta chiusa');
+  }
   await largo('CAD con Digita');
 
   await b.close(); server.close();
