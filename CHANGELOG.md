@@ -2,6 +2,13 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.46.0 - Tornio: zigrinatura, sovrametallo per rettifica, gola larga e profonda
+- **Zigrinatura** su un cilindro (passo 0,8 / 1 / 1,2 / 1,6, diritta o incrociata): fase a giri fissi bassi dopo la finitura; l'utensile entra di mezzo passo e scorre lungo il tratto. Utensile T8 se non c'e un zigrinatore in tabella. Il diametro cresce: la nota lo ricorda e consiglia la prova su un pezzo di scarto. Sui coni viene saltata con una nota.
+- **Sovrametallo per la rettifica** (0,2 / 0,3 / 0,5 sul diametro): il tornio lascia il cilindro piu grosso della misura; la nota dice a che diametro e tornito.
+- **Gola larga e profonda**: larghezze fino a 10 mm (piu affondamenti con lo stesso utensile) e profondita scelta (0,5 - 3 mm sul raggio) quando la linea non e filettata.
+- Le nuove voci sono nel foglio della linea a schermo intero (scorciatoie Zigrinatura e Rettifica), nel pannello della linea e nelle schede dei tratti di Disegna e lavora; sul disegno la zigrinatura si vede tratteggiata e il sovrametallo con una linea.
+- Prove: pianificazione e programma con zigrinatura, rettifica e gola profonda; scelte dal foglio e dai tratti.
+
 ## 2.45.0 - Tornio a schermo intero: foglio con le lavorazioni della linea
 - **Disegna un profilo (tornio) a schermo intero**: toccando una linea (o un punto) si apre un foglio con le sue lavorazioni sul tornio: filetto per gruppi, gola di scarico, tolleranza, spigolo alla fine, quote, dividi, arco o retta, elimina. Con il telefono in orizzontale il foglio sta a destra e il disegno si stringe a sinistra senza coprire il pezzo; in verticale sta in basso. Scorciatoie in alto: Filetto, Gola, Tolleranza, Spigolo. Chiudi toglie la scelta.
 - **Scelte rapide col dito** per gola di scarico (3, 4, 5, 6 mm) e tolleranza (h6, h7, g6, f7, k6, js6), anche fuori dallo schermo intero.

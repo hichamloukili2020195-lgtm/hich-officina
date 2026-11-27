@@ -1497,4 +1497,31 @@ prova('CAD fresa: passata in Z scritta nella lavorazione', () => {
   E[0].lav[0].ap = 20; assert.strictEqual(O.pianificaCAD({ fz: 6, entita: E }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }).fasi[0].c.ap, 6);
   delete E[0].lav[0].ap; assert.ok(O.pianificaCAD({ fz: 6, entita: E }, { mat: O.MATERIALI[4], tab: [], nmax: 10000 }).fasi[0].c.ap !== 1.5);
 });
+
+// ===== 2.46.0: zigrinatura, sovrametallo per rettifica, gola larga e profonda =====
+prova('tornio: zigrinatura, rettifica e gola profonda sulle linee', () => {
+  const mt = O.MATERIALI[4];
+  const punti = [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 20, z: -25, zig: 1.2, zigTipo: 'incrociata' }, { x: 30, z: -25 }, { x: 30, z: -45, rett: 0.3 }, { x: 36, z: -45 }, { x: 36, z: -60, gola: 8, golaProf: 2 }, { x: 40, z: -60 }];
+  const p = O.pianificaProfilo(punti, { mat: mt, tab: [], dg: 42, nmax: 3000 }); assert.ok(!p.errore, p.errore);
+  const ops = p.fasi.map(f => f.op);
+  assert.ok(ops.indexOf('zigrinatura') > ops.indexOf('profilo'), ops.join());
+  const z = p.fasi.find(f => f.op === 'zigrinatura'); assert.strictEqual(z.c.pz, 1.2); assert.strictEqual(z.c.za, 0); assert.strictEqual(z.c.zb, -25); assert.ok(z.c.incrociata); assert.ok(z.c.giri > 0 && z.c.giri < 600, 'giri bassi: ' + z.c.giri);
+  const prof = p.fasi.find(f => f.op === 'profilo'); const P = prof.c.punti;
+  assert.strictEqual(P[3].x, 30.3); assert.strictEqual(P[4].x, 30.3); assert.ok(p.note.some(n => /rettifica/.test(n)));
+  const g = p.fasi.find(f => f.op === 'gola'); assert.strictEqual(g.c.b, 8); assert.strictEqual(g.c.dfondo, 32);
+  const r = O.gcodeSequenzaTornio(p.fasi, { num: 1, nome: 'T' }); assert.ok(!r.errore, r.errore);
+  assert.ok(r.righe.some(l => /ZIGRINATURA/.test(l)) && r.righe.some(l => /^G97 S\d+ M3/.test(l)));
+  const gz = O.gcodeTornio('zigrinatura', Object.assign({ dg: 20, nmax: 3000, t: 8 }, z.c)); assert.ok(!gz.errore, gz.errore);
+  assert.ok(gz.righe.some(l => /X19\.4/.test(l)), 'entra a Ø20 - 0,6: ' + gz.righe.join(' | '));
+  assert.ok(gz.righe.some(l => /Z-25/.test(l)));
+  assert.ok(O.gcodeTornio('zigrinatura', { dg: 20, nmax: 3000, d: 20, za: -5, zb: -5, giri: 300 }).errore);
+  // la gola larga si fa in piu affondamenti
+  assert.ok(O.gcodeTornio('gola', Object.assign({ nmax: 3000, t: 4 }, g.c)).avvisi.some(a => /affondamenti/.test(a) && !/^1 /.test(a)));
+  // zigrinatura su un cono: saltata con nota
+  const q = O.pianificaProfilo([{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 26, z: -20, zig: 1 }, { x: 40, z: -20 }], { mat: mt, tab: [], dg: 42, nmax: 3000 });
+  assert.ok(!q.fasi.some(f => f.op === 'zigrinatura') && q.note.some(n => /solo sui cilindri/.test(n)));
+  // Disegna e lavora: le nuove voci passano dai tratti ai punti
+  const pt = O.puntiTornio([{ tipo: 'cil', d: 20, l: 25, zig: 1, zigTipo: 'diritta', rett: 0.2, gola: 8, golaProf: 1.5 }], {});
+  const b = pt.punti.find(x => x.zig); assert.ok(b && b.rett === 0.2 && b.golaProf === 1.5 && b.zigTipo === 'diritta', JSON.stringify(pt.punti));
+});
 console.log(process.exitCode ? 'PROVE FALLITE' : 'OK ' + n + ' prove');

@@ -323,6 +323,9 @@
         if (t.errore) note.testi.push('Tolleranza "' + b.toll + '" su Ø' + d + ' non capita: al nominale.');
         else { nuovo = r3(d + (t.sup + t.inf) / 2); misure.push({ nome: 'Ø' + d + ' ' + b.toll, nominale: String(d), toll: b.toll }); }
       }
+      // sovrametallo per la rettifica: il tornio lascia il cilindro piu grosso (sul diametro)
+      const sr = Number(punti[i].rett);
+      if (sr > 0) { nuovo = r3(d + sr); note.testi.push('Ø' + d + ': lasciati ' + String(sr).replace('.', ',') + ' mm sul diametro per la rettifica (tornito a Ø' + String(nuovo).replace('.', ',') + ').'); }
       a.x = nuovo; b.x = nuovo;
     }
     const base = { nmax, codLimite: ctx.codLimite, codFiletto: ctx.codFiletto, refrig: ctx.refrig };
@@ -331,6 +334,17 @@
     const fasi = [{ op: 'profilo', titolo: 'Sgrossatura e finitura del profilo T' + tSgr, c: Object.assign({}, base, { t: tSgr, dg, punti: P.map(p => ({ x: p.x, z: p.z, tratto: p.tratto, r: Number(p.r) || 0, raccordo: Number(p.raccordo) || 0, smusso: Number(p.smusso) || 0 })),
       ap: mezzo, sx: 0.4, sz: 0.1, ff: r3(Math.max(0.05, mt.lf * 0.4)), finitura: true, metodo: ctx.metodo || 'passate', vc: mt.lvc, f: mt.lf }) }];
     if (P.some((p, i) => Number(punti[i].toll) || punti[i].toll)) note.testi.push('I cilindri con tolleranza si finiscono al centro della tolleranza.');
+    // zigrinature sui cilindri, dopo la finitura
+    for (let i = 1; i < punti.length; i++) {
+      const b = punti[i], pz = Number(b.zig);
+      if (!(pz > 0)) continue;
+      const d = Number(b.x), a = punti[i - 1];
+      if (Math.abs(Number(a.x) - d) > 1e-9) { note.testi.push('La zigrinatura si fa solo sui cilindri: saltata sulla linea ' + i + '.'); continue; }
+      const tZ = trovaT(tab, ['zigrinatore'], 0, 8, note), zA = Number(a.z), zB = Number(b.z);
+      fasi.push({ op: 'zigrinatura', titolo: 'Zigrinatura ' + (b.zigTipo === 'incrociata' ? 'incrociata' : 'diritta') + ' passo ' + pz + ' su Ø' + d + ' T' + tZ,
+        c: Object.assign({}, base, { t: tZ, dg: d, d, pz, za: zA, zb: r3(zB + (Number(b.gola) > 0 ? Number(b.gola) : 0)), incrociata: b.zigTipo === 'incrociata', giri: giriDa(Math.min(25, mt.lvc * 0.12), d, nmax), f: 0.15 }) });
+      note.testi.push('Zigrinatura su Ø' + d + ': il diametro cresce di circa ' + String(r3(0.5 * pz)).replace('.', ',') + ' mm; prova su un pezzo di scarto.');
+    }
     // gole alla fine delle linee, poi i filetti
     for (let i = 1; i < punti.length; i++) {
       const b = punti[i], d = Number(b.x), zA = Number(punti[i - 1].z), zB = Number(b.z);

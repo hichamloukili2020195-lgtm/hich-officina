@@ -1883,6 +1883,11 @@ const server = http.createServer((q, r) => {
     await pg.click('#lav-fil-0-no'); await pg.waitForTimeout(60);
     ok(!(await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0].fil)), 'filetto tolto');
     await pg.click('#lav-fil-0-g-m'); await pg.click('#lav-fil-0 .fil-misure .chip:text-is("M20")'); await pg.waitForTimeout(80);
+    await pg.click('.lav-card.aperta .chips[aria-label="Zigrinatura"] .chip:text-is("1")'); await pg.waitForTimeout(60);
+    await pg.click('.lav-card.aperta .chips[aria-label="Rettifica"] .chip:text-is("0,2")'); await pg.waitForTimeout(60);
+    const tz = await pg.evaluate(() => App.lavoroStato.S.tornio.tratti[0]);
+    ok(Number(tz.zig) === 1 && tz.zigTipo === 'diritta' && Number(tz.rett) === 0.2, 'zigrinatura e rettifica nel tratto: ' + JSON.stringify(tz));
+    await pg.click('.lav-card.aperta .chips[aria-label="Zigrinatura"] .chip:text-is("No")'); await pg.click('.lav-card.aperta .chips[aria-label="Rettifica"] .chip:text-is("No")'); await pg.waitForTimeout(60);
     // passo 3: disegno, scelta della lavorazione, passate
     await pg.evaluate(() => App.lavoroStato.vaiPasso(2)); await pg.waitForTimeout(200);
     ok(await pg.isVisible('.lav-tela') && await pg.isVisible('#lav-pieno'), 'al passo Lavorazioni si vede il disegno con Schermo intero');
@@ -1913,7 +1918,7 @@ const server = http.createServer((q, r) => {
     await pg.click('#d-pieno'); await pg.waitForTimeout(200);
     ok(await pg.isVisible('#d-foglio'), 'a schermo intero la linea scelta apre il foglio');
     ok((await pg.textContent('#d-foglio .d-foglio-testa')).includes('Cilindro'), 'titolo del foglio: ' + (await pg.textContent('#d-foglio .d-foglio-testa')));
-    ok((await pg.$$eval('#d-foglio .d-foglio-rapidi .chip', x => x.map(c => c.textContent))).join() === 'Filetto,Gola,Tolleranza,Spigolo', 'scorciatoie del foglio');
+    ok((await pg.$$eval('#d-foglio .d-foglio-rapidi .chip', x => x.map(c => c.textContent))).join() === 'Filetto,Gola,Zigrinatura,Rettifica,Tolleranza,Spigolo', 'scorciatoie del foglio');
     ok(await pg.isVisible('#d-foglio #d-fil') && await pg.isVisible('#d-foglio #f-gola'), 'filetto e gola nel foglio');
     await pg.click('#d-foglio #d-fil-g-mf'); await pg.waitForTimeout(60);
     await pg.click('#d-foglio .fil-misure .chip:text-is("M20x1.5")'); await pg.waitForTimeout(100);
@@ -1923,6 +1928,12 @@ const server = http.createServer((q, r) => {
     await pg.click('#d-gola-rapida .chip:text-is("4 mm")'); await pg.click('#d-toll-rapida .chip:text-is("g6")'); await pg.waitForTimeout(80);
     const pg2 = await pg.evaluate(() => App.mem.disegno.punti[2]);
     ok(pg2.gola === '4' && pg2.toll === 'g6', 'gola e tolleranza col dito: ' + JSON.stringify(pg2));
+    ok((await pg.$$eval('#d-foglio .d-foglio-rapidi .chip', x => x.map(c => c.textContent))).join() === 'Filetto,Gola,Zigrinatura,Rettifica,Tolleranza,Spigolo', 'scorciatoie con zigrinatura e rettifica');
+    await pg.click('#d-zig-rapida .chip:text-is("1,2")'); await pg.waitForTimeout(60);
+    await pg.click('#d-zigtipo-rapida .chip:text-is("Incrociata")'); await pg.click('#d-rett-rapida .chip:text-is("0,3")'); await pg.waitForTimeout(60);
+    await pg.click('#d-gola-rapida .chip:text-is("8 mm")'); await pg.waitForTimeout(60);
+    const pz2 = await pg.evaluate(() => App.mem.disegno.punti[2]);
+    ok(pz2.zig === '1.2' && pz2.zigTipo === 'incrociata' && pz2.rett === '0.3' && pz2.gola === '8', 'zigrinatura, rettifica e gola larga dal foglio: ' + JSON.stringify(pz2));
     await pg.click('#d-foglio-x'); await pg.waitForTimeout(80);
     ok(!(await pg.isVisible('#d-foglio')), 'Chiudi toglie il foglio');
     await pg.click('#d-pieno'); await pg.waitForTimeout(100);

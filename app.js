@@ -472,7 +472,7 @@
     condividiBin,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, scaricaBin, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.45.0'
+    schermi: {}, param: {}, VERSIONE: '2.46.0'
   };
   window.App = App;
 

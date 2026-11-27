@@ -637,6 +637,22 @@
       va(sic, null, true);
       va(null, zSic, true);
       avvisi.push(zz.length + ' affondamenti. Z riferita al fianco DESTRO dell\'utensile.');
+    } else if (op === 'zigrinatura') {
+      // zigrinatura a pressione: giri fissi bassi, l'utensile entra di mezza profondita del passo e scorre lungo il tratto
+      const { d, za, zb } = c, pz = pos(c.pz) ? c.pz : 1;
+      if (!pos(d)) return err('Diametro da zigrinare mancante.');
+      if (!(za > zb)) return err('Il tratto da zigrinare ha lunghezza zero.');
+      const giriZ = Math.round(c.giri || 0);
+      if (!pos(giriZ)) return err('Giri al minuto mancanti.');
+      if (giriZ > c.nmax) return err('I giri superano il massimo impostato.');
+      const fz = pos(c.f) ? c.f : 0.15, dz = Math.round((d - 0.5 * pz) * 1000) / 1000;
+      R.push('G97 S' + giriZ + ' M3');
+      va(d + 2, za + 1, true, refrig.trim());
+      va(dz, null, false, 'F0.05');
+      va(null, zb, false, 'F' + gc(fz));
+      va(d + 2, null, true);
+      va(null, zSic, true);
+      avvisi.push('Zigrinatura ' + (c.incrociata ? 'incrociata' : 'diritta') + ' passo ' + tx(pz) + ': entra a Ø' + tx(dz) + ' e scorre da Z' + tx(za) + ' a Z' + tx(zb) + '. Il diametro della zigrinatura cresce: tornisci il cilindro un po\' sotto misura e prova su un pezzo di scarto.');
     } else if (op === 'filetto') {
       const { d, p, l, n } = c;
       if (!pos(d) || !pos(p) || !pos(l)) return err('Diametro, passo e lunghezza mancanti.');

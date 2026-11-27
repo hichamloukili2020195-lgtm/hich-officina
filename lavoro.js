@@ -44,7 +44,7 @@
         if (!(R >= corda / 2 - 1e-6)) return { errore: 'Tratto ' + (i + 1) + ': raggio troppo piccolo (almeno ' + r3(corda / 2) + ').', punti: [] };
         p.tratto = t.forma === 'incavato' ? 'cw' : 'ccw'; p.r = R;
       }
-      if (t.tipo === 'cil') { if (pos(num(t.fil))) { p.fil = num(t.fil); if (t.filFam) p.filFam = t.filFam; if (t.filNome) p.filNome = t.filNome; } if (pos(num(t.gola))) p.gola = num(t.gola); if (t.toll && String(t.toll).trim()) p.toll = String(t.toll).trim(); }
+      if (t.tipo === 'cil') { if (pos(num(t.fil))) { p.fil = num(t.fil); if (t.filFam) p.filFam = t.filFam; if (t.filNome) p.filNome = t.filNome; } if (pos(num(t.gola))) p.gola = num(t.gola); if (pos(num(t.golaProf))) p.golaProf = num(t.golaProf); if (t.toll && String(t.toll).trim()) p.toll = String(t.toll).trim(); if (pos(num(t.zig))) { p.zig = num(t.zig); if (t.zigTipo) p.zigTipo = t.zigTipo; } if (pos(num(t.rett))) p.rett = num(t.rett); }
       spigolo(p, t.spigolo);
       P.push(p);
       d = p.x;

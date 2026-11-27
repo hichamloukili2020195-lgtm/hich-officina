@@ -327,8 +327,12 @@
                 if (!F) { delete t.fil; delete t.filFam; delete t.filNome; ri(); return; }
                 t.d = F.d; t.fil = F.p; t.filFam = F.fam; t.filNome = F.nome; if (!t.gola && i < T.tratti.length - 1) t.gola = Math.max(3, Math.round(2 * F.p * 10) / 10); ri();
               } }));
-              ed.append(el('div', { class: 'lav-et', testo: 'Gola di scarico alla fine' }), chips([['', 'No'], [3, '3 mm'], [4, '4 mm'], [5, '5 mm'], [6, '6 mm']], t.gola || '', v => { if (v) t.gola = v; else delete t.gola; ri(); }, 'Gola'));
+              ed.append(el('div', { class: 'lav-et', testo: 'Gola di scarico alla fine' }), chips([['', 'No'], [3, '3 mm'], [4, '4 mm'], [5, '5 mm'], [6, '6 mm'], [8, '8 mm'], [10, '10 mm']], t.gola || '', v => { if (v) t.gola = v; else { delete t.gola; delete t.golaProf; } ri(); }, 'Gola'));
+              if (num(t.gola) > 0 && !(num(t.fil) > 0)) ed.append(el('div', { class: 'lav-et', testo: 'Profondita della gola (sul raggio)' }), chips([['', '0,5'], [1, '1'], [1.5, '1,5'], [2, '2'], [3, '3']], t.golaProf || '', v => { if (v) t.golaProf = v; else delete t.golaProf; ri(); }, 'Profondita della gola'));
               ed.append(el('div', { class: 'lav-et', testo: 'Tolleranza' }), chips([['', 'No'], ['h6', 'h6'], ['h7', 'h7'], ['g6', 'g6'], ['f7', 'f7'], ['k6', 'k6'], ['js6', 'js6']], t.toll || '', v => { if (v) t.toll = v; else delete t.toll; ri(); }, 'Tolleranza'));
+              ed.append(el('div', { class: 'lav-et', testo: 'Zigrinatura (passo)' }), chips([['', 'No'], [0.8, '0,8'], [1, '1'], [1.2, '1,2'], [1.6, '1,6']], t.zig || '', v => { if (v) { t.zig = v; if (!t.zigTipo) t.zigTipo = 'diritta'; } else { delete t.zig; delete t.zigTipo; } ri(); }, 'Zigrinatura'));
+              if (num(t.zig) > 0) ed.append(chips([['diritta', 'Diritta'], ['incrociata', 'Incrociata']], t.zigTipo || 'diritta', v => { t.zigTipo = v; ri(); }, 'Tipo di zigrinatura'));
+              ed.append(el('div', { class: 'lav-et', testo: 'Sovrametallo per la rettifica (sul diametro)' }), chips([['', 'No'], [0.2, '0,2'], [0.3, '0,3'], [0.5, '0,5']], t.rett || '', v => { if (v) t.rett = v; else delete t.rett; ri(); }, 'Rettifica'));
               const tutte = [];
               ['d', 'e', 'f', 'g', 'h', 'js', 'k', 'm', 'n', 'p'].forEach(l => ['5', '6', '7', '8', '9', '10', '11', '12', '13', '14'].forEach(g => tutte.push(l + g)));
               const altre = el('select', { class: 'lav-altra-toll', 'aria-label': 'Altra tolleranza', id: 'lav-altra-toll-' + i }, [el('option', { value: '', testo: 'Altra tolleranza…' })].concat(tutte.map(c => el('option', { value: c, testo: c }))));

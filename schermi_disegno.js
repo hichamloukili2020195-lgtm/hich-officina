@@ -202,8 +202,15 @@
             for (let z = za, k = 0; z > zb + (num(b.gola) || 0) - 1e-9; z -= pz / 2, k++) { const y = k % 2 ? Y(r - h) : Y(r); k ? g.lineTo(X(z), y) : g.moveTo(X(z), y); }
             g.stroke();
           }
+          if (num(b.zig) > 0) {
+            const zf = zb + (num(b.gola) || 0), passoZ = Math.max(num(b.zig), 5 / sc), hz = Math.min(r * 0.35, 3 / sc * 2);
+            g.save(); g.strokeStyle = col('--accento'); g.lineWidth = 1; g.globalAlpha = 0.8; g.beginPath();
+            for (let z = za; z > zf; z -= passoZ) { g.moveTo(X(z), Y(r)); g.lineTo(X(Math.max(zf, z - passoZ)), Y(r - hz)); if (b.zigTipo === 'incrociata') { g.moveTo(X(Math.max(zf, z - passoZ)), Y(r)); g.lineTo(X(z), Y(r - hz)); } }
+            g.stroke(); g.restore();
+          }
+          if (num(b.rett) > 0) { g.save(); g.strokeStyle = col('--avviso'); g.setLineDash([3, 3]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(za), Y(r + num(b.rett) / 2) - 3); g.lineTo(X(zb), Y(r + num(b.rett) / 2) - 3); g.stroke(); g.restore(); }
           if (num(b.gola) > 0) {
-            const w = num(b.gola), pf = num(b.fil) > 0 ? 0.6134 * num(b.fil) + 0.1 : 0.5;
+            const w = num(b.gola), pf = num(b.fil) > 0 ? 0.6134 * num(b.fil) + 0.1 : Math.max(0.5, num(b.golaProf) || 0.5);
             g.fillStyle = col('--avviso'); g.globalAlpha = 0.5;
             g.fillRect(X(zb + w), Y(r), X(zb) - X(zb + w), Math.max(2, pf * sc)); g.globalAlpha = 1;
           }
@@ -426,7 +433,7 @@
       const descrivi = i => {
         const a = S.punti[i - 1], b = S.punti[i], t = tipoLinea(i);
         const xa = num(a.x), xb = num(b.x), L = Math.abs(num(a.z) - num(b.z));
-        if (t === 'cil') return 'Cilindro Ø' + fmt(xa, 3) + ' lungo ' + fmt(L, 3) + (num(b.fil) > 0 ? ' · filetto M' + fmt(xa, 3) + 'x' + fmt(num(b.fil), 3) : '') + (num(b.gola) > 0 ? ' · gola ' + fmt(num(b.gola), 2) : '') + (b.toll ? ' · ' + b.toll : '');
+        if (t === 'cil') return 'Cilindro Ø' + fmt(xa, 3) + ' lungo ' + fmt(L, 3) + (num(b.fil) > 0 ? ' · filetto M' + fmt(xa, 3) + 'x' + fmt(num(b.fil), 3) : '') + (num(b.gola) > 0 ? ' · gola ' + fmt(num(b.gola), 2) : '') + (b.toll ? ' · ' + b.toll : '') + (num(b.zig) > 0 ? ' · zigrinatura ' + fmt(num(b.zig), 2) : '') + (num(b.rett) > 0 ? ' · rettifica +' + fmt(num(b.rett), 2) : '');
         if (t === 'faccia') return 'Faccia fino a Ø' + fmt(xb, 3);
         if (t === 'spalla') return 'Spallamento da Ø' + fmt(xa, 3) + ' a Ø' + fmt(xb, 3);
         if (t === 'cono') return 'Cono da Ø' + fmt(xa, 3) + ' a Ø' + fmt(xb, 3) + ', lungo ' + fmt(L, 3) + ' (' + fmt(Math.atan(Math.abs(xb - xa) / 2 / L) * 180 / Math.PI, 2) + '°)';
@@ -509,7 +516,11 @@
           // scelte rapide col dito: gola di scarico e tolleranza
           const rapida = (et, id, valori, att, fn) => el('div', { class: 'd-rapida', id }, [el('div', { class: 'leggenda', style: 'margin:6px 2px 2px', testo: et }),
             el('div', { class: 'chips' }, valori.map(([v, t]) => el('button', { class: 'chip' + (String(att || '') === String(v) ? ' attiva' : ''), type: 'button', testo: t, onclick: () => { ricorda(); fn(v); A.salva(); tutto(); } })))]);
-          editor.appendChild(rapida('Gola di scarico:', 'd-gola-rapida', [['', 'No'], ['3', '3 mm'], ['4', '4 mm'], ['5', '5 mm'], ['6', '6 mm']], b.gola ? String(num(b.gola)) : '', v => { if (v) b.gola = v; else delete b.gola; }));
+          editor.appendChild(rapida('Gola alla fine della linea (larghezza):', 'd-gola-rapida', [['', 'No'], ['3', '3 mm'], ['4', '4 mm'], ['5', '5 mm'], ['6', '6 mm'], ['8', '8 mm'], ['10', '10 mm']], b.gola ? String(num(b.gola)) : '', v => { if (v) b.gola = v; else { delete b.gola; delete b.golaProf; } }));
+          if (num(b.gola) > 0 && !(num(b.fil) > 0)) editor.appendChild(rapida('Profondita della gola (sul raggio):', 'd-golaprof-rapida', [['', '0,5 mm'], ['1', '1 mm'], ['1.5', '1,5 mm'], ['2', '2 mm'], ['3', '3 mm']], b.golaProf ? String(num(b.golaProf)) : '', v => { if (v) b.golaProf = v; else delete b.golaProf; }));
+          editor.appendChild(rapida('Zigrinatura (passo):', 'd-zig-rapida', [['', 'No'], ['0.8', '0,8'], ['1', '1'], ['1.2', '1,2'], ['1.6', '1,6']], b.zig ? String(num(b.zig)) : '', v => { if (v) { b.zig = v; if (!b.zigTipo) b.zigTipo = 'diritta'; } else { delete b.zig; delete b.zigTipo; } }));
+          if (num(b.zig) > 0) editor.appendChild(rapida('Tipo di zigrinatura:', 'd-zigtipo-rapida', [['diritta', 'Diritta'], ['incrociata', 'Incrociata']], b.zigTipo || 'diritta', v => { b.zigTipo = v; }));
+          editor.appendChild(rapida('Sovrametallo per la rettifica (sul diametro):', 'd-rett-rapida', [['', 'No'], ['0.2', '0,2'], ['0.3', '0,3'], ['0.5', '0,5']], b.rett ? String(num(b.rett)) : '', v => { if (v) b.rett = v; else delete b.rett; }));
           editor.appendChild(rapida('Tolleranza:', 'd-toll-rapida', [['', 'No'], ['h6', 'h6'], ['h7', 'h7'], ['g6', 'g6'], ['f7', 'f7'], ['k6', 'k6'], ['js6', 'js6']], b.toll || '', v => { if (v) b.toll = v; else delete b.toll; }));
         }
         const ultimo = i === S.punti.length - 1;
@@ -550,7 +561,7 @@
         foglio.innerHTML = '';
         const tit = selL !== null ? 'Linea ' + selL + ': ' + descrivi(selL) : 'Punto P' + (sel + 1);
         const vai = sel2 => { const t = foglio.querySelector(sel2); if (t) (t.closest('.fil-scelta, .d-rapida') || t.closest('label, .chips, .pannello') || t).scrollIntoView({ block: 'start', behavior: 'smooth' }); };
-        const rapidi = selL !== null && tipoLinea(selL) === 'cil' ? [['Filetto', '#d-fil'], ['Gola', '#d-gola-rapida'], ['Tolleranza', '#d-toll-rapida'], ['Spigolo', '.d-spigolo']] : selL !== null ? [['Spigolo', '.d-spigolo']] : [];
+        const rapidi = selL !== null && tipoLinea(selL) === 'cil' ? [['Filetto', '#d-fil'], ['Gola', '#d-gola-rapida'], ['Zigrinatura', '#d-zig-rapida'], ['Rettifica', '#d-rett-rapida'], ['Tolleranza', '#d-toll-rapida'], ['Spigolo', '.d-spigolo']] : selL !== null ? [['Spigolo', '.d-spigolo']] : [];
         foglio.append(el('div', { class: 'd-foglio-testa' }, [el('b', { testo: tit }), el('button', { class: 'pul sec', id: 'd-foglio-x', type: 'button', testo: 'Chiudi', onclick: () => { sel = selL = null; tutto(); } })]));
         if (rapidi.length) foglio.appendChild(el('div', { class: 'chips d-foglio-rapidi', role: 'group', 'aria-label': 'Vai a' }, rapidi.map(([t, q]) => el('button', { class: 'chip', type: 'button', testo: t, onclick: () => vai(q) }))));
         foglio.appendChild(editor);
@@ -603,7 +614,7 @@
         const { errore, poli } = poliDi(S.punti);
         if (errore) { A.avviso(errore); return; }
         if (poli.length < 2) { A.avviso('Servono almeno due punti'); return; }
-        const conLav = S.punti.some(p => num(p.fil) > 0 || num(p.gola) > 0 || (p.toll && String(p.toll).trim()));
+        const conLav = S.punti.some(p => num(p.fil) > 0 || num(p.gola) > 0 || num(p.zig) > 0 || num(p.rett) > 0 || (p.toll && String(p.toll).trim()));
         if (conLav) {
           const I = A.imp();
           const pr = O.pianificaProfilo(S.punti, { mat: A.materiale(S.mat || 0), tab: A.tabellaUt ? A.tabellaUt() : [], dg: num(S.dg), nmax: I.nmaxTornio, codLimite: I.codLimite, codFiletto: I.codFiletto, refrig: I.refrig });
