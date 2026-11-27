@@ -401,10 +401,10 @@
       '<text x="12" y="' + (Y(0) - 4) + '" font-size="10.5" fill="var(--tenue)">0</text>' +
       zona(60, a.sup, a.inf, 'var(--accento)', 'Foro ' + A.esc(foro)) + zona(190, b.sup, b.inf, 'var(--ok)', 'Albero ' + A.esc(alb)) + '</svg>';
   }
-  const SCELTE_FORI = ['H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14', 'G6', 'G7', 'F7', 'F8', 'E8', 'E9', 'D9', 'D10', 'JS6', 'JS7', 'JS9'].map(x => [x, x]);
-  const SCELTE_ALB = ['h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'h12', 'h13', 'h14', 'g5', 'g6', 'f6', 'f7', 'e8', 'e9', 'd9', 'd10', 'js6', 'js7', 'k5', 'k6', 'm6', 'n6', 'p6'].map(x => [x, x]);
+  const SCELTE_FORI = ['H5', 'H6', 'H7', 'H8', 'H9', 'H10', 'H11', 'H12', 'H13', 'H14', 'G6', 'G7', 'F7', 'F8', 'E8', 'E9', 'D9', 'D10', 'JS6', 'JS7', 'JS9', 'K6', 'K7', 'M6', 'M7', 'N7', 'P7'].map(x => [x, x]);
+  const SCELTE_ALB = ['h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'h12', 'h13', 'h14', 'g5', 'g6', 'f6', 'f7', 'e8', 'e9', 'd9', 'd10', 'js6', 'js7', 'k5', 'k6', 'm6', 'n6', 'p6', 'r6', 's6'].map(x => [x, x]);
   const SCELTE_ACC = [['H7/g6', 'H7/g6 con gioco preciso'], ['H7/h6', 'H7/h6 scorrevole'], ['H7/f7', 'H7/f7 girevole'], ['H8/f7', 'H8/f7 girevole largo'],
-    ['H7/js6', 'H7/js6 incerto'], ['H7/k6', 'H7/k6 incerto (bloccato)'], ['H7/m6', 'H7/m6 leggermente forzato'], ['H7/n6', 'H7/n6 forzato'], ['H7/p6', 'H7/p6 a pressa'],
+    ['H7/js6', 'H7/js6 incerto'], ['H7/k6', 'H7/k6 incerto (bloccato)'], ['H7/m6', 'H7/m6 leggermente forzato'], ['H7/n6', 'H7/n6 forzato'], ['H7/p6', 'H7/p6 a pressa'], ['H7/r6', 'H7/r6 a pressa forte'], ['H7/s6', 'H7/s6 a caldo'],
     ['H11/d9', 'H11/d9 con molto gioco'], ['', 'Scegli foro e albero']];
   function esitoMisura(uscita, d, t, campo) {
     const mis = O.num(v_mis());

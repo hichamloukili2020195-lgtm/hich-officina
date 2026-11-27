@@ -43,7 +43,7 @@ prova('tolleranze note', () => {
   assert.deepStrictEqual(t(40, 'js7'), [12.5, -12.5]);
   assert.deepStrictEqual(t(25, 'k8'), [33, 0]);      // k oltre IT7: scostamento 0
   assert.ok(O.tolleranza(600, 'H7').errore);
-  assert.ok(O.tolleranza(20, 'K7').errore);
+  assert.ok(O.tolleranza(20, 'Z7').errore);        // campo che non c'e (K7 c'e dalla 2.47.0)
   assert.ok(O.tolleranza(20, 'x').errore);
 });
 prova('filetto metrico', () => {
@@ -667,6 +667,25 @@ prova('lavoro: barenatura interna, modelli, costo del pezzo, rampa della tasca',
   rampe.forEach(s => { const m = Math.atan2(s.z0 - s.z, Math.hypot(s.x - s.x0, s.y - s.y0)) * 180 / Math.PI; assert.ok(m <= 3.01, 'pendenza ' + m); });
   assert.ok(!O.eseguiISO(r.righe.join('\n')).errore);
 });
+prova('APK: la libreria che legge il testo non manda statistiche d\'uso (servizio di invio tolto dal manifest)', () => {
+  const m = require('fs').readFileSync(require('path').join(__dirname, '..', 'android/app/src/main/AndroidManifest.xml'), 'utf8');
+  assert.ok(/xmlns:tools="http:\/\/schemas\.android\.com\/tools"/.test(m), 'manca lo spazio dei nomi tools');
+  assert.ok(/datatransport\.runtime\.backends\.TransportBackendDiscovery"\s+tools:node="remove"/.test(m), 'il servizio di invio delle statistiche c\'e ancora');
+});
+prova('tolleranze: alberi r e s, fori K M N P (valori della norma ISO 286-2)', () => {
+  const T = (d, c) => { const r = O.tolleranza(d, c); assert.ok(!r.errore, d + ' ' + c + ': ' + r.errore); return [r.sup, r.inf]; };
+  const uguale = (d, c, sup, inf) => { const [a, b] = T(d, c); assert.ok(Math.abs(a - sup) < 0.01 && Math.abs(b - inf) < 0.01, d + ' ' + c + ': atteso ' + sup + '/' + inf + ', calcolato ' + a + '/' + b); };
+  // alberi r e s (sopra i 50 mm i campi di diametro sono piu fitti)
+  uguale(12, 'r6', 34, 23); uguale(25, 'r6', 41, 28); uguale(40, 'r6', 50, 34); uguale(60, 'r6', 60, 41); uguale(70, 'r6', 62, 43); uguale(110, 'r6', 76, 54);
+  uguale(25, 's6', 48, 35); uguale(60, 's6', 72, 53); uguale(90, 's6', 93, 71); uguale(2, 'r6', 16, 10); uguale(25, 's7', 56, 35);
+  // fori K, M, N, P
+  uguale(25, 'K7', 6, -15); uguale(25, 'K6', 2, -11); uguale(25, 'K8', 10, -23); uguale(2, 'K7', 0, -10); uguale(40, 'K7', 7, -18);
+  uguale(25, 'M7', 0, -21); uguale(25, 'M6', -4, -17); uguale(50, 'M7', 0, -25);
+  uguale(25, 'N7', -7, -28); uguale(25, 'N6', -11, -24); uguale(25, 'N9', 0, -52); uguale(2, 'N7', -4, -14); uguale(100, 'N7', -10, -45);
+  uguale(25, 'P7', -14, -35); uguale(25, 'P6', -18, -31); uguale(25, 'P8', -22, -55); uguale(10, 'P7', -9, -24);
+  ['r', 's'].forEach(c => assert.ok(O.CAMPI_ALBERI.includes(c), 'manca ' + c + ' tra gli alberi'));
+  ['K', 'M', 'N', 'P'].forEach(c => assert.ok(O.CAMPI_FORI.includes(c), 'manca ' + c + ' tra i fori'));
+});
 prova('tolleranze: tutti i gradi IT01-IT18 e le classi con ogni grado', () => {
   assert.strictEqual(O.GRADI_IT.length, 20);
   // ogni grado cresce con il grado e con il diametro
@@ -951,14 +970,16 @@ prova('materiale: tornio (sfacciatura, tornitura, rapido nel grezzo, alesatura)'
   const pb = (z, raggio) => mb.occ[Math.floor((z - mb.zBot) / mb.cella) * mb.nr + Math.floor(raggio / mb.cella)] === 1;
   assert.ok(!pb(-10, 5) && !pb(-10, 6.5) && pb(-10, 8) && pb(-10, 21), 'foro a 12 poi alesato a 14 dall\'interno (la parete resta)');
 });
-prova('three.js: in locale (non dal web), con la licenza, nel funzionamento senza rete e prima della vista 3D', () => {
+prova('three.js: in locale (non dal web), con la licenza, nel funzionamento senza rete, caricato solo per la vista 3D', () => {
   const fs = require('fs'), path = require('path'), r = p => path.join(__dirname, '..', p);
   const t = fs.readFileSync(r('three.min.js'), 'utf8');
   assert.ok(t.startsWith('/* three.js') && /MIT License/.test(t.slice(0, 200)) && /var THREE=/.test(t.slice(0, 400)), 'intestazione e licenza');
   assert.ok(fs.statSync(r('three.min.js')).size < 900000, 'troppo grande');
   assert.ok(/MIT/.test(fs.readFileSync(r('docs/LICENZE_TERZI.md'), 'utf8')), 'licenza nella documentazione');
   const html = fs.readFileSync(r('app.html'), 'utf8');
-  assert.ok(html.indexOf('three.min.js') > 0 && html.indexOf('three.min.js') < html.indexOf('vista3d.js'), 'ordine dei file');
+  // 2.47.0: la libreria 3D (750 KB) non si carica all'avvio ma solo quando si apre la vista 3D (avvio piu rapido)
+  assert.ok(html.indexOf('three.min.js') < 0, 'three.min.js non deve stare tra gli script dell\'avvio');
+  assert.ok(/['"]three\.min\.js['"]/.test(fs.readFileSync(r('vista3d.js'), 'utf8')), 'vista3d.js carica three.min.js (in locale) quando serve');
   assert.ok(!/<script[^>]+src="https?:/.test(html), 'nessun programma caricato dal web');
   assert.ok(/'\.\/three\.min\.js'/.test(fs.readFileSync(r('sw.js'), 'utf8')) && /'\.\/vista3d\.js'/.test(fs.readFileSync(r('sw.js'), 'utf8')), 'nel funzionamento senza rete');
   assert.ok(/cp stile\.css \*\.js/.test(fs.readFileSync(r('.github/workflows/apk.yml'), 'utf8')), 'l\'APK copia i file js della radice');

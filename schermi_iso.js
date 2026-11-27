@@ -429,7 +429,13 @@
       };
       const disegna = () => {
         // vista 3D vera (three.js) al posto del disegno 2D
-        const tre = N && sv.vista === 'iso' && puo3d() && (v3 || (v3 = A.crea3D(telaBox, mat)));
+        // la prima volta la libreria 3D non c'e ancora: si carica e intanto si vede il 2D; poi si ridisegna
+        if (N && sv.vista === 'iso' && puo3d() && !window.THREE && A.carica3D) A.carica3D(pronto => {
+          if (!telaBox.isConnected) return;
+          if (!pronto && modo === 'tornio') { sv.vista = 'zx'; A.salva(); schede.querySelectorAll('button').forEach(b => { b.hidden = b.dataset.id === 'iso'; b.classList.toggle('attiva', b.dataset.id === 'zx'); }); prepara(); }
+          disegna();
+        });
+        const tre = N && sv.vista === 'iso' && puo3d() && window.THREE && (v3 || (v3 = A.crea3D(telaBox, mat)));
         cv.style.display = tre ? 'none' : '';
         if (v3) { v3.canvas.style.display = tre ? '' : 'none'; v3.hint.style.display = tre ? '' : 'none'; const bs = telaBox.querySelector('#sim-sez3d'); if (bs) bs.style.display = tre ? '' : 'none'; }
         if (tre) {

@@ -18,6 +18,7 @@ import android.os.Environment;
 import android.print.PrintAttributes;
 import android.print.PrintManager;
 import android.provider.MediaStore;
+import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -178,6 +179,15 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** Il posto per la foto si prepara prima di aprire la scelta: se poi si sceglie un'immagine gia fatta (o si annulla),
+     *  resterebbe un file vuoto nella galleria (Immagini/Hich-Officina). Si toglie se non e quello usato. */
+    private void togliFotoVuota(Uri usata) {
+        if (fotoCamera != null && !fotoCamera.equals(usata)) {
+            try { getContentResolver().delete(fotoCamera, null, null); } catch (Exception e) { /* niente */ }
+        }
+        fotoCamera = null;
+    }
+
     @Override
     protected void onActivityResult(int richiesta, int esito, Intent dati) {
         super.onActivityResult(richiesta, esito, dati);
@@ -190,7 +200,9 @@ public class MainActivity extends Activity {
                 } else if (dati != null && dati.getData() != null) scelti = new Uri[]{dati.getData()};
                 else if (fotoCamera != null) scelti = new Uri[]{fotoCamera};
             }
-            if (scelti == null && fotoCamera != null) { try { getContentResolver().delete(fotoCamera, null, null); } catch (Exception e) { /* niente */ } }
+            Uri usata = null;
+            if (scelti != null) for (Uri x : scelti) if (fotoCamera != null && fotoCamera.equals(x)) usata = x;
+            togliFotoVuota(usata);
             if (attesaInput != null) attesaInput.onReceiveValue(scelti);
             attesaInput = null;
             return;
@@ -198,6 +210,7 @@ public class MainActivity extends Activity {
         if (richiesta == LEGGI_FOTO) {
             Uri u = null;
             if (esito == RESULT_OK) u = (dati != null && dati.getData() != null) ? dati.getData() : fotoCamera;
+            togliFotoVuota(u);
             if (u == null) { rispostaFoto(null, "Nessuna foto"); return; }
             leggiTesto(u);
             return;
@@ -354,6 +367,15 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void orientamento(String modo) {
             runOnUiThread(() -> setRequestedOrientation("orizzontale".equals(modo) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : "verticale".equals(modo) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT : ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED));
+        }
+
+        /** Schermo sempre acceso (durante la simulazione) oppure normale. */
+        @JavascriptInterface
+        public void schermoAcceso(boolean si) {
+            runOnUiThread(() -> {
+                if (si) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            });
         }
 
         @JavascriptInterface

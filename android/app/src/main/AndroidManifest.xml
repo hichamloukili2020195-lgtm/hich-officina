@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- solo per mandare i programmi alla macchina via FTP -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- vibrazione breve sui tasti e sugli avvisi -->
@@ -21,5 +22,10 @@
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+        <!-- la libreria che legge il testo dalle foto funziona sul telefono; questo servizio serve solo a spedire
+             statistiche d'uso: si toglie, cosi l'app non manda dati (gli eventi restano senza destinazione e si scartano) -->
+        <service
+            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+            tools:node="remove" />
     </application>
 </manifest>

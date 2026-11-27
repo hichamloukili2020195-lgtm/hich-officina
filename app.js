@@ -94,16 +94,23 @@
   mem = migra(mem);
   if (!mem.primoUso) mem.primoUso = new Date().toISOString().slice(0, 10);
   let salvaTimer = null, salvaFallito = false;
+  function scrivi() {
+    salvaTimer = null;
+    try { localStorage.setItem(CHIAVE, JSON.stringify(mem)); salvaFallito = false; }
+    catch (e) {
+      // memoria piena o bloccata: si dice una volta sola, perche non si perda il lavoro senza saperlo
+      if (!salvaFallito) { salvaFallito = true; try { avviso('Non riesco a salvare i dati su questo telefono: fai la copia di sicurezza (Impostazioni)'); } catch (x) { /* niente */ } }
+    }
+  }
   function salva() {
     clearTimeout(salvaTimer);
-    salvaTimer = setTimeout(() => {
-      try { localStorage.setItem(CHIAVE, JSON.stringify(mem)); salvaFallito = false; }
-      catch (e) {
-        // memoria piena o bloccata: si dice una volta sola, perche non si perda il lavoro senza saperlo
-        if (!salvaFallito) { salvaFallito = true; try { avviso('Non riesco a salvare i dati su questo telefono: fai la copia di sicurezza (Impostazioni)'); } catch (x) { /* niente */ } }
-      }
-    }, 150);
+    salvaTimer = setTimeout(scrivi, 150);
   }
+  // se il telefono manda l'app in background (o la chiude) prima che passi il ritardo, si salva subito:
+  // in background il sistema puo fermare i timer o chiudere l'app e l'ultima modifica andrebbe persa
+  const salvaSeInSospeso = () => { if (salvaTimer !== null) { clearTimeout(salvaTimer); scrivi(); } };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') salvaSeInSospeso(); });
+  window.addEventListener('pagehide', salvaSeInSospeso);
   const sezione = k => (mem[k] = mem[k] || {});
 
   // ----- impostazioni -----
@@ -472,16 +479,32 @@
     condividiBin,
     O, $, el, esc, fmt, arrot, icona, mem, salva, sezione, imp, IMPOSTAZIONI_SERIE, applicaTema, materiali, materiale, sceltaMateriali,
     avviso, modulo, numeri, ANDROID, misuratore, griglia, info, copia, scarica, scaricaBin, condividi, condividiFile, salvaIn, stampa, scegliTesto, Foto, riduciFoto, pulsantiFoto, schermoPieno, ruotaSchermo, campoNum, chiudiTastierino, mailSegnalazione,
-    schermi: {}, param: {}, VERSIONE: '2.46.0'
+    schermi: {}, param: {}, VERSIONE: '2.47.0'
   };
   window.App = App;
 
   let attuale = null;
   // quale voce della barra in basso e "accesa" per ogni schermata
-  const VOCI_BARRA = { cad: ['cad', 'disegno'], lavoro: ['lavoro', 'programma', 'ciclo', 'macro', 'dalDisegno', 'apri', 'listato', 'simula', 'galleria'],
-    'g-calcola': ['g-calcola', 'calcoli', 'tolleranze', 'tabelle', 'angolo', 'misure'],
-    'g-archivio': ['g-archivio', 'pezzi', 'pezzo', 'salvati', 'tabellaUtensili', 'utensile', 'utensili', 'materiali', 'materiale', 'materialiImporta', 'preferiti', 'foglio', 'guida', 'note', 'ripristino', 'scambio', 'g-officina', 'g-controlla'] };
+  // 2.47.0: uno schema solo, la barra ha gli stessi gruppi della home
+  const VOCI_BARRA = { 'g-disegna': ['g-disegna', 'lavoro', 'cad', 'disegno', 'dalDisegno', 'ciclo', 'programma', 'macro', 'macroModifica'],
+    'g-controlla': ['g-controlla', 'apri', 'listato', 'simula', 'salvati', 'galleria', 'spiega'],
+    'g-calcola': ['g-calcola', 'calcoli', 'tolleranze', 'tabelle', 'angolo', 'misure', 'materiali', 'materiale', 'materialiImporta'],
+    'g-archivio': ['g-archivio', 'pezzi', 'pezzo', 'tabellaUtensili', 'utensile', 'utensili', 'preferiti', 'foglio', 'guida', 'note', 'ripristino', 'scambio'] };
   function voceBarra(id) { if (id === 'home') return 'home'; for (const k of Object.keys(VOCI_BARRA)) if (VOCI_BARRA[k].includes(id)) return k; return ''; }
+  // 2.47.0: durante la simulazione lo schermo resta acceso (il telefono non si spegne mentre si guarda il percorso).
+  // Nell'APK lo fa il ponte Android; nel browser il blocco dello schermo, se c'e. Fuori dalla simulazione torna normale.
+  let accesoOra = false, bloccoSchermo = null;
+  function schermoAcceso(si) {
+    if (si === accesoOra) return;
+    accesoOra = si;
+    if (window.Android && window.Android.schermoAcceso) { try { window.Android.schermoAcceso(si); } catch (e) { /* ponte vecchio */ } return; }
+    try {
+      if (si && navigator.wakeLock) navigator.wakeLock.request('screen').then(b => { if (accesoOra) bloccoSchermo = b; else b.release(); }).catch(() => { /* non permesso */ });
+      else if (!si && bloccoSchermo) { bloccoSchermo.release(); bloccoSchermo = null; }
+    } catch (e) { /* niente */ }
+  }
+  // il blocco del browser si perde quando l'app va in background: si riprende al ritorno
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && accesoOra && !(window.Android && window.Android.schermoAcceso)) { accesoOra = false; schermoAcceso(true); } });
   function mostra() {
     chiudiTastierino();
     if (document.body.classList.contains('cad-pieno')) { document.body.classList.remove('cad-pieno'); $('schermo').classList.remove('pieno'); App.esciPieno = null; App.orientaPieno = 0; if (window.Android && window.Android.orientamento) window.Android.orientamento('libero'); }
@@ -500,6 +523,7 @@
         html: icona('stella'), onclick: () => preferito(id) }));
     }
     (s.azioni ? s.azioni() : []).forEach(a => azioni.appendChild(a));
+    schermoAcceso(id === 'simula');
     const voce = voceBarra(id);
     document.querySelectorAll('#barra button').forEach(b => { const on = b.dataset.vai === voce; b.classList.toggle('attiva', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('b-imp').classList.toggle('attiva', id === 'impostazioni');
@@ -563,12 +587,12 @@
     ['tabelle', 'tabella', 'Tabelle', 'Filetti, tolleranze, rugosita, pollici'],
     ['materiali', 'materiale', 'Materiali', 'Velocita di taglio e avanzamenti per materiale']
   ];
-  // la home: quattro ingressi grandi; dentro ogni gruppo le sue funzioni
+  // la home: quattro ingressi grandi, gli stessi della barra in basso; ogni funzione sta in un gruppo solo
   const GRUPPI = {
-    disegna: { t: 'Disegna e lavora', s: 'Dal pezzo al programma in 4 passi', ic: 'fresa', vai: 'lavoro' },
-    calcola: { t: 'Calcola', s: 'Giri, tolleranze, filetti, angoli', ic: 'calcolo', voci: ['calcoli', 'tolleranze', 'tabelle', 'angolo', 'materiali'] },
+    disegna: { t: 'Disegna', s: 'Lavoro guidato, CAD, programma', ic: 'fresa', voci: ['lavoro', 'cad', 'disegno', 'dalDisegno', 'ciclo', 'programma', 'macro'] },
     controlla: { t: 'Controlla', s: 'Apri, simula, programmi salvati', ic: 'codice', voci: ['apri', 'salvati', 'galleria'] },
-    officina: { t: 'Officina', s: 'Utensili, pezzi, strumenti avanzati', ic: 'utensile', voci: ['dalDisegno', 'tabellaUtensili', 'pezzi', 'programma', 'cad', 'disegno', 'macro', 'ciclo', 'guida'] }
+    calcola: { t: 'Calcola', s: 'Giri, tolleranze, filetti, materiali', ic: 'calcolo', voci: ['calcoli', 'tolleranze', 'tabelle', 'angolo', 'materiali'] },
+    archivio: { t: 'Archivio', s: 'Pezzi, utensili, preferiti, guida', ic: 'salvati', voci: ['pezzi', 'tabellaUtensili', 'preferiti', 'guida'] }
   };
   const TITOLO_BREVE = { cad: 'CAD fresa libero', disegno: 'CAD tornio libero', programma: 'Programma ISO a mano', macro: 'Macro CNC', ciclo: 'Ciclo di lavoro', calcoli: 'Calcolatrice di taglio', tolleranze: 'Tolleranze',
     angolo: 'Angolo da una foto', tabelle: 'Tabelle e filetti', apri: 'Controlla e simula', galleria: 'Esempi', pezzi: 'Pezzi e attrezzaggio', tabellaUtensili: 'Tabella utensili', salvati: 'Programmi salvati', materiali: 'Materiali', guida: 'Come si fa' };
@@ -576,13 +600,7 @@
     return el('button', { class: 'tessera', 'data-vai': id, 'aria-label': t, onclick: () => App.vai(id) }, [
       el('span', { class: 'ic', html: icona(ic) }), el('b', { testo: TITOLO_BREVE[id] || t }), el('small', { testo: s })]);
   }
-  App.schermi['g-archivio'] = { titolo: 'Archivio', render(m) {
-    const voci = ['pezzi', 'salvati', 'tabellaUtensili', 'materiali', 'preferiti', 'guida'].map(id => MENU.find(x => x[0] === id)).filter(Boolean);
-    m.appendChild(el('div', { class: 'tessere' }, voci.map(tessera)));
-    m.appendChild(el('div', { class: 'sez', testo: 'Altro' }));
-    m.appendChild(el('div', { class: 'tessere' }, ['apri', 'tolleranze', 'tabelle'].map(id => MENU.find(x => x[0] === id)).filter(Boolean).map(tessera)));
-  } };
-  ['calcola', 'controlla', 'officina'].forEach(k => {
+  Object.keys(GRUPPI).forEach(k => {
     App.schermi['g-' + k] = { titolo: GRUPPI[k].t, render(m) { m.appendChild(el('div', { class: 'tessere' }, GRUPPI[k].voci.map(id => MENU.find(x => x[0] === id)).filter(Boolean).map(tessera))); } };
   });
   function voceMenu([id, ic, t, s]) {

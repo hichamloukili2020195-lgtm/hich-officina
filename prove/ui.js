@@ -39,13 +39,14 @@ const server = http.createServer((q, r) => {
   await foto('01-home');
   ok((await pg.$$eval('.ingressi .ingresso', x => x.length)) === 4, 'quattro ingressi nella home');
   let voci = 0;
-  for (const g of ['calcola', 'controlla', 'officina']) { await vai('g-' + g); voci += await pg.$$eval('#schermo .tessera', x => x.length); }
-  ok(voci === 17, 'funzioni dentro i gruppi: ' + voci);
+  for (const g of ['disegna', 'controlla', 'calcola', 'archivio']) { await vai('g-' + g); voci += await pg.$$eval('#schermo .tessera', x => x.length); }
+  // 2.47.0: ogni funzione del menu sta in un gruppo (una volta sola)
+  ok(voci === (await pg.evaluate(() => App.MENU.length)), 'funzioni dentro i gruppi: ' + voci);
   await vai('home');
   await largo('home');
 
   // tutte le schermate si aprono
-  for (const s of ['home', 'programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'cad', 'lavoro', 'g-calcola', 'g-controlla', 'g-officina', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
+  for (const s of ['home', 'programma', 'calcoli', 'utensili', 'tolleranze', 'macro', 'galleria', 'salvati', 'tabelle', 'materiali', 'preferiti', 'impostazioni', 'apri', 'pezzi', 'tabellaUtensili', 'simula', 'listato', 'disegno', 'cad', 'lavoro', 'g-disegna', 'g-calcola', 'g-controlla', 'g-archivio', 'ciclo', 'angolo', 'guida', 'note', 'scambio']) {
     await vai(s); await erroreSchermo(s); await largo(s);
     // nessun "null", "undefined" o "NaN" scritto sullo schermo
     const sporco = await pg.evaluate(() => { const t = document.getElementById('schermo').innerText; const m = t.match(/\b(null|undefined|NaN)\b/); return m ? m[0] + ' in: ' + t.slice(Math.max(0, m.index - 30), m.index + 30).replace(/\n/g, ' ') : ''; });
@@ -578,7 +579,9 @@ const server = http.createServer((q, r) => {
     await pg.evaluate(() => { delete App.mem.lavoro; delete App.mem.materiali; App.salva(); });
     await vai('home');
     await pg.click('.ingresso[data-gruppo="disegna"]'); await pg.waitForTimeout(120);
-    ok((await pg.evaluate(() => location.hash)) === '#lavoro', 'Disegna apre il lavoro guidato');
+    ok((await pg.evaluate(() => location.hash)) === '#g-disegna', 'Disegna apre il suo gruppo');
+    await pg.click('.tessera[data-vai="lavoro"]'); await pg.waitForTimeout(120);
+    ok((await pg.evaluate(() => location.hash)) === '#lavoro', 'dal gruppo Disegna si apre il lavoro guidato');
     ok((await pg.$$eval('.lav-passi button', x => x.length)) === 4, 'quattro passi');
     // passo 1: tornio, barra
     await pg.click('.lav-macchina[data-modo="tornio"]');
@@ -1308,6 +1311,7 @@ const server = http.createServer((q, r) => {
   if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '32-materiale-3d.png') });
   const con3d = await pg.evaluate(() => !!window.App.webgl3d);
   if (con3d) {
+    await pg.waitForFunction(() => !!window.THREE, null, { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(150);
     ok((await pg.$$eval('canvas.sim-tela', x => x.filter(c => c.style.display !== 'none').length)) === 1 && !!(await pg.$('.sim-box canvas.sim-tela >> nth=1')), 'vista 3D vera (three.js) nella simulazione');
     await pg.$eval('#f-passo', e => { e.value = 6; e.dispatchEvent(new Event('input')); }); await pg.waitForTimeout(150);
     if (dirFoto) await pg.screenshot({ path: path.join(dirFoto, '32b-materiale-3d-in-corso.png') });
@@ -1451,11 +1455,11 @@ const server = http.createServer((q, r) => {
 
   // ===== 2.36.0: barra a 5 voci, impostazioni in testata e in home, bersagli grandi, numeri monospace, vibrazione =====
   await vai('home'); await pg.waitForTimeout(80);
-  ok((await pg.$$eval('#barra button', x => x.map(b => b.dataset.vai).join(','))) === 'home,cad,lavoro,g-calcola,g-archivio', 'barra a 5 voci');
+  ok((await pg.$$eval('#barra button', x => x.map(b => b.dataset.vai).join(','))) === 'home,g-disegna,g-controlla,g-calcola,g-archivio', 'barra a 5 voci');
   ok(await pg.isVisible('.home-imp') && !(await pg.isVisible('#b-imp')), 'impostazioni dalla home');
   await pg.click('.home-imp'); await pg.waitForTimeout(100);
   ok((await pg.evaluate(() => location.hash)) === '#impostazioni' && await pg.isVisible('#b-imp'), 'impostazioni con la rotella');
-  for (const [voce, hash] of [['cad', '#cad'], ['lavoro', '#lavoro'], ['g-calcola', '#g-calcola'], ['g-archivio', '#g-archivio'], ['home', '#home']]) {
+  for (const [voce, hash] of [['g-disegna', '#g-disegna'], ['g-controlla', '#g-controlla'], ['g-calcola', '#g-calcola'], ['g-archivio', '#g-archivio'], ['home', '#home']]) {
     await pg.click('#barra button[data-vai="' + voce + '"]'); await pg.waitForTimeout(120);
     const h = await pg.evaluate(() => location.hash);
     ok(h === hash || (voce === 'home' && (h === '' || h === '#home')), 'barra: ' + voce + ' -> ' + h);
@@ -1463,7 +1467,22 @@ const server = http.createServer((q, r) => {
   }
   await pg.click('#barra button[data-vai="g-archivio"]'); await pg.waitForTimeout(100);
   const arch = await pg.$$eval('.tessera', x => x.map(b => b.dataset.vai));
-  ok(['pezzi', 'salvati', 'tabellaUtensili', 'materiali', 'preferiti'].every(v => arch.includes(v)), 'archivio: ' + arch.join(','));
+  ok(['pezzi', 'tabellaUtensili', 'preferiti', 'guida'].every(v => arch.includes(v)), 'archivio: ' + arch.join(','));
+  // 2.47.0: uno schema solo (barra = home), ogni voce in un posto solo
+  {
+    const gruppi = {};
+    for (const g of ['g-disegna', 'g-controlla', 'g-calcola', 'g-archivio']) { await vai(g); await pg.waitForTimeout(60); gruppi[g] = await pg.$$eval('#schermo .tessera', x => x.map(b => b.dataset.vai)); }
+    const tutte = [].concat(...Object.values(gruppi));
+    ok(tutte.length === new Set(tutte).size, 'voci ripetute in piu gruppi: ' + JSON.stringify(gruppi));
+    ok(['lavoro', 'cad', 'disegno', 'dalDisegno', 'ciclo', 'programma', 'macro'].every(v => gruppi['g-disegna'].includes(v)), 'gruppo Disegna: ' + gruppi['g-disegna']);
+    ok(['apri', 'salvati', 'galleria'].every(v => gruppi['g-controlla'].includes(v)), 'gruppo Controlla: ' + gruppi['g-controlla']);
+    ok(['calcoli', 'tolleranze', 'tabelle', 'angolo', 'materiali'].every(v => gruppi['g-calcola'].includes(v)), 'gruppo Calcoli: ' + gruppi['g-calcola']);
+    await vai('home'); await pg.waitForTimeout(60);
+    ok((await pg.$$eval('.ingresso', x => x.map(b => b.dataset.gruppo).join(','))) === 'disegna,controlla,calcola,archivio', 'home con gli stessi gruppi della barra');
+    for (const [scr, voce] of [['cad', 'g-disegna'], ['lavoro', 'g-disegna'], ['apri', 'g-controlla'], ['salvati', 'g-controlla'], ['materiali', 'g-calcola'], ['guida', 'g-archivio']]) {
+      await vai(scr); ok((await pg.$eval('#barra button.attiva', b => b.dataset.vai)) === voce, scr + ' accende ' + voce);
+    }
+  }
   await vai('pezzi'); ok((await pg.$eval('#barra button.attiva', b => b.dataset.vai)) === 'g-archivio', 'i pezzi accendono Archivio');
   await vai('calcoli'); ok((await pg.$eval('#barra button.attiva', b => b.dataset.vai)) === 'g-calcola', 'la calcolatrice accende Calcoli');
   // bersagli grandi e numeri monospace
@@ -1940,6 +1959,103 @@ const server = http.createServer((q, r) => {
     ok(!(await pg.evaluate(() => document.body.classList.contains('cad-pieno'))) && !(await pg.isVisible('#d-foglio')), 'fuori dallo schermo intero');
   }
   await largo('CAD con Digita');
+
+  // ===== 2.47.0: telefono stretto (360 px): bersagli da almeno 44 px e nessun testo tagliato =====
+  {
+    const c3 = await b.newContext({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+    const p3 = await c3.newPage();
+    await p3.goto(url); await p3.evaluate(() => { localStorage.setItem('hich-officina-v2', JSON.stringify({ benvenuto: true })); }); await p3.reload(); await p3.waitForTimeout(200);
+    for (const s of ['home', 'cad', 'disegno', 'lavoro', 'g-disegna', 'calcoli']) {
+      await p3.evaluate(x => { location.hash = x; }, s); await p3.waitForTimeout(150);
+      const r = await p3.evaluate(() => {
+        const piccoli = [], tagliati = [];
+        document.querySelectorAll('#schermo button, #schermo select, #schermo input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file]), #barra button, #testata button').forEach(e => {
+          const q = e.getBoundingClientRect(); if (!q.width || !q.height) return;
+          if (q.height < 44 || q.width < 44) piccoli.push((e.id || e.className) + ' ' + Math.round(q.width) + 'x' + Math.round(q.height));
+        });
+        document.querySelectorAll('#schermo button, #schermo button span').forEach(e => { if (e.scrollWidth > e.clientWidth + 2 && getComputedStyle(e).textOverflow !== 'ellipsis') tagliati.push(e.textContent.trim().slice(0, 30)); });
+        return { piccoli, tagliati, largo: document.documentElement.scrollWidth > innerWidth + 1 };
+      });
+      ok(!r.piccoli.length, s + ' a 360 px, bersagli sotto i 44 px: ' + r.piccoli.slice(0, 6).join(', '));
+      ok(!r.tagliati.length, s + ' a 360 px, testo tagliato: ' + r.tagliati.join(', '));
+      ok(!r.largo, s + ' a 360 px scorre in orizzontale');
+    }
+    await c3.close();
+  }
+
+  // ===== 2.47.0: tolleranze K, M, N, P per i fori e r, s per gli alberi =====
+  {
+    await vai('tolleranze'); await pg.waitForTimeout(100);
+    const fori = await pg.$$eval('#f-foro option', x => x.map(o => o.value)), alb = await pg.$$eval('#f-alb option', x => x.map(o => o.value));
+    ok(['K7', 'M7', 'N7', 'P7'].every(c => fori.includes(c)) && ['r6', 's6'].every(c => alb.includes(c)), 'campi nuovi nelle scelte: ' + fori.join() + ' | ' + alb.join());
+    await pg.selectOption('#f-foro', 'H7'); await pg.selectOption('#f-alb', 's6'); await pg.waitForTimeout(100);
+    ok(/Interferenza/.test(await pg.textContent('#schermo')), 'H7/s6 con interferenza');
+    await erroreSchermo('tolleranze K7');
+  }
+
+  // ===== 2.47.0: schermo sempre acceso durante la simulazione (ponte Android), spento fuori =====
+  {
+    await pg.evaluate(() => { window.__acceso = []; window.Android = Object.assign(window.Android || {}, { schermoAcceso: v => window.__acceso.push(String(v)) }); });
+    await pg.evaluate(() => { App.param.sim = { testo: '%\nO0001\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG1 X10\nM30\n%', modo: 'fresa', titolo: 'prova' }; });
+    await vai('simula'); await pg.waitForTimeout(150);
+    await vai('home'); await pg.waitForTimeout(100);
+    const acc = await pg.evaluate(() => { const a = window.__acceso.slice(); delete window.Android.schermoAcceso; return a; });
+    ok(acc.includes('true') && acc[acc.length - 1] === 'false', 'schermo acceso in simulazione e poi libero: ' + acc.join(','));
+  }
+
+  // ===== 2.47.0: memoria del telefono piena: avviso una volta sola, niente errori, poi si torna a salvare =====
+  {
+    const r = await pg.evaluate(async () => {
+      const vero = Storage.prototype.setItem;
+      Storage.prototype.setItem = function () { throw new DOMException('piena', 'QuotaExceededError'); };
+      document.getElementById('toast').textContent = '';
+      App.mem.provaPiena = 1; App.salva(); await new Promise(f => setTimeout(f, 250));
+      const primo = document.getElementById('toast').textContent;
+      document.getElementById('toast').textContent = '';
+      App.salva(); await new Promise(f => setTimeout(f, 250));
+      const secondo = document.getElementById('toast').textContent;
+      Storage.prototype.setItem = vero;
+      App.salva(); await new Promise(f => setTimeout(f, 250));
+      const dopo = JSON.parse(localStorage.getItem('hich-officina-v2')).provaPiena === 1;
+      delete App.mem.provaPiena; App.salva(); await new Promise(f => setTimeout(f, 250));
+      return { primo, secondo, dopo };
+    });
+    ok(/copia di sicurezza/.test(r.primo), 'avviso con la memoria piena: ' + r.primo);
+    ok(!r.secondo, 'l\'avviso della memoria piena si ripete: ' + r.secondo);
+    ok(r.dopo, 'con la memoria libera si torna a salvare');
+  }
+
+  // ===== 2.47.0: la libreria 3D non si carica all'avvio =====
+  {
+    const p3 = await ctx.newPage();
+    await p3.goto(url); await p3.waitForTimeout(300);
+    ok(!(await p3.evaluate(() => !!window.THREE)), 'three.js caricato all\'avvio: deve arrivare solo con la vista 3D');
+    ok(!(await p3.$('script[src="three.min.js"]')), 'script della vista 3D gia presente all\'avvio');
+    await p3.close();
+  }
+
+  // ===== 2.47.0: il salvataggio non si perde se l'app va in background subito dopo una modifica =====
+  {
+    await vai('home'); await pg.waitForTimeout(250);
+    const salvato = await pg.evaluate(() => {
+      App.mem.provaSfondo = 'x' + Date.now(); App.salva();
+      // il telefono manda l'app in background prima che passi il ritardo del salvataggio
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      const ok = JSON.parse(localStorage.getItem('hich-officina-v2')).provaSfondo === App.mem.provaSfondo;
+      delete document.visibilityState; delete App.mem.provaSfondo; App.salva();
+      return ok;
+    });
+    ok(salvato, 'dati salvati subito quando l\'app va in background');
+    const salvatoChiusura = await pg.evaluate(() => {
+      App.mem.provaSfondo = 'y' + Date.now(); App.salva();
+      window.dispatchEvent(new Event('pagehide'));
+      const ok = JSON.parse(localStorage.getItem('hich-officina-v2')).provaSfondo === App.mem.provaSfondo;
+      delete App.mem.provaSfondo; App.salva();
+      return ok;
+    });
+    ok(salvatoChiusura, 'dati salvati subito quando la pagina si chiude');
+  }
 
   await b.close(); server.close();
   if (errori.length) { console.error('ERRORI:\n' + errori.join('\n')); process.exit(1); }

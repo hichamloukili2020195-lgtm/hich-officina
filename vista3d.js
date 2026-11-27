@@ -1,4 +1,4 @@
-// ===== Hich-Officina: vista 3D vera della simulazione (three.js, in locale: three.min.js) =====
+// ===== Hich-Officina: vista 3D vera della simulazione (three.js, in locale: three.min.js, caricato quando serve) =====
 // Fresa: il grezzo e fatto di colonne (una per cella) che si abbassano quando la fresa passa; si gira con un dito, si ingrandisce con due.
 // Tornio: come in macchina, mandrino a sinistra e asse Z orizzontale; il pezzo e intero (a richiesta tagliato a spicchio per vedere
 // l'interno), le griffe girano mentre si lavora; torretta con portautensile e inserto. Se il telefono non ha WebGL, resta il disegno 2D.
@@ -6,17 +6,30 @@
   'use strict';
   const A = window.App;
   const webglOk = () => {
-    if (!window.THREE) return false;
     try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; }
   };
   A.webgl3d = webglOk();
+  // three.min.js (750 KB) non sta tra gli script dell'avvio: si carica (in locale) la prima volta che serve la vista 3D.
+  // fatto(true) quando e pronto; fatto(false) se il file non si carica (la simulazione resta in 2D).
+  let attese = null;
+  A.carica3D = fatto => {
+    if (window.THREE) { fatto(true); return; }
+    if (attese) { attese.push(fatto); return; }
+    attese = [fatto];
+    const s = document.createElement('script');
+    s.src = 'three.min.js';
+    const fine = esito => { const l = attese; attese = null; if (!esito) A.webgl3d = false; l.forEach(f => { try { f(esito); } catch (e) { /* la schermata e gia chiusa */ } }); };
+    s.onload = () => fine(!!window.THREE);
+    s.onerror = () => { s.remove(); fine(false); };
+    document.head.appendChild(s);
+  };
   let attuale = null;
   A.vista3DFine = () => { if (attuale) { try { attuale.distruggi(); } catch (e) { /* gia chiuso */ } attuale = null; } };
 
   /** Crea la vista 3D dentro box. mat = modello di materiale (fresa o tornio). Ritorna {canvas, aggiorna(o), distruggi()} oppure null. */
   function crea3D(box, mat) {
     const T = window.THREE;
-    if (!A.webgl3d || !mat || mat.vuoto || mat.tipo === 'troppo') return null;
+    if (!T || !A.webgl3d || !mat || mat.vuoto || mat.tipo === 'troppo') return null;
     A.vista3DFine();
     let renderer;
     try { renderer = new T.WebGLRenderer({ antialias: true, alpha: true }); } catch (e) { A.webgl3d = false; return null; }

@@ -332,8 +332,15 @@
     p: [6, 12, 15, 18, 22, 26, 32, 37, 43, 50, 56, 62, 68]
   };
 
-  const CAMPI_FORI = ['D', 'E', 'F', 'G', 'H', 'JS'];
-  const CAMPI_ALBERI = ['d', 'e', 'f', 'g', 'h', 'js', 'k', 'm', 'n', 'p'];
+  // alberi r e s: sopra i 50 mm la norma divide i campi di diametro (50-65, 65-80, ...), con valori propri
+  const LIMITI_FINI = [3, 6, 10, 18, 30, 50, 65, 80, 100, 120, 140, 160, 180, 200, 225, 250, 280, 315, 355, 400, 450, 500];
+  const EI_FINI = {
+    r: [10, 15, 19, 23, 28, 34, 41, 43, 51, 54, 63, 65, 68, 77, 80, 84, 94, 98, 108, 114, 126, 132],
+    s: [14, 19, 23, 28, 35, 43, 53, 59, 71, 79, 92, 100, 108, 122, 130, 140, 158, 170, 190, 208, 232, 252]
+  };
+
+  const CAMPI_FORI = ['D', 'E', 'F', 'G', 'H', 'JS', 'K', 'M', 'N', 'P'];
+  const CAMPI_ALBERI = ['d', 'e', 'f', 'g', 'h', 'js', 'k', 'm', 'n', 'p', 'r', 's'];
 
   /**
    * Scostamenti di una tolleranza ISO, es. tolleranza(25,'H7') -> {sup:21, inf:0} in micrometri.
@@ -357,6 +364,18 @@
     } else if (EI_ALBERO[l] && !foro) {
       const ei = l === 'k' && (grado < 4 || grado > 7) ? 0 : EI_ALBERO[l][i];
       inf = ei; sup = ei + it;
+    } else if (EI_FINI[l] && !foro) {
+      inf = EI_FINI[l][LIMITI_FINI.findIndex(x => d <= x)]; sup = inf + it;
+    } else if (EI_ALBERO[l] && foro) {
+      // fori K, M, N, P (ISO 286-1): ES = -ei dell'albero + delta per i gradi fini (K, M, N fino a IT8; P fino a IT7),
+      // dove delta = IT(n) - IT(n-1); sotto i 3 mm delta e zero. Gradi grossi: K e N hanno ES = 0, M e P ES = -ei.
+      const ei = EI_ALBERO[l][i];
+      const prec = IT[String(grado - 1)];
+      const delta = i === 0 || !prec || grado < 3 ? 0 : it - prec[i];
+      const fine = l === 'p' ? grado <= 7 : grado <= 8;
+      if (fine) sup = -ei + delta;
+      else sup = l === 'k' ? 0 : l === 'n' ? (i === 0 ? -4 : 0) : -ei;
+      inf = sup - it;
     } else {
       return { errore: 'Campi disponibili: fori ' + CAMPI_FORI.join(' ') + ', alberi ' + CAMPI_ALBERI.join(' ') + '.' };
     }

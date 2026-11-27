@@ -2,6 +2,17 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.47.0 - Menu con uno schema solo, avvio piu rapido, dati piu sicuri
+- **Uno schema solo**: la barra in basso e la home hanno gli stessi quattro gruppi: **Disegna** (lavoro guidato, CAD fresa e tornio, dal disegno, ciclo, programma a mano, macro), **Controlla** (apri e simula, programmi salvati, esempi), **Calcoli** (taglio, tolleranze, tabelle, angolo, materiali) e **Archivio** (pezzi, utensili, preferiti, guida). Ogni funzione sta in un posto solo; il gruppo Officina non c'e piu.
+- **Avvio piu rapido**: la libreria della vista 3D non si carica piu all'apertura dell'app ma la prima volta che si apre la vista 3D della simulazione (nel frattempo si vede il 2D).
+- **Tolleranze nuove**: fori K, M, N, P e alberi r, s (ISO 286-2, sopra i 50 mm con i campi di diametro fitti della norma). Nelle scelte: K6, K7, M6, M7, N7, P7, r6, s6 e gli accoppiamenti H7/r6 e H7/s6.
+- **Privacy (APK)**: tolto il servizio con cui la libreria che legge il testo dalle foto poteva spedire statistiche d'uso; la lettura resta sul telefono.
+- **Schermo sempre acceso durante la simulazione**: il telefono non si spegne mentre si guarda il percorso; fuori dalla simulazione torna normale.
+- **Telefoni stretti (360 px)**: campi numerici, scelte rapide, linee del CAD e pulsanti dello zoom sono grandi almeno 44 pixel; "Spallamento" non e piu tagliato; la barra dello zoom del tornio va a capo invece di allargare la pagina.
+- Corretto: una modifica fatta appena prima di passare a un'altra app (o di chiudere l'app) poteva non essere salvata, perche il salvataggio parte con un piccolo ritardo. Ora, quando l'app va in background o si chiude, si salva subito.
+- Corretto (APK): quando si sceglieva una foto gia fatta invece di scattarla, o si annullava, restava un'immagine vuota in Immagini/Hich-Officina. Ora si toglie.
+- Prove: salvataggio quando l'app va in background e quando la pagina si chiude; libreria 3D non caricata all'avvio; ogni voce del menu in un gruppo solo e barra uguale alla home; bersagli e testo a 360 px; memoria del telefono piena; schermo acceso in simulazione; tolleranze K M N P r s con i valori della norma; statistiche tolte dal manifest.
+
 ## 2.46.0 - Tornio: zigrinatura, sovrametallo per rettifica, gola larga e profonda
 - **Zigrinatura** su un cilindro (passo 0,8 / 1 / 1,2 / 1,6, diritta o incrociata): fase a giri fissi bassi dopo la finitura; l'utensile entra di mezzo passo e scorre lungo il tratto. Utensile T8 se non c'e un zigrinatore in tabella. Il diametro cresce: la nota lo ricorda e consiglia la prova su un pezzo di scarto. Sui coni viene saltata con una nota.
 - **Sovrametallo per la rettifica** (0,2 / 0,3 / 0,5 sul diametro): il tornio lascia il cilindro piu grosso della misura; la nota dice a che diametro e tornito.
