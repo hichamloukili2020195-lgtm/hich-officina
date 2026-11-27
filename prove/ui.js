@@ -1902,6 +1902,32 @@ const server = http.createServer((q, r) => {
     await pg.click('#lav-pieno'); await pg.waitForTimeout(100);
     ok(!(await pg.evaluate(() => document.body.classList.contains('cad-pieno'))), 'uscita dallo schermo intero');
   }
+
+  // ===== 2.45.0: tornio a schermo intero, foglio delle lavorazioni della linea =====
+  {
+    await vai('disegno'); await pg.waitForTimeout(100);
+    await pg.evaluate(() => { App.mem.disegno.punti = [{ x: '0', z: '0' }, { x: '20', z: '0' }, { x: '20', z: '-25' }, { x: '30', z: '-25' }, { x: '30', z: '-45' }, { x: '40', z: '-45' }]; App.mem.disegno.vista = '2D'; App.salva(); });
+    await vai('home'); await vai('disegno'); await pg.waitForTimeout(100);
+    ok(!(await pg.isVisible('#d-foglio')), 'senza schermo intero niente foglio');
+    await pg.click('.linea-testo:has-text("Cilindro Ø20 lungo 25")'); await pg.waitForTimeout(60);
+    await pg.click('#d-pieno'); await pg.waitForTimeout(200);
+    ok(await pg.isVisible('#d-foglio'), 'a schermo intero la linea scelta apre il foglio');
+    ok((await pg.textContent('#d-foglio .d-foglio-testa')).includes('Cilindro'), 'titolo del foglio: ' + (await pg.textContent('#d-foglio .d-foglio-testa')));
+    ok((await pg.$$eval('#d-foglio .d-foglio-rapidi .chip', x => x.map(c => c.textContent))).join() === 'Filetto,Gola,Tolleranza,Spigolo', 'scorciatoie del foglio');
+    ok(await pg.isVisible('#d-foglio #d-fil') && await pg.isVisible('#d-foglio #f-gola'), 'filetto e gola nel foglio');
+    await pg.click('#d-foglio #d-fil-g-mf'); await pg.waitForTimeout(60);
+    await pg.click('#d-foglio .fil-misure .chip:text-is("M20x1.5")'); await pg.waitForTimeout(100);
+    const pf = await pg.evaluate(() => App.mem.disegno.punti[2]);
+    ok(pf.fil === '1.5' && pf.filFam === 'mf', 'filetto scelto dal foglio: ' + JSON.stringify(pf));
+    ok(await pg.isVisible('#d-foglio'), 'il foglio resta aperto dopo la scelta');
+    await pg.click('#d-gola-rapida .chip:text-is("4 mm")'); await pg.click('#d-toll-rapida .chip:text-is("g6")'); await pg.waitForTimeout(80);
+    const pg2 = await pg.evaluate(() => App.mem.disegno.punti[2]);
+    ok(pg2.gola === '4' && pg2.toll === 'g6', 'gola e tolleranza col dito: ' + JSON.stringify(pg2));
+    await pg.click('#d-foglio-x'); await pg.waitForTimeout(80);
+    ok(!(await pg.isVisible('#d-foglio')), 'Chiudi toglie il foglio');
+    await pg.click('#d-pieno'); await pg.waitForTimeout(100);
+    ok(!(await pg.evaluate(() => document.body.classList.contains('cad-pieno'))) && !(await pg.isVisible('#d-foglio')), 'fuori dallo schermo intero');
+  }
   await largo('CAD con Digita');
 
   await b.close(); server.close();

@@ -377,10 +377,10 @@ body.cad-pieno{overflow:hidden}
 
 /* schermo intero del disegno da tornio */
 body.cad-pieno #schermo.pieno{padding:0;max-width:none}
-body.cad-pieno #schermo.pieno>*:not(.disegno-tela):not(.chips):not(.barra-vista){display:none}
+body.cad-pieno #schermo.pieno>*:not(.disegno-tela):not(.d-strum):not(.barra-vista):not(.d-foglio){display:none}
 body.cad-pieno #schermo.pieno .disegno-tela{position:fixed;inset:0;width:100vw;height:100vh;z-index:40;border-radius:0;margin:0}
 body.cad-pieno #schermo.pieno .barra-vista{position:fixed;z-index:41;left:8px;right:8px;bottom:8px;display:flex;flex-wrap:wrap;gap:6px;background:color-mix(in srgb,var(--pannello) 92%,transparent);padding:6px;border-radius:12px;margin:0}
-body.cad-pieno #schermo.pieno .chips{position:fixed;z-index:41;left:8px;right:8px;top:8px;margin:0;flex-wrap:wrap;background:color-mix(in srgb,var(--pannello) 92%,transparent);padding:6px;border-radius:12px}
+body.cad-pieno #schermo.pieno>.d-strum{position:fixed;z-index:41;left:8px;right:8px;top:8px;margin:0;flex-wrap:wrap;background:color-mix(in srgb,var(--pannello) 92%,transparent);padding:6px;border-radius:12px}
 
 /* ===== 2.20: sistema grafico comune (spazi da 8, raggi, ombre) ===== */
 :root{--r1:10px;--r2:14px;--r3:20px;--s1:8px;--s2:16px;--s3:24px}
@@ -720,3 +720,19 @@ body.cad-pieno .cad-digita,.cad.pieno .cad-digita{bottom:0}
 .lav-radice.pieno .lav-corpo .lav-latob,.lav-radice.pieno .lav-titolo{display:none}
 @media (orientation:landscape){.lav-radice.pieno .lav-grid{grid-template-rows:none;grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr)}}
 body.cad-pieno .lav-barra,body.cad-pieno .lav-passi{display:none}
+/* 2.45.0: foglio della linea a schermo intero (tornio) */
+.d-foglio{display:none}
+body.cad-pieno #schermo.pieno>.d-foglio:not([hidden]){display:block;position:fixed;z-index:42;left:0;right:0;bottom:0;max-height:58vh;overflow:auto;background:var(--fondo);border-top:2px solid var(--accento);border-radius:16px 16px 0 0;padding:10px 14px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -8px 24px rgba(0,0,0,.45)}
+@media (orientation:landscape){body.cad-pieno #schermo.pieno>.d-foglio:not([hidden]){left:auto;top:0;width:min(400px,46vw);max-height:none;border-top:0;border-left:2px solid var(--accento);border-radius:0;padding-top:max(10px,env(safe-area-inset-top))}}
+.d-foglio-testa{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:-10px;background:var(--fondo);padding:4px 0 6px;z-index:1}
+.d-foglio-testa .pul{min-height:44px;margin:0;width:auto;padding:0 14px}
+.d-foglio-rapidi{margin:0 0 6px}
+body.cad-pieno #schermo.pieno.con-foglio .disegno-tela{height:42vh;width:100vw}
+body.cad-pieno #schermo.pieno.con-foglio>.d-strum{display:none}
+body.cad-pieno #schermo.pieno.con-foglio .barra-vista{bottom:calc(58vh + 8px)}
+@media (orientation:landscape){
+  body.cad-pieno #schermo.pieno.con-foglio .disegno-tela{height:100vh;width:calc(100vw - min(400px,46vw))}
+  body.cad-pieno #schermo.pieno.con-foglio .barra-vista{bottom:8px;right:calc(min(400px,46vw) + 8px)}
+}
+.d-foglio .pannello:has(> .riga-campo){display:block}
+.d-foglio .fil-scelta,.d-foglio .d-rapida,.d-foglio .d-spigolo{scroll-margin-top:64px}

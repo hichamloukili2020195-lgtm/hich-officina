@@ -2,6 +2,12 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.45.0 - Tornio a schermo intero: foglio con le lavorazioni della linea
+- **Disegna un profilo (tornio) a schermo intero**: toccando una linea (o un punto) si apre un foglio con le sue lavorazioni sul tornio: filetto per gruppi, gola di scarico, tolleranza, spigolo alla fine, quote, dividi, arco o retta, elimina. Con il telefono in orizzontale il foglio sta a destra e il disegno si stringe a sinistra senza coprire il pezzo; in verticale sta in basso. Scorciatoie in alto: Filetto, Gola, Tolleranza, Spigolo. Chiudi toglie la scelta.
+- **Scelte rapide col dito** per gola di scarico (3, 4, 5, 6 mm) e tolleranza (h6, h7, g6, f7, k6, js6), anche fuori dallo schermo intero.
+- Corretto: a schermo intero le file di pulsanti del pannello (per esempio "Tutti gli spigoli") finivano sopra la barra in alto.
+- Prove: foglio della linea a schermo intero, filetto, gola e tolleranza dal foglio.
+
 ## 2.44.0 - Filetti per gruppi, spessore delle passate, simulazione del tornio piu vera, lavorazioni comode sul telefono
 - **Filetti per gruppi** (Disegna e lavora e disegno del tornio): prima il gruppo (metrico grosso, metrico fine, gas G, gas conico R, NPT, UNC, UNF, UNEF, Whitworth BSW e BSF, trapezio, ACME, Pg), poi la misura. Le misure vicine al diametro del tratto sono a portata di dito, le altre in "Tutte le misure". Se la misura scelta ha un altro diametro, il tratto si adegua (e il programma lo dice).
 - **Spessore delle passate**: al passo Lavorazioni ogni lavorazione mostra e fa cambiare la passata (in Z o radiale), le passate del filetto (con la profondita della prima e dell'ultima) e la beccata dei fori. Nel CAD della fresa: "Passata in Z" per contorno, tasca libera e asola. Vuoto = valore proposto dal materiale.

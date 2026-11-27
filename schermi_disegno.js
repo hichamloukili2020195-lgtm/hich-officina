@@ -89,7 +89,7 @@
       const schede = el('div', { class: 'schede' });
       [['2D', 'Disegno'], ['3D', 'Pezzo 3D']].forEach(([id, t]) => schede.appendChild(el('button', { 'data-id': id, testo: t, onclick: () => { S.vista = id; A.salva(); tutto(); } })));
       const cv = el('canvas', { class: 'vista disegno-tela', 'aria-label': 'Disegno del profilo: tocca per mettere i punti' });
-      const chips = el('div', { class: 'chips' });
+      const chips = el('div', { class: 'chips d-strum' });
       if (S.modo !== 'mano') S.modo = 'punti';
       const [cPunti, cMano] = [['punti', 'Tocca: punti e linee'], ['mano', 'A mano libera']].map(([id, t]) => { const b = el('button', { class: 'chip', 'data-id': id, testo: t, onclick: () => { S.modo = id; A.salva(); tutto(); } }); chips.appendChild(b); return b; });
       const bAnnulla = el('button', { class: 'chip', testo: '↶ Annulla', 'aria-label': 'Annulla', onclick: () => { if (!storia.length) return; futuro.push(JSON.stringify(S.punti)); S.punti = JSON.parse(storia.pop()); sel = selL = null; A.salva(); tutto(); } });
@@ -110,7 +110,7 @@
         el('button', { class: 'icona-pul', 'aria-label': 'Rimpicciolisci', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/></svg>', onclick: () => zoomA(1 / 1.5) }),
         el('button', { class: 'icona-pul', 'aria-label': 'Ingrandisci', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5v14"/></svg>', onclick: () => zoomA(1.5) }),
         el('button', { class: 'chip', testo: 'Adatta', onclick: () => { vista.zoom = 1; vista.dx = 0; vista.dy = 0; v3.zoom = 1; disegna(); } }),
-        el('button', { class: 'chip', id: 'd-pieno', testo: 'Schermo intero', 'aria-label': 'Schermo intero', onclick: e => { const on = A.schermoPieno(m, () => disegna()); e.currentTarget.textContent = on ? 'Esci' : 'Schermo intero'; } }),
+        el('button', { class: 'chip', id: 'd-pieno', testo: 'Schermo intero', 'aria-label': 'Schermo intero', onclick: e => { const on = A.schermoPieno(m, () => tutto()); e.currentTarget.textContent = on ? 'Esci' : 'Schermo intero'; } }),
         el('button', { class: 'chip', id: 'd-ruota', testo: 'Ruota', 'aria-label': 'Ruota lo schermo', onclick: e => { const o = A.ruotaSchermo(() => disegna()); e.currentTarget.textContent = o === 'libero' ? 'Ruota' : o === 'orizzontale' ? 'Orizzontale' : 'Verticale'; } }), lettura]);
       cv.after(barraVista);
 
@@ -506,11 +506,16 @@
             if (id === 'toll') { if (String(lv.toll).trim()) b.toll = lv.toll.trim(); else delete b.toll; }
             A.salva(); disegna(); disegnaElenco();
           });
+          // scelte rapide col dito: gola di scarico e tolleranza
+          const rapida = (et, id, valori, att, fn) => el('div', { class: 'd-rapida', id }, [el('div', { class: 'leggenda', style: 'margin:6px 2px 2px', testo: et }),
+            el('div', { class: 'chips' }, valori.map(([v, t]) => el('button', { class: 'chip' + (String(att || '') === String(v) ? ' attiva' : ''), type: 'button', testo: t, onclick: () => { ricorda(); fn(v); A.salva(); tutto(); } })))]);
+          editor.appendChild(rapida('Gola di scarico:', 'd-gola-rapida', [['', 'No'], ['3', '3 mm'], ['4', '4 mm'], ['5', '5 mm'], ['6', '6 mm']], b.gola ? String(num(b.gola)) : '', v => { if (v) b.gola = v; else delete b.gola; }));
+          editor.appendChild(rapida('Tolleranza:', 'd-toll-rapida', [['', 'No'], ['h6', 'h6'], ['h7', 'h7'], ['g6', 'g6'], ['f7', 'f7'], ['k6', 'k6'], ['js6', 'js6']], b.toll || '', v => { if (v) b.toll = v; else delete b.toll; }));
         }
         const ultimo = i === S.punti.length - 1;
         if (!ultimo) {
           const metti = (k, val) => { ricorda(); delete b.smusso; delete b.raccordo; if (k) b[k] = val; A.salva(); tutto(); };
-          editor.appendChild(el('div', { class: 'leggenda', style: 'margin:6px 2px', testo: 'Spigolo alla fine della linea:' }));
+          editor.appendChild(el('div', { class: 'leggenda d-spigolo', style: 'margin:6px 2px', testo: 'Spigolo alla fine della linea:' }));
           editor.appendChild(el('div', { class: 'chips' }, [['C0.5', 'smusso', '0.5'], ['C1', 'smusso', '1'], ['R1', 'raccordo', '1'], ['R2', 'raccordo', '2'], ['Vivo', null, null]]
             .map(([tt, k, val]) => el('button', { class: 'chip' + ((k && String(b[k]) === val) || (!k && !(num(b.smusso) > 0) && !(num(b.raccordo) > 0)) ? ' attiva' : ''), testo: tt, onclick: () => metti(k, val) }))));
         }
@@ -532,7 +537,27 @@
       };
 
       // ----- riquadro del punto scelto -----
-      const mostraEditor = () => {
+      // a schermo intero: toccando una linea (o un punto) si apre un foglio con le sue lavorazioni sul tornio
+      const foglio = el('div', { class: 'd-foglio', id: 'd-foglio', role: 'dialog', 'aria-label': 'Lavorazioni della linea scelta', hidden: true });
+      m.appendChild(foglio);
+      const pieno = () => document.body.classList.contains('cad-pieno') && m.classList.contains('pieno');
+      const collocaEditor = () => {
+        const scelto = selL !== null || sel !== null;
+        const prima = m.classList.contains('con-foglio');
+        m.classList.toggle('con-foglio', pieno() && scelto);
+        if (prima !== m.classList.contains('con-foglio')) requestAnimationFrame(() => disegna());
+        if (!(pieno() && scelto)) { foglio.hidden = true; if (editor.parentNode !== m || editor.previousSibling !== msg) msg.after(editor); return; }
+        foglio.innerHTML = '';
+        const tit = selL !== null ? 'Linea ' + selL + ': ' + descrivi(selL) : 'Punto P' + (sel + 1);
+        const vai = sel2 => { const t = foglio.querySelector(sel2); if (t) (t.closest('.fil-scelta, .d-rapida') || t.closest('label, .chips, .pannello') || t).scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+        const rapidi = selL !== null && tipoLinea(selL) === 'cil' ? [['Filetto', '#d-fil'], ['Gola', '#d-gola-rapida'], ['Tolleranza', '#d-toll-rapida'], ['Spigolo', '.d-spigolo']] : selL !== null ? [['Spigolo', '.d-spigolo']] : [];
+        foglio.append(el('div', { class: 'd-foglio-testa' }, [el('b', { testo: tit }), el('button', { class: 'pul sec', id: 'd-foglio-x', type: 'button', testo: 'Chiudi', onclick: () => { sel = selL = null; tutto(); } })]));
+        if (rapidi.length) foglio.appendChild(el('div', { class: 'chips d-foglio-rapidi', role: 'group', 'aria-label': 'Vai a' }, rapidi.map(([t, q]) => el('button', { class: 'chip', type: 'button', testo: t, onclick: () => vai(q) }))));
+        foglio.appendChild(editor);
+        foglio.hidden = false;
+      };
+      const mostraEditor = () => { mostraEditor0(); collocaEditor(); };
+      const mostraEditor0 = () => {
         editor.innerHTML = '';
         if (selL !== null && S.punti[selL] && S.punti[selL - 1]) { mostraLinea(); return; }
         selL = null;
