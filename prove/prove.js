@@ -904,6 +904,44 @@ prova('profilo dalla foto: archi riconosciuti, raggio dalla quota, verso giusto 
   const cz = ga.c.a, cr = ga.c.b;
   assert.ok(Math.abs(cz - -10) < 0.6 && Math.abs(cr - 18) < 0.6, 'centro dell\'arco (z -10, raggio 18): ' + JSON.stringify(ga));
 });
+prova('profilo dalla foto: filetti, gole e tolleranze sul profilo del tornio', () => {
+  // 4 pixel per mm, asse y=400, testa a destra x=800; il profilo si scrive in mm (z dalla testa, raggio)
+  const k = 4, at = (z, r) => ({ x: 800 + z * k, y: 400 - r * k });
+  const prof = pts => O.raddrizza(tratto(pts.map(([z, r]) => at(z, r)), 0.8), { tol: 2.5 });
+  const W = 1000, H = 800, q = (id, tipo, x, y, extra) => Object.assign({ id, tipo, testo: '', x: x / W, y: y / H, stato: 'da' }, extra);
+  // M20x1,5 lungo 25 con la gola ripassata (Ø17 larga 3) prima della spalla, poi Ø30 h6 lungo 20, poi Ø40 lungo 15
+  const m1 = prof([[0, 10], [-22, 10], [-22, 8.5], [-25, 8.5], [-25, 15], [-45, 15], [-45, 20], [-60, 20]]);
+  const Q1 = [q(1, 'filetto', 750, 340, { d: 20, p: 1.5, testo: 'M20x1.5' }), q(2, 'diametro', 640, 320, { valore: 30, toll: 'h6', testo: 'Ø30 h6' }), q(3, 'diametro', 590, 300, { valore: 40, testo: 'Ø40' }),
+    q(4, 'lunghezza', 750, 470, { valore: 25 }), q(5, 'lunghezza', 660, 470, { valore: 20 }), q(6, 'lunghezza', 680, 500, { valore: 60 })];
+  const r1 = O.profiloTornio(m1, 400, Q1, W, H);
+  assert.ok(!r1.errore, r1.errore);
+  assert.deepStrictEqual(r1.punti.map(p => [p.x, p.z]), [[0, 0], [20, 0], [20, -25], [30, -25], [30, -45], [40, -45], [40, -60]], JSON.stringify(r1.punti));
+  const f = r1.punti[2];
+  assert.ok(f.fil === 1.5 && f.filFam === 'mf' && f.filNome === 'M20x1.5', 'filetto: ' + JSON.stringify(f));
+  assert.ok(f.gola === 3 && f.golaProf === undefined, 'gola ripassata diventa la gola di scarico del filetto: ' + JSON.stringify(f));
+  assert.strictEqual(r1.punti[4].toll, 'h6');
+  assert.ok(r1.misure.some(x => x.testo === 'M20x1.5') && r1.misure.some(x => /^Gola 3/.test(x.testo)), 'misure: ' + JSON.stringify(r1.misure));
+  // il disegno del tornio legge filetto e gola
+  assert.ok(!O.trattiTornio(r1.punti).errore);
+  // gola in mezzo a un cilindro senza filetto: larghezza e profondita
+  const m2 = prof([[0, 15], [-10, 15], [-10, 13], [-14, 13], [-14, 15], [-30, 15], [-30, 20], [-40, 20]]);
+  const Q2 = [q(1, 'diametro', 700, 320, { valore: 30 }), q(2, 'diametro', 650, 300, { valore: 40 }), q(3, 'lunghezza', 760, 470, { valore: 14 }), q(4, 'lunghezza', 700, 490, { valore: 30 }), q(5, 'lunghezza', 680, 510, { valore: 40 })];
+  const r2 = O.profiloTornio(m2, 400, Q2, W, H);
+  assert.ok(!r2.errore, r2.errore);
+  assert.deepStrictEqual(r2.punti.map(p => [p.x, p.z]), [[0, 0], [30, 0], [30, -14], [30, -30], [40, -30], [40, -40]], JSON.stringify(r2.punti));
+  assert.ok(r2.punti[2].gola === 4 && r2.punti[2].golaProf === 2, 'gola in mezzo: ' + JSON.stringify(r2.punti[2]));
+  // filetto senza gola disegnata e spalla dopo: gola di scarico proposta (2 passi, almeno 3 mm), da controllare
+  const m3 = prof([[0, 6], [-20, 6], [-20, 10], [-35, 10]]);
+  const Q3 = [q(1, 'filetto', 760, 360, { d: 12, p: 1.75, testo: 'M12' }), q(2, 'diametro', 700, 340, { valore: 20 }), q(3, 'lunghezza', 760, 450, { valore: 20 }), q(4, 'lunghezza', 720, 470, { valore: 35 })];
+  const r3 = O.profiloTornio(m3, 400, Q3, W, H);
+  assert.ok(!r3.errore, r3.errore);
+  const f3 = r3.punti[2];
+  assert.ok(f3.fil === 1.75 && f3.filFam === 'm' && f3.filNome === 'M12' && f3.gola === 3.5, 'filetto grosso con gola proposta: ' + JSON.stringify(f3));
+  assert.ok(r3.dubbi.some(d => /gola di scarico/i.test(d)), 'gola proposta detta nei dubbi');
+  // un Ø uguale al filetto ma lontano non lo sostituisce: vince la quota vicina al tratto
+  const r4 = O.profiloTornio(m3, 400, Q3.concat([q(9, 'diametro', 760, 470, { valore: 12, testo: 'Ø12' })]), W, H);
+  assert.strictEqual(r4.punti[2].filNome, 'M12');
+});
 prova('profilo dalla foto: aggancio ai bordi veri del disegno e asse sulla linea tratto punto', () => {
   // linee nere del disegno a y=200 (orizzontale) e x=300 (verticale); asse tratteggiato a y=400
   const scuro = (x, y) => (Math.abs(y - 200) < 1 && x >= 300 && x <= 500) || (Math.abs(x - 300) < 1 && y >= 200 && y <= 300) ? 1 : Math.abs(y - 400) < 1 && Math.floor(x / 10) % 3 !== 2 ? 1 : 0;

@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.50.0 - Ripassa il profilo: filetti, gole e tolleranze sul profilo del tornio
+- **Filetti**: un filetto letto sul disegno (M20x1,5, M12) che torna con il diametro di un tratto va su quel tratto, con la famiglia giusta (metrico grosso o fine). Se ci sono piu quote che tornano (un M20 e un Ø20 da un'altra parte), vince quella scritta piu vicino al tratto, sopra o sotto l'asse.
+- **Gole**: una gola ripassata sul profilo (gradino giu, tratto stretto, gradino su) diventa la gola di scarico alla fine del cilindro, con larghezza e, senza filetto, profondita sul raggio; anche in mezzo a un cilindro. Un filetto con una spalla dopo e senza gola disegnata riceve la gola proposta (2 passi, almeno 3 mm). Le gole si dicono nei dubbi: vanno controllate sul disegno.
+- **Tolleranze**: la tolleranza di un diametro (Ø30 h6) passa sul tratto.
+- Tutto va nel disegno del tornio, sulla linea del tratto, come se l'avessi scelto dal foglio della linea.
+- Corretto: una gola piccola ripassata poteva essere presa per un arco; ora un arco vero non ha spigoli a 90 gradi.
+- Prove: filetto con gola ripassata, gola in mezzo a un cilindro, filetto grosso con gola proposta, quota piu vicina che vince; interfaccia: filetto e gola fino al disegno del tornio.
+
 ## 2.49.0 - Dal disegno al pezzo: ripassa il profilo sulla foto, quote lette meglio
 - **Ripassa il profilo** (nuovo, consigliato): sulla foto del disegno tocchi l'asse e ripassi col dito il profilo (tornio) o il contorno (fresa), anche a mano libera e in piu tratti. L'app raddrizza le linee, chiude gli spigoli ad angolo retto, riconosce i raccordi (archi tangenti), aggancia le linee a quelle vere del disegno e trova l'asse anche se tocchi vicino. Due dita: ingrandisci e sposta; schermo intero.
 - **Misure dalle quote**: la scala si trova da sola confrontando il profilo con le quote lette vicino (non quelle delle altre viste, delle sezioni o dei dettagli); ogni misura prende la quota che torna (in verde), le altre sono misurate sulla foto, arrotondate al mezzo millimetro e da controllare (in arancione). Senza quote: "Scrivi una misura" su una linea del profilo e l'app ricava le altre.

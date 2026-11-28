@@ -83,6 +83,15 @@
         // tutti i pezzi girano dalla stessa parte
         const segni = []; for (let k = i + 1; k < j; k++) segni.push(Math.sign(giro(P[idx[k - 1]], P[idx[k]], P[idx[k + 1]])));
         if (segni.some(s => s !== segni[0])) break;
+        // in un arco vero i pezzi di fila girano di poco; uno spigolo (gola, gradino) gira di 90 gradi
+        let spigolo = false;
+        for (let k = i + 1; k < j; k++) {
+          const u = P[idx[k - 1]], v = P[idx[k]], w = P[idx[k + 1]];
+          const a1 = Math.atan2(v.y - u.y, v.x - u.x), a2 = Math.atan2(w.y - v.y, w.x - v.x);
+          let d = Math.abs(a2 - a1) * 180 / Math.PI; if (d > 180) d = 360 - d;
+          if (d > 55) spigolo = true;
+        }
+        if (spigolo) break;
         if (c.r > corda * 6) continue;                                    // ancora quasi dritto: forse piu avanti
         const m = pezzo[Math.floor(pezzo.length / 2)];
         const freccia = Math.abs(giro(a, m, b)) / (corda || 1);
@@ -205,7 +214,7 @@
     const mx = Math.max(zona.x1 - zona.x0, zona.y1 - zona.y0) * 0.35 + 20, my = mx;
     return (quote || []).filter(q => q.stato !== 'no').filter(q => { const x = q.x * W, y = q.y * H; return x >= zona.x0 - mx && x <= zona.x1 + mx && y >= zona.y0 - my && y <= zona.y1 + my; });
   }
-  const valoriDi = (Q, tipi) => Q.filter(q => tipi.includes(q.tipo)).map(q => ({ v: q.tipo === 'filetto' ? q.d : q.valore, id: q.id, testo: q.testo })).filter(x => x.v > 0);
+  const valoriDi = (Q, tipi) => Q.filter(q => tipi.includes(q.tipo)).map(q => ({ v: q.tipo === 'filetto' ? q.d : q.valore, id: q.id, testo: q.testo, tipo: q.tipo, p: q.p, toll: q.toll, x: q.x, y: q.y })).filter(x => x.v > 0);
 
   /** Il rapporto mm/pixel che fa tornare piu misure. coppie = [{px, quote: [{v}]}]. Ritorna {k, tornano} oppure null. */
   function scala(misure) {
@@ -263,6 +272,39 @@
   }
 
   /**
+   * Gole sul profilo del tornio. Una gola ripassata (cilindro, gradino giu, tratto stretto, gradino su fino almeno allo
+   * stesso diametro) diventa la gola di scarico alla fine del cilindro: larghezza e, senza filetto, profondita sul raggio.
+   * Un filetto con una spalla dopo e senza gola disegnata riceve la gola proposta (2 passi, almeno 3 mm), da controllare.
+   * punti = [{x (diametro), z, ...}] dalla testa al mandrino (senza il punto sull'asse): cambia la lista.
+   */
+  function golaEFiletti(punti, mis, dubbi) {
+    const ug = (a, b) => Math.abs(a - b) < 1e-6;
+    for (let j = 1; j + 3 < punti.length; j++) {
+      const a0 = punti[j - 1], a1 = punti[j], g0 = punti[j + 1], g1 = punti[j + 2], b0 = punti[j + 3];
+      if ([a1, g0, g1, b0].some(p => p.tratto)) continue;
+      const cilA = ug(a0.x, a1.x) && a1.z < a0.z, giu = ug(a1.z, g0.z) && g0.x < a1.x, fondo = ug(g0.x, g1.x) && g1.z < g0.z, su = ug(g1.z, b0.z) && b0.x >= a1.x - 1e-6;
+      if (!(cilA && giu && fondo && su)) continue;
+      const w = r3(g0.z - g1.z), prof = r3((a1.x - g0.x) / 2);
+      if (!(w <= Math.max(6, 0.35 * a1.x) && prof > 0 && prof <= 3)) continue;
+      const fine = Object.assign({}, a1, { z: g1.z, gola: w });
+      if (!(a1.fil > 0)) fine.golaProf = prof;
+      const resto = ug(b0.x, a1.x) ? [] : [b0];   // gola in mezzo: il cilindro continua dal punto dopo
+      punti.splice(j, 4, fine, ...resto);
+      mis.push({ testo: 'Gola ' + w + (a1.fil > 0 ? '' : ' x ' + prof), fonte: 'foto' });
+      dubbi.push('Gola larga ' + w + (a1.fil > 0 ? ' (scarico del filetto ' + a1.filNome + ')' : ', profonda ' + prof + ' sul raggio') + ' presa dal profilo: controllala sul disegno.');
+    }
+    // filetto con la spalla dopo e senza gola: gola di scarico proposta
+    for (let j = 1; j < punti.length - 1; j++) {
+      const p = punti[j];
+      if (!(p.fil > 0) || p.gola > 0) continue;
+      if (ug(punti[j + 1].z, p.z) && punti[j + 1].x > p.x) {
+        p.gola = Math.max(3, Math.round(2 * p.fil * 10) / 10);
+        dubbi.push('Gola di scarico larga ' + p.gola + ' proposta alla fine del filetto ' + p.filNome + ': controllala sul disegno.');
+      }
+    }
+  }
+
+  /**
    * Tornio. mod = profilo raddrizzato (pixel), asseY = riga dell'asse, quote lette (posizioni da 0 a 1), W e H della foto.
    * opz = {k (mm/pixel scelto a mano), testa: 'destra'|'sinistra'}.
    * Ritorna {punti: [{x, z, tratto, r}], k, misure: [{testo, fonte, id}], dubbi, usate} oppure {errore}.
@@ -294,21 +336,33 @@
     const usate = new Set(), mis = [];
     // raggi (meta del diametro) di ogni vertice, dalle rette orizzontali agganciate ai diametri letti
     const rag = U.map(p => p.v * k);
-    const dVert = new Array(V.length).fill(null);
+    const dVert = new Array(V.length).fill(null), attr = new Array(V.length).fill(null);
     L.forEach((l, i) => {
       if (l.tipo !== 'retta' || l.dir !== 'h') return;
       const D = 2 * U[i].v * k;
-      let b = null; dq.forEach(q => { if (vicino(D, q.v) && (!b || Math.abs(D - q.v) < Math.abs(D - b.v))) b = q; });
+      // tra le quote che tornano col diametro vince quella scritta piu vicino al tratto (sopra o sotto l'asse):
+      // cosi un filetto M20 e un Ø20 di un'altra parte del pezzo non si scambiano
+      const mx = (V[i].x + V[i + 1].x) / 2, my = V[i].y, my2 = 2 * asseY - V[i].y;
+      const lontano = q => Math.min(Math.hypot(q.x * W - mx, q.y * H - my), Math.hypot(q.x * W - mx, q.y * H - my2));
+      const tornano = dq.filter(q => vicino(D, q.v, q.tipo === 'filetto' ? 0.06 : 0.035));
+      const b = tornano.sort((u, w) => lontano(u) - lontano(w))[0] || null;
       const val = b ? b.v : r1(D);
       if (b) usate.add(b.id);
       dVert[i] = dVert[i + 1] = val;
-      mis.push({ testo: 'Ø' + val, fonte: b ? 'quota' : 'foto', id: b ? b.id : null });
+      if (b && b.tipo === 'filetto' && b.p > 0) {
+        const grosso = O.FILETTI_GROSSI && O.FILETTI_GROSSI.some(f => f[0] === b.v && Math.abs(f[1] - b.p) < 1e-9);
+        attr[i + 1] = { fil: b.p, filFam: grosso ? 'm' : 'mf', filNome: grosso ? 'M' + b.v : 'M' + b.v + 'x' + b.p };
+        mis.push({ testo: attr[i + 1].filNome, fonte: 'quota', id: b.id });
+      } else {
+        if (b && b.toll) attr[i + 1] = { toll: b.toll };
+        mis.push({ testo: 'Ø' + val + (b && b.toll ? ' ' + b.toll : ''), fonte: b ? 'quota' : 'foto', id: b ? b.id : null });
+      }
       if (!b) dubbi.push('Ø' + val + ' misurato sulla foto (nessuna quota vicina torna): controllalo.');
     });
     // posizioni lungo l'asse
     const pz = posizioni(gz.gruppi.map(v => v * k), lq);
     pz.forEach((p, j) => { if (p.id) usate.add(p.id); if (j && p.fonte === 'foto') dubbi.push('Posizione Z-' + p.v + ' misurata sulla foto: controllala.'); });
-    const punti = V.map((p, i) => ({ x: r3(dVert[i] !== null ? dVert[i] : r1(2 * rag[i])), z: r3(-pz[gz.di[i]].v) }));
+    const punti = V.map((p, i) => Object.assign({ x: r3(dVert[i] !== null ? dVert[i] : r1(2 * rag[i])), z: r3(-pz[gz.di[i]].v) }, attr[i] || {}));
     // archi: raggio agganciato ai raggi letti, verso nel piano (z, raggio)
     L.forEach((l, i) => {
       if (l.tipo !== 'arco') return;
@@ -322,6 +376,7 @@
       if (b) usate.add(b.id); else dubbi.push('Raggio R' + Rv + ' misurato sulla foto: controllalo.');
       mis.push({ testo: 'R' + Rv, fonte: b ? 'quota' : 'foto', id: b ? b.id : null });
     });
+    golaEFiletti(punti, mis, dubbi);
     // la testa parte dall'asse
     if (punti[0].x > 0) punti.unshift({ x: 0, z: 0 });
     // fino al mandrino: l'ultimo punto e il diametro piu grosso dell'ultimo tratto

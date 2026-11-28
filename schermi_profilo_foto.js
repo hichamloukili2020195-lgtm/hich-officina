@@ -222,7 +222,14 @@
       const crea = P.modo === 'tornio'
         ? el('button', { class: 'pul grande', id: 'pf-crea', html: A.icona('avanti') + 'Apri nel disegno del tornio', onclick: () => {
           const D = A.sezione('disegno');
-          D.punti = ris.punti.map(p => { const o = { x: String(p.x), z: String(p.z) }; if (p.tratto) { o.tratto = p.tratto; o.r = String(p.r); } return o; });
+          // filetto, gola e tolleranza passano sulla linea (il punto alla fine del tratto), come nel disegno del tornio
+          D.punti = ris.punti.map(p => {
+            const o = { x: String(p.x), z: String(p.z) };
+            if (p.tratto) { o.tratto = p.tratto; o.r = String(p.r); }
+            ['fil', 'gola', 'golaProf'].forEach(k => { if (p[k] > 0) o[k] = String(p[k]); });
+            ['filFam', 'filNome', 'toll'].forEach(k => { if (p[k]) o[k] = p[k]; });
+            return o;
+          });
           const dMax = Math.max(...ris.punti.map(p => p.x)), lTot = Math.max(...ris.punti.map(p => -p.z));
           D.dg = String(O.barraPer ? O.barraPer(dMax) : Math.ceil(dMax + 3)); D.lg = String(Math.ceil(lTot + 5)); D.vista = '2D';
           if (S.mat !== undefined) D.mat = S.mat;

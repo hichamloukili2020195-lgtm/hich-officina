@@ -1288,7 +1288,7 @@ const server = http.createServer((q, r) => {
       await App.Foto.metti('fprova', c.toDataURL('image/png'));
       const q = (id, tipo, valore, x, y) => ({ id, tipo, valore, testo: (tipo === 'diametro' ? 'Ø' : '') + valore, x: x / 1000, y: y / 600, w: 0.03, h: 0.03, stato: 'da' });
       App.mem.dalDisegno = { foto: 'fprova', letta: true, vista: 'profilo', prof: { modo: 'tornio' },
-        quote: [q(1, 'diametro', 20, 750, 330), q(2, 'diametro', 30, 660, 310), q(3, 'diametro', 40, 590, 290), q(4, 'lunghezza', 25, 750, 520), q(5, 'lunghezza', 20, 660, 520), q(6, 'lunghezza', 60, 680, 560), q(7, 'diametro', 330, 60, 60), q(8, 'lunghezza', 509, 100, 580)] };
+        quote: [Object.assign(q(1, 'filetto', 20, 750, 330), { d: 20, p: 1.5, testo: 'M20x1.5' }), q(2, 'diametro', 30, 660, 310), q(3, 'diametro', 40, 590, 290), q(4, 'lunghezza', 25, 750, 520), q(5, 'lunghezza', 20, 660, 520), q(6, 'lunghezza', 60, 680, 560), q(7, 'diametro', 330, 60, 60), q(8, 'lunghezza', 509, 100, 580)] };
       App.salva();
     });
     await p5.evaluate(() => { location.hash = 'dalDisegno'; }); await p5.waitForTimeout(500);
@@ -1308,7 +1308,7 @@ const server = http.createServer((q, r) => {
     for (let i = 1; i < giro.length; i++) await p5.mouse.move(...pt(...giro[i]), { steps: 18 });
     await p5.mouse.up(); await p5.waitForTimeout(250);
     const mis = await p5.$$eval('.pf-mis', x => x.map(e => e.className.split(' ').pop() + ':' + e.textContent));
-    ok(['quota:Ø20', 'quota:Ø30', 'quota:Ø40'].every(m => mis.includes(m)) && !mis.some(m => m.includes('330')), 'misure dalle quote vicine: ' + mis.join(' '));
+    ok(['quota:M20x1.5', 'quota:Ø30', 'quota:Ø40'].every(m => mis.includes(m)) && !mis.some(m => m.includes('330')), 'misure dalle quote vicine: ' + mis.join(' '));
     ok(await p5.isVisible('#pf-crea'), 'pulsante per aprire nel disegno del tornio');
     await p5.click('#pf-annulla'); await p5.waitForTimeout(100);
     ok(!(await p5.isVisible('#pf-crea')) && (await p5.evaluate(() => App.mem.dalDisegno.prof.tratti.length)) === 0, 'annulla l\'ultimo tratto');
@@ -1320,6 +1320,9 @@ const server = http.createServer((q, r) => {
     ok((await p5.evaluate(() => location.hash)) === '#disegno', 'apre il disegno del tornio');
     const punti = await p5.evaluate(() => App.mem.disegno.punti.map(p => p.x + ',' + p.z).join(' '));
     ok(punti === '0,0 20,0 20,-25 30,-25 30,-45 40,-45 40,-60', 'profilo nel disegno del tornio: ' + punti);
+    const fil = await p5.evaluate(() => App.mem.disegno.punti[2]);
+    ok(fil.fil === '1.5' && fil.filFam === 'mf' && fil.filNome === 'M20x1.5' && fil.gola === '3', 'filetto e gola di scarico nel disegno del tornio: ' + JSON.stringify(fil));
+    ok(/filetto M20x1[.,]5/.test(await p5.textContent('#schermo')), 'il disegno del tornio mostra il filetto');
     // la vista delle quote resta: si passa con la scheda
     await p5.evaluate(() => { location.hash = 'dalDisegno'; }); await p5.waitForTimeout(300);
     await p5.click('#dd-vista-quote'); await p5.waitForTimeout(150);
