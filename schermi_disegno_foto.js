@@ -36,8 +36,15 @@
       const proposta = el('div', { class: 'dd-proposta' });
       const barraFoto = el('div', { class: 'pulsanti dd-barra' });
       const bAggiungi = el('button', { class: 'pul sec', id: 'dd-aggiungi', html: svg('<path d="M12 5v14M5 12h14"/>') + 'Aggiungi una quota', onclick: () => { aggiungi = !aggiungi; bAggiungi.classList.toggle('attiva', aggiungi); stato.textContent = aggiungi ? 'Tocca la foto dove c\'e la quota da aggiungere.' : ''; } });
-      m.append(A.pulsantiFoto({ id: 'f-disegno', dopo: f => carica(f[0]) }), stato, el('div', { class: 'dd-foto' }, [tela]), barraFoto, lista, proposta);
+      // due modi: ripassare il profilo sulla foto (consigliato) oppure controllare le quote una per una
+      if (!S.vista) S.vista = 'profilo';
+      const schede = el('div', { class: 'schede dd-schede' });
+      [['profilo', 'Ripassa il profilo'], ['quote', 'Solo le quote']].forEach(([k, t]) => schede.appendChild(el('button', { id: 'dd-vista-' + k, 'data-id': k, testo: t, onclick: () => { S.vista = k; A.salva(); tutto(); } })));
+      const profBox = el('div', { class: 'dd-profilo' }), quoteBox = el('div', { class: 'dd-quote' });
+      quoteBox.append(el('div', { class: 'dd-foto' }, [tela]), barraFoto, lista, proposta);
+      m.append(A.pulsantiFoto({ id: 'f-disegno', dopo: f => carica(f[0]) }), schede, stato, profBox, quoteBox);
       barraFoto.append(bAggiungi);
+      const profilo = A.profiloFoto ? A.profiloFoto(profBox, { S, img: () => img, quote: () => S.quote, radice: m }) : null;
 
       // ----- foto: si tiene con le altre (IndexedDB), si legge, si disegna -----
       const carica = async file => {
@@ -73,7 +80,9 @@
           const mt = O.materialeDa(r.righe || [], A.materiali());
           if (mt !== null) S.mat = String(mt);
           A.salva();
-          stato.textContent = Q.length ? 'Trovate ' + Q.length + ' quote. Controllale una per una: ✓ giusta, ✗ da scartare, oppure correggi il testo.' : 'Non ho trovato quote: aggiungile a mano.';
+          const nv = Q.filter(q => q.stato !== 'no').length;
+          if (S.vista !== 'quote') stato.textContent = nv ? 'Lette ' + nv + ' quote: servono a dare le misure giuste al profilo che ripassi.' : 'Non ho letto quote: dopo il profilo scrivi tu una misura.';
+          else stato.textContent = Q.length ? 'Trovate ' + Q.length + ' quote. Controllale una per una: ✓ giusta, ✗ da scartare, oppure correggi il testo.' : 'Non ho trovato quote: aggiungile a mano.';
           tutto();
         };
         A.ANDROID.leggiImmagine(await perLettura(dato));
@@ -139,7 +148,7 @@
         const metti = st => { q.stato = q.stato === st ? 'da' : st; sel = q.id; A.salva(); tutto(); };
         return el('div', { class: 'dd-q ' + q.stato + (q.id === sel ? ' scelta' : ''), 'data-q': q.id }, [
           el('span', { class: 'num', testo: String(i + 1) }),
-          el('div', { class: 'dd-q-c' }, [el('small', { testo: NOMI[q.tipo] || q.tipo }), inp]),
+          el('div', { class: 'dd-q-c' }, [el('small', { testo: (NOMI[q.tipo] || q.tipo) + (q.motivo && q.stato === 'no' ? ' · scartata: ' + q.motivo : '') }), inp]),
           el('button', { class: 'dd-si' + (q.stato === 'ok' ? ' on' : ''), 'aria-label': 'Quota ' + (i + 1) + ' giusta', 'aria-pressed': q.stato === 'ok' ? 'true' : 'false', html: svg('<path d="M5 13l4 4L19 7"/>'), onclick: () => metti('ok') }),
           el('button', { class: 'dd-no' + (q.stato === 'no' ? ' on' : ''), 'aria-label': 'Scarta la quota ' + (i + 1), 'aria-pressed': q.stato === 'no' ? 'true' : 'false', html: svg('<path d="M6 6l12 12M18 6L6 18"/>'), onclick: () => metti('no') })]);
       };
@@ -177,6 +186,10 @@
       };
 
       const tutto = () => {
+        const prof = S.vista !== 'quote' && !!profilo;
+        schede.querySelectorAll('button').forEach(x => x.classList.toggle('attiva', x.dataset.id === (prof ? 'profilo' : 'quote')));
+        profBox.hidden = !prof; quoteBox.hidden = prof;
+        if (prof) { profilo.aggiorna(); return; }
         lista.innerHTML = '';
         if (S.quote.length) {
           const daFare = S.quote.filter(q => q.stato === 'da').length;

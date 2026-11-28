@@ -11,6 +11,29 @@
   // righe del cartiglio e note: non sono quote
   const NON_QUOTE = /\b(scala|foglio|disegnato|data|rev|revisione|materiale|trattamento|tolleranze|iso\s*2768|massa|peso|cliente|codice|n\.?\s*disegno|quantit|firma|sostituisce|denominazione|rugosit|spigoli|bavatur|vietat|propriet|dove non|smussi|raggi|angoli|concentricit|perpendicol|parallelism|planarit|approvato|titolo|soggetto|documento|dettaglio|sezione|marcatura|zona|dimensioni in|formato|class|size|pag\.)/i;
   const DATA = /\b\d{1,2}[-\/.]\d{1,2}[-\/.]\d{2,4}\b/;
+  // cartigli e note in inglese e tedesco (disegni che arrivano da fuori)
+  const NON_QUOTE_ESTERO = /\b(places?|view|sheet|scale|drawn|draw|check(ed)?|date|material|weight|title|tolerance|deburr|edges|stainless|steel|section|detail|surface|finish|unless|otherwise|specified|dimensions|initiale|gewicht|format|massstab|ma(ss|ß)stab|blatt|werkstoff|datum|zeichnung|name|approved|part|qty|quantity|revision|units?)\b/i;
+  const SCALA = /\b\d+\s*:\s*\d+\b/;                          // 2:1, A-A (1:1), C(4:1)
+  const NORMA = /\b(DIN|ISO|UNI|EN|ANSI|ASME|JIS|BS)\s*\d/;       // E 0,4x0,2 DIN 509: il numero della norma non e una quota
+  const RUGOSITA = /^\s*(Ra\s*)?\d+[.,]\d+\s*[\/√]|√|\bRa\s*\d/;  // 1,6/  3,2/(√)
+  const GEOMETRICA = /^[^\dA-Za-z]*\d*[.,]?\d+\s+[A-F](\s*[A-F])*\s*$/;  // 0,02 B (tolleranza geometrica con il riferimento)
+  // numeri di richiamo nei cerchietti: soli (7), tra parentesi davanti ((22) 8+0,1) o in fondo a una quota (Ø30 31, 3 (20))
+  const RICHIAMO_SOLO = /^\(?\s*(\d{1,2})\s*\)?$/, RICHIAMO_DAVANTI = /^\(\s*(\d{1,2})\s*\)\s+(?=\S)/, RICHIAMO_DIETRO = /(\S)\s+\(?(\d{1,2})\)?\s*$/;
+  /** Ci sono i richiami numerati? Tanti numeri piccoli diversi che coprono buona parte di 1..N. */
+  function conRichiami(righe) {
+    const visti = new Set();
+    (righe || []).forEach(r => {
+      const t = String(r.t || '').trim();
+      let m = RICHIAMO_SOLO.exec(t);
+      if (m && (!(r.w > 0) || !(r.h > 0) || r.w <= 2.6 * Math.max(r.h, 1) || r.h <= 2.6 * r.w)) visti.add(Number(m[1]));
+      if ((m = RICHIAMO_DAVANTI.exec(t))) visti.add(Number(m[1]));
+      if ((m = RICHIAMO_DIETRO.exec(t)) && /[Øø⌀R±°]|\d\s*[xX×]|[+\-]\s*\d|\d[.,]\d|\d/.test(t.slice(0, m.index + 1))) visti.add(Number(m[2]));
+    });
+    visti.delete(0);
+    if (visti.size < 6) return false;
+    const max = Math.max(...visti);
+    return visti.size >= 0.4 * max;
+  }
   /** Il materiale scritto nel cartiglio, se e uno di quelli dell'app. */
   function materialeDa(righe, materiali) {
     const testo = righe.map(r => r.t).join(' \n ');
@@ -93,6 +116,7 @@
   function quoteDaRighe(righe, W, H) {
     const out = [];
     let id = 1;
+    const richiami = conRichiami(righe);
     blocchi(righe, W, H).forEach(b => {
       const r = b[0];
       const x0 = Math.min(...b.map(z => z.x)), y0 = Math.min(...b.map(z => z.y)), x1 = Math.max(...b.map(z => z.x + z.w)), y1 = Math.max(...b.map(z => z.y + z.h));
@@ -105,8 +129,18 @@
         if (g) { out.push(Object.assign(g, box, { id: id++, verticale, stato: 'da', riga: testo })); return; }
       }
       b.forEach(z => {
-        const t = String(z.t || '').trim();
-        if (!t || NON_QUOTE.test(t) || DATA.test(t)) return;
+        let t = String(z.t || '').trim();
+        if (!t || NON_QUOTE.test(t) || DATA.test(t) || NON_QUOTE_ESTERO.test(t) || SCALA.test(t) || NORMA.test(t) || RUGOSITA.test(t) || GEOMETRICA.test(t)) return;
+        if (richiami) {
+          const solo = RICHIAMO_SOLO.exec(t);
+          if (solo) {   // resta nella lista, scartato: se era davvero una quota si riprende con la spunta
+            out.push({ tipo: 'lunghezza', testo: solo[1], valore: Number(solo[1]), id: id++, x: (z.x + z.w / 2) / W, y: (z.y + z.h / 2) / H, w: z.w / W, h: z.h / H, verticale: false, ordine: 0, stato: 'no', motivo: 'numero di richiamo (nel cerchietto)', riga: t });
+            return;
+          }
+          t = t.replace(RICHIAMO_DAVANTI, '');
+          const m = RICHIAMO_DIETRO.exec(t);
+          if (m && /[Øø⌀R±°]|\d\s*[xX×]|[+\-]\s*\d|\d[.,]\d|\d/.test(t.slice(0, m.index + 1))) t = t.slice(0, m.index + 1);
+        }
         const parole = (t.match(/[A-Za-zàèéìòù]{4,}/g) || []).length;
         if (parole >= 3) return;   // una frase, non una quota
         const Q = O.estraiQuote(t);

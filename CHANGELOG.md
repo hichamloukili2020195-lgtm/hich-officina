@@ -2,6 +2,14 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.49.0 - Dal disegno al pezzo: ripassa il profilo sulla foto, quote lette meglio
+- **Ripassa il profilo** (nuovo, consigliato): sulla foto del disegno tocchi l'asse e ripassi col dito il profilo (tornio) o il contorno (fresa), anche a mano libera e in piu tratti. L'app raddrizza le linee, chiude gli spigoli ad angolo retto, riconosce i raccordi (archi tangenti), aggancia le linee a quelle vere del disegno e trova l'asse anche se tocchi vicino. Due dita: ingrandisci e sposta; schermo intero.
+- **Misure dalle quote**: la scala si trova da sola confrontando il profilo con le quote lette vicino (non quelle delle altre viste, delle sezioni o dei dettagli); ogni misura prende la quota che torna (in verde), le altre sono misurate sulla foto, arrotondate al mezzo millimetro e da controllare (in arancione). Senza quote: "Scrivi una misura" su una linea del profilo e l'app ricava le altre.
+- Il profilo va nel **disegno del tornio** (punti, archi compresi) o nel **CAD della fresa** (contorno chiuso), dove si corregge e si fa il programma.
+- **Quote lette meglio**: non si prendono piu come quote i numeri dei richiami nei cerchietti (restano scartati nella lista, si possono riprendere), la rugosita (1,6/), le tolleranze geometriche (0,02 B), i numeri delle norme (DIN 509 diventava una lunghezza di 509), la scala (2:1, A-A (1:1)) e le scritte dei cartigli in inglese e tedesco. Corretto: "Ø3+0,1 30" diventava "Ø3 +0.130".
+- La scheda "Solo le quote" e il modo di prima; nelle quote scartate si vede il motivo.
+- Prove: richiami, rugosita, norme, scala e cartiglio su un disegno finto; profilo a gradini e raccordo concavo (con il verso dell'arco nel disegno del tornio), contorno della fresa con angolo raggiato, aggancio alle linee e all'asse, 300 tratti tremolanti; interfaccia: asse, profilo in due tratti, annulla, apertura nel disegno del tornio.
+
 ## 2.48.0 - Lettura del programma da una foto piu sicura, righe da controllare, piu foto di seguito
 - **Correzioni migliori**: una lettera e un indirizzo solo se ha un valore dopo; se segue un indirizzo vuoto o chiude un numero senza valore e una cifra letta male (YI2 -> Y12, XS0 -> X50, Z-O.5 -> Z-0.5, GOl -> G01, HI -> H1, X1.234S -> X1.2345). Trattini lunghi e ~ diventano il meno; simboli sporchi (», °) si tolgono; 0I234 (PEZZO) -> O1234 (PEZZO).
 - Corretto: una Z attaccata tra due numeri (X10Y20Z5) diventava un 2 e cambiava la quota. Le righe con parole intere (macro, altri linguaggi, scritte dei menu) non si toccano piu: prima "CALL 1" diventava "CALL1" e le scritte dei menu potevano passare per programma.

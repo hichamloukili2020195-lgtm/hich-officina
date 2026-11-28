@@ -825,7 +825,7 @@ const server = http.createServer((q, r) => {
       { t: '25', x: 180, y: 400, w: 40, h: 24, r: 0 }, { t: '20', x: 430, y: 400, w: 40, h: 24, r: 0 }, { t: '15', x: 690, y: 400, w: 40, h: 24, r: 0 }, { t: '60', x: 450, y: 460, w: 40, h: 24, r: 0 },
       { t: '1x45°', x: 80, y: 90, w: 60, h: 22, r: 0 }, { t: 'Materiale: C40', x: 760, y: 470, w: 200, h: 20, r: 0 }, { t: 'Scala 1:1', x: 760, y: 490, w: 120, h: 18, r: 0 }];
     await pg.evaluate(r => { App._androidVero = App.ANDROID; App.ANDROID = { leggiImmagine: dato => { App._letta = dato.slice(0, 22); setTimeout(() => window.__righeLette({ w: 1000, h: 500, righe: r }, null), 20); } }; }, righeD);
-    await pg.evaluate(() => { delete App.mem.dalDisegno; App.salva(); });
+    await pg.evaluate(() => { App.mem.dalDisegno = { vista: 'quote' }; App.salva(); });
     await vai('lavoro'); await pg.click('.lav-passi button[data-passo="0"]'); await pg.waitForTimeout(60);
     await pg.click('#lav-da-foto'); await pg.waitForTimeout(100);
     ok((await pg.evaluate(() => location.hash)) === '#dalDisegno', 'dal lavoro alla foto del disegno');
@@ -854,7 +854,7 @@ const server = http.createServer((q, r) => {
     await pg.click('#lav-avanti'); await pg.waitForTimeout(150);
     ok((await pg.$$eval('.lav-fase', x => x.length)) >= 4, 'lavorazioni dal disegno');
     // nel browser senza lettura: le quote si aggiungono toccando la foto
-    await pg.evaluate(() => { App.ANDROID = null; delete App.mem.dalDisegno; App.salva(); });
+    await pg.evaluate(() => { App.ANDROID = null; App.mem.dalDisegno = { vista: 'quote' }; App.salva(); });
     await vai('dalDisegno');
     await pg.setInputFiles('#f-disegno', { name: 'albero.png', mimeType: 'image/png', buffer: Buffer.from(pngD, 'base64') });
     await pg.waitForTimeout(400);
@@ -872,7 +872,7 @@ const server = http.createServer((q, r) => {
       { t: 'N°2 Fori spina Ø 8 H7 (+0.015', x: 60, y: 560, w: 260, h: 20 }, { t: 'Prof.foro 12', x: 60, y: 582, w: 120, h: 20 }, { t: 'A 180°', x: 60, y: 604, w: 60, h: 20 },
       { t: 'Ø 160', x: 900, y: 450, w: 24, h: 70, r: 90 }, { t: 'Ø 110 - ISO F11', x: 860, y: 430, w: 24, h: 140, r: 90 }, { t: 'Ø 90 - Fori spina', x: 820, y: 430, w: 24, h: 150, r: 90 }, { t: 'Ø 70', x: 780, y: 460, w: 24, h: 60, r: 90 },
       { t: 'Tolleranze (dove non specificato)', x: 500, y: 900, w: 250, h: 18 }, { t: 'Smussi 0.5 x 45°', x: 500, y: 920, w: 150, h: 18 }].map(x => Object.assign({ r: 0 }, x));
-    await pg.evaluate(r => { App.ANDROID = { leggiImmagine: () => setTimeout(() => window.__righeLette({ w: 1000, h: 1000, righe: r }, null), 20) }; delete App.mem.dalDisegno; App.salva(); }, righeF);
+    await pg.evaluate(r => { App.ANDROID = { leggiImmagine: () => setTimeout(() => window.__righeLette({ w: 1000, h: 1000, righe: r }, null), 20) }; App.mem.dalDisegno = { vista: 'quote' }; App.salva(); }, righeF);
     await vai('dalDisegno');
     await pg.setInputFiles('#f-disegno', { name: 'flangia.png', mimeType: 'image/png', buffer: Buffer.from(pngD, 'base64') });
     await pg.waitForTimeout(500);
@@ -1271,6 +1271,61 @@ const server = http.createServer((q, r) => {
   await pg2.click('button.pul:text-is("Simula")'); await pg2.waitForTimeout(200);
   ok((await pg2.$$eval('.dro-riga', x => x.length)) === 3, 'simulazione del programma letto');
   await ctx2.close();
+
+  // ===== 2.49.0: dal disegno, ripassa il profilo sulla foto =====
+  {
+    const c5 = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: false, hasTouch: false });
+    const p5 = await c5.newPage();
+    p5.on('pageerror', e => errori.push('pagina profilo: ' + e.message));
+    await p5.goto(url); await p5.waitForTimeout(200);
+    // disegno finto: albero a gradini (testa a destra), meta sopra e sotto l'asse tratto e punto
+    await p5.evaluate(async () => {
+      const c = document.createElement('canvas'); c.width = 1000; c.height = 600; const g = c.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, 1000, 600); g.strokeStyle = '#000'; g.lineWidth = 3;
+      const lato = s => { g.beginPath(); [[800, 400], [800, 400 - 40 * s], [700, 400 - 40 * s], [700, 400 - 60 * s], [620, 400 - 60 * s], [620, 400 - 80 * s], [560, 400 - 80 * s], [560, 400]].forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); };
+      lato(1); lato(-1);
+      g.lineWidth = 2; g.setLineDash([24, 6, 4, 6]); g.beginPath(); g.moveTo(80, 400); g.lineTo(920, 400); g.stroke();
+      await App.Foto.metti('fprova', c.toDataURL('image/png'));
+      const q = (id, tipo, valore, x, y) => ({ id, tipo, valore, testo: (tipo === 'diametro' ? 'Ø' : '') + valore, x: x / 1000, y: y / 600, w: 0.03, h: 0.03, stato: 'da' });
+      App.mem.dalDisegno = { foto: 'fprova', letta: true, vista: 'profilo', prof: { modo: 'tornio' },
+        quote: [q(1, 'diametro', 20, 750, 330), q(2, 'diametro', 30, 660, 310), q(3, 'diametro', 40, 590, 290), q(4, 'lunghezza', 25, 750, 520), q(5, 'lunghezza', 20, 660, 520), q(6, 'lunghezza', 60, 680, 560), q(7, 'diametro', 330, 60, 60), q(8, 'lunghezza', 509, 100, 580)] };
+      App.salva();
+    });
+    await p5.evaluate(() => { location.hash = 'dalDisegno'; }); await p5.waitForTimeout(500);
+    ok(await p5.isVisible('#dd-vista-profilo.attiva') && await p5.isVisible('.pf-tela'), 'si apre su Ripassa il profilo');
+    ok((await p5.textContent('.pf-passo li.ora')).includes('asse'), 'primo passo: l\'asse');
+    let bb = await p5.$eval('.pf-tela', c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, s: r.width / 1000 }; });
+    const pt = (x, y) => [bb.x + x * bb.s, bb.y + y * bb.s];
+    await p5.mouse.click(...pt(450, 405)); await p5.waitForTimeout(150);
+    const asse = await p5.evaluate(() => App.mem.dalDisegno.prof.asseY);
+    ok(Math.abs(asse - 400) <= 2, 'asse trovato sulla linea tratto e punto: ' + asse);
+    const bb2 = await p5.$eval('.pf-tela', c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, s: r.width / 1000 }; });
+    ok(Math.abs(bb2.y - bb.y) < 1, 'la foto non salta tra un passo e l\'altro: ' + bb.y + ' -> ' + bb2.y);
+    bb = bb2;
+    // il profilo ripassato un po' storto e spostato (non sulla linea): l'app lo raddrizza e lo aggancia
+    const giro = [[803, 363], [704, 366], [697, 344], [622, 343], [618, 324], [557, 322]];
+    await p5.mouse.move(...pt(...giro[0])); await p5.mouse.down();
+    for (let i = 1; i < giro.length; i++) await p5.mouse.move(...pt(...giro[i]), { steps: 18 });
+    await p5.mouse.up(); await p5.waitForTimeout(250);
+    const mis = await p5.$$eval('.pf-mis', x => x.map(e => e.className.split(' ').pop() + ':' + e.textContent));
+    ok(['quota:Ø20', 'quota:Ø30', 'quota:Ø40'].every(m => mis.includes(m)) && !mis.some(m => m.includes('330')), 'misure dalle quote vicine: ' + mis.join(' '));
+    ok(await p5.isVisible('#pf-crea'), 'pulsante per aprire nel disegno del tornio');
+    await p5.click('#pf-annulla'); await p5.waitForTimeout(100);
+    ok(!(await p5.isVisible('#pf-crea')) && (await p5.evaluate(() => App.mem.dalDisegno.prof.tratti.length)) === 0, 'annulla l\'ultimo tratto');
+    // ripassato in due tratti (si stacca il dito a meta)
+    await p5.mouse.move(...pt(...giro[0])); await p5.mouse.down(); for (let i = 1; i <= 3; i++) await p5.mouse.move(...pt(...giro[i]), { steps: 18 }); await p5.mouse.up();
+    await p5.mouse.move(...pt(...giro[3])); await p5.mouse.down(); for (let i = 4; i < giro.length; i++) await p5.mouse.move(...pt(...giro[i]), { steps: 18 }); await p5.mouse.up();
+    await p5.waitForTimeout(250);
+    await p5.click('#pf-crea'); await p5.waitForTimeout(300);
+    ok((await p5.evaluate(() => location.hash)) === '#disegno', 'apre il disegno del tornio');
+    const punti = await p5.evaluate(() => App.mem.disegno.punti.map(p => p.x + ',' + p.z).join(' '));
+    ok(punti === '0,0 20,0 20,-25 30,-25 30,-45 40,-45 40,-60', 'profilo nel disegno del tornio: ' + punti);
+    // la vista delle quote resta: si passa con la scheda
+    await p5.evaluate(() => { location.hash = 'dalDisegno'; }); await p5.waitForTimeout(300);
+    await p5.click('#dd-vista-quote'); await p5.waitForTimeout(150);
+    ok(await p5.isVisible('.dd-lista') && !(await p5.isVisible('.pf-tela')), 'scheda Solo le quote');
+    await c5.close();
+  }
 
   // ===== 2.48.0: lettura da foto: righe da controllare e piu foto di seguito =====
   {

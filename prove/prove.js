@@ -13,6 +13,7 @@ require('../dxf.js');
 require('../qr.js');
 require('../pdf.js');
 require('../lavoro.js');
+require('../profilo_foto.js');
 require('../ciclo.js');
 require('../disegno_foto.js');
 require('../iso.js'); require('../spiega.js'); require('../materiale.js');
@@ -795,6 +796,140 @@ prova('funzioni d\'officina: barra seno, ingranaggi, divisore, dilatazione, pote
   O.MATERIALI.forEach(m => assert.ok(O.kcMateriale(m) >= 400 && O.kcMateriale(m) <= 3500, m.n));
   // tempo
   vicino(O.tempoTaglio(120, 300, 3).minuti, 1.2, 1e-9); assert.strictEqual(O.tempoTaglio(0, 300), null); assert.strictEqual(O.tempoTaglio(10, 300, 0).passate, 1);
+});
+prova('dal disegno 2.49.0: numeri di richiamo, rugosita, tolleranze geometriche, norme, scala e cartiglio non sono quote', () => {
+  // righe lette finte (inventate), come le da il telefono su un disegno con i richiami numerati nei cerchietti
+  const R = (t, x, y, w, h, r) => ({ t, x, y, w: w || 12 * String(t).length, h: h || 18, r: r || 0 });
+  const righe = [
+    R('Ø40', 80, 300, 18, 50, 90), R('2', 60, 250, 16, 16), R('1', 150, 300, 16, 16),
+    R('R0,3 3', 380, 100), R('R19', 500, 110), R('4', 560, 110, 16, 16), R('Ø15', 560, 260, 18, 40, 90), R('6', 560, 300, 16, 16),
+    R('Ø30 31', 1300, 120), R('Ø3+0,1 30', 1100, 90), R('x4', 1100, 115),
+    R('1x45° 13', 690, 450), R('7+0,1 12', 820, 450), R('19+0,1 14', 740, 500), R('76±0,1 17', 520, 540), R('21,9', 380, 70), R('21,9', 600, 505),
+    R('(22) 8+0,1', 230, 495), R('3 (20)', 380, 505),
+    R('1,6/', 250, 225), R('3,2/', 1320, 740), R('0,02 B', 270, 180), R('0,02 B', 770, 175),
+    R('E 0,4x0,2 DIN 509', 1050, 495), R('C(4:1)', 1080, 465), R('A-A (1:1)', 310, 660), R('2:1', 1395, 945), R('2 PLACES', 1330, 420), R('THIS VIEW', 1330, 438),
+    R('Draw', 980, 870), R('Check', 980, 885), R('Date', 1015, 855), R('Initiale', 1065, 855), R('Gewicht', 1295, 805), R('Format', 1370, 805), R('Material', 1040, 945), R('Stainless Steel', 1050, 962),
+    R('5', 425, 180, 16, 16), R('7', 1030, 490, 16, 16), R('8', 890, 172, 16, 16), R('9', 140, 300, 16, 16), R('10', 1010, 315, 18, 16), R('11', 730, 360, 18, 16)
+  ];
+  const Q = O.quoteDaRighe(righe, 1440, 1000);
+  const vive = Q.filter(q => q.stato !== 'no').map(q => q.testo).sort();
+  // niente di questo deve restare come quota
+  ['509', '0.02', '1.6', '3.2', '4', '2', '1'].forEach(v => assert.ok(!vive.includes(v), 'resta come quota: ' + v + ' in ' + vive.join(' | ')));
+  assert.ok(!Q.some(q => /PLACES|VIEW|Draw|Gewicht/i.test(q.riga || '') && q.stato !== 'no'), 'scritte del cartiglio prese come quote');
+  // le quote vere restano, senza il numero del richiamo attaccato
+  ['Ø40', 'Ø15', 'Ø30', 'R0.3', 'R19', '1x45°', '21.9', '76'].forEach(v => assert.ok(vive.some(x => x.startsWith(v)), 'manca ' + v + ': ' + vive.join(' | ')));
+  assert.ok(!vive.some(x => /^(31|30|13|12|14|17|22|20)$/.test(x)), 'numero di richiamo preso come lunghezza: ' + vive.join(' | '));
+  assert.ok(vive.includes('7') && vive.includes('19') && vive.includes('8') && vive.includes('3'), 'lunghezze con il richiamo vicino: ' + vive.join(' | '));
+  // i numeri soli nei cerchietti restano nella lista ma scartati, con il motivo (si possono riprendere)
+  const scartate = Q.filter(q => q.stato === 'no');
+  assert.ok(scartate.length >= 8 && scartate.every(q => q.motivo), 'richiami scartati con il motivo: ' + scartate.map(q => q.testo + ':' + q.motivo).join(' '));
+  // senza richiami (pochi numeri soli) un numero solo resta una quota
+  const pochi = O.quoteDaRighe([R('Ø20', 100, 100), R('25', 200, 150), R('8', 300, 150)], 1000, 500).filter(q => q.stato !== 'no').map(q => q.testo);
+  assert.deepStrictEqual(pochi.sort(), ['25', '8', 'Ø20']);
+});
+// tratto a mano finto: segue una spezzata (pixel) con un tremolio regolare, un punto ogni 3 pixel
+const tratto = (pts, trem) => {
+  const out = []; let k = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], n = Math.max(2, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 3));
+    for (let j = i === 1 ? 0 : 1; j <= n; j++) { const t = j / n; k++; out.push({ x: a.x + (b.x - a.x) * t + (trem || 1.2) * Math.sin(k * 1.7), y: a.y + (b.y - a.y) * t + (trem || 1.2) * Math.cos(k * 2.3) }); }
+  }
+  return out;
+};
+prova('profilo dalla foto: il tratto a mano diventa rette dritte con gli spigoli chiusi', () => {
+  // albero a gradini, 4 pixel per mm, asse a y=400, testa a destra (x=800)
+  const P = [{ x: 800, y: 360 }, { x: 700, y: 361 }, { x: 700, y: 340 }, { x: 620, y: 340 }, { x: 620, y: 320 }, { x: 560, y: 320 }];
+  const m = O.raddrizza(tratto(P, 1.5), { tol: 3 });
+  assert.strictEqual(m.lati.length, 5, 'lati: ' + JSON.stringify(m.lati.map(l => l.dir)));
+  assert.deepStrictEqual(m.lati.map(l => l.dir).join(''), 'hvhvh');
+  // gli spigoli sono veri angoli retti: la verticale ha la stessa x sopra e sotto
+  for (let i = 0; i < m.lati.length; i++) { const a = m.vertici[i], b = m.vertici[i + 1]; if (m.lati[i].dir === 'h') assert.ok(Math.abs(a.y - b.y) < 1e-9); if (m.lati[i].dir === 'v') assert.ok(Math.abs(a.x - b.x) < 1e-9); }
+  assert.ok(Math.abs(m.vertici[1].x - 700) < 2.5 && Math.abs(m.vertici[2].y - 340) < 2.5, 'spigolo al posto giusto: ' + JSON.stringify(m.vertici[1]));
+});
+prova('profilo dalla foto: tornio, scala e misure dalle quote vicine (non dalle altre viste ne dai richiami)', () => {
+  const W = 1000, H = 800, P = [{ x: 800, y: 360 }, { x: 700, y: 361 }, { x: 700, y: 340 }, { x: 620, y: 340 }, { x: 620, y: 320 }, { x: 560, y: 320 }];
+  const m = O.raddrizza(tratto(P, 1.5), { tol: 3 });
+  const q = (id, tipo, valore, x, y, extra) => Object.assign({ id, tipo, valore, testo: String(valore), x: x / W, y: y / H, stato: 'da' }, extra || {});
+  const quote = [q(1, 'diametro', 20, 750, 300), q(2, 'diametro', 30, 660, 290), q(3, 'diametro', 40, 590, 270), q(4, 'lunghezza', 25, 750, 450), q(5, 'lunghezza', 20, 660, 450), q(6, 'lunghezza', 60, 680, 480),
+    q(7, 'lunghezza', 3, 640, 300, { stato: 'no' }), q(8, 'diametro', 330, 100, 100), q(9, 'lunghezza', 509, 120, 700), q(10, 'lunghezza', 12, 900, 470)];
+  const r = O.profiloTornio(m, 400, quote, W, H);
+  assert.ok(!r.errore, r.errore);
+  assert.ok(Math.abs(r.k - 0.25) < 0.01, 'scala: ' + r.k);
+  assert.deepStrictEqual(r.punti.map(p => [p.x, p.z]), [[0, 0], [20, 0], [20, -25], [30, -25], [30, -45], [40, -45], [40, -60]]);
+  assert.ok(!r.usate.includes(8) && !r.usate.includes(9) && !r.usate.includes(7), 'quote di altre viste o scartate usate');
+  assert.ok(r.misure.filter(x => x.fonte === 'quota').length >= 5 && !r.dubbi.length, 'misure dalle quote: ' + JSON.stringify(r.misure) + ' ' + r.dubbi);
+  // tracciato al contrario (dal mandrino verso la testa): stesso pezzo
+  const r2 = O.profiloTornio(O.raddrizza(tratto(P.slice().reverse(), 1.5), { tol: 3 }), 400, quote, W, H);
+  assert.deepStrictEqual(r2.punti.map(p => [p.x, p.z]), r.punti.map(p => [p.x, p.z]));
+  // il profilo va bene per il disegno del tornio
+  const tt = O.trattiTornio(r.punti); assert.ok(!tt.errore && tt.tratti.length >= 5, JSON.stringify(tt.errore));
+  // senza quote vicine la scala non si trova: si chiede
+  const s = O.profiloTornio(m, 400, [], W, H);
+  assert.ok(s.errore && s.serveScala);
+  // con la scala scritta a mano (Ø20 = 80 pixel): misure dalla foto, da controllare
+  const t = O.profiloTornio(m, 400, [], W, H, { k: 0.25 });
+  const atteso = [[0, 0], [20, 0], [20, -25], [30, -25], [30, -45], [40, -45], [40, -60]];
+  assert.strictEqual(t.punti.length, atteso.length);
+  t.punti.forEach((p, i) => assert.ok(Math.abs(p.x - atteso[i][0]) <= 0.5 && Math.abs(p.z - atteso[i][1]) <= 0.5, 'misura dalla foto troppo lontana: ' + JSON.stringify(t.punti)));
+  assert.ok(t.dubbi.length >= 3);
+});
+prova('profilo dalla foto: regge il tremolio del dito (300 tratti, almeno il 90% giusti)', () => {
+  let seme = 1; const rnd = () => { seme = (seme * 16807) % 2147483647; return seme / 2147483647 - 0.5; };
+  const tr = (pts, t) => { const out = []; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], n = Math.max(2, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 3)); for (let j = i === 1 ? 0 : 1; j <= n; j++) { const u = j / n; out.push({ x: a.x + (b.x - a.x) * u + t * rnd() * 2, y: a.y + (b.y - a.y) * u + t * rnd() * 2 }); } } return out; };
+  const W = 1000, H = 800, q = (id, tipo, valore, x, y) => ({ id, tipo, valore, testo: String(valore), x: x / W, y: y / H, stato: 'da' });
+  const quote = [q(1, 'diametro', 20, 750, 300), q(2, 'diametro', 30, 660, 290), q(3, 'diametro', 40, 590, 270), q(4, 'lunghezza', 25, 750, 450), q(5, 'lunghezza', 20, 660, 450), q(6, 'lunghezza', 60, 680, 480)];
+  const P = [{ x: 800, y: 360 }, { x: 700, y: 360 }, { x: 700, y: 340 }, { x: 620, y: 340 }, { x: 620, y: 320 }, { x: 560, y: 320 }];
+  let giusti = 0;
+  [0.5, 1, 1.5, 2, 2.5, 3].forEach(t => { for (let k = 1; k <= 50; k++) { seme = k * 7919; const r = O.profiloTornio(O.raddrizza(tr(P, t), { tol: 3 }), 400, quote, W, H); if (!r.errore && r.punti.map(p => p.x + ',' + p.z).join(' ') === '0,0 20,0 20,-25 30,-25 30,-45 40,-45 40,-60') giusti++; } });
+  assert.ok(giusti >= 270, 'giusti ' + giusti + ' su 300');
+});
+prova('profilo dalla foto: archi riconosciuti, raggio dalla quota, verso giusto nel disegno del tornio', () => {
+  // Ø16 per 10 mm, poi raccordo concavo R10 fino al Ø36, poi Ø36 per 10 mm (5 pixel per mm, asse y=500, testa x=900)
+  const k = 5, ay = 500, hx = 900, pts = [];
+  const at = (z, r) => ({ x: hx + z * k, y: ay - r * k });
+  pts.push(at(0, 8), at(-10, 8));
+  for (let t = 1; t <= 18; t++) { const th = t / 18 * Math.PI / 2; pts.push(at(-10 - 10 * Math.sin(th), 18 - 10 * Math.cos(th))); }
+  pts.push(at(-30, 18));
+  const m = O.raddrizza(tratto(pts, 0.8), { tol: 2.5 });
+  assert.ok(m.lati.some(l => l.tipo === 'arco'), 'arco non riconosciuto: ' + JSON.stringify(m.lati.map(l => l.tipo + l.dir)));
+  const W = 1200, H = 800, q = (id, tipo, valore, x, y) => ({ id, tipo, valore, testo: String(valore), x: x / W, y: y / H, stato: 'ok' });
+  const r = O.profiloTornio(m, ay, [q(1, 'diametro', 16, 870, 430), q(2, 'diametro', 36, 760, 380), q(3, 'raggio', 10, 820, 420), q(4, 'lunghezza', 10, 870, 560), q(5, 'lunghezza', 30, 820, 580)], W, H);
+  assert.ok(!r.errore, r.errore);
+  const arco = r.punti.find(p => p.tratto);
+  assert.ok(arco && arco.r === 10 && arco.x === 36 && arco.z === -20, 'arco: ' + JSON.stringify(r.punti));
+  // il centro dell'arco sta fuori dal materiale (concavo): il punto di mezzo del raccordo e piu vicino all'asse della corda
+  const g = O.trattiTornio(r.punti);
+  const ga = g.tratti.find(e => e.tipo === 'A');
+  assert.ok(ga, 'arco nel disegno del tornio: ' + JSON.stringify(g));
+  const cz = ga.c.a, cr = ga.c.b;
+  assert.ok(Math.abs(cz - -10) < 0.6 && Math.abs(cr - 18) < 0.6, 'centro dell\'arco (z -10, raggio 18): ' + JSON.stringify(ga));
+});
+prova('profilo dalla foto: aggancio ai bordi veri del disegno e asse sulla linea tratto punto', () => {
+  // linee nere del disegno a y=200 (orizzontale) e x=300 (verticale); asse tratteggiato a y=400
+  const scuro = (x, y) => (Math.abs(y - 200) < 1 && x >= 300 && x <= 500) || (Math.abs(x - 300) < 1 && y >= 200 && y <= 300) ? 1 : Math.abs(y - 400) < 1 && Math.floor(x / 10) % 3 !== 2 ? 1 : 0;
+  const m = O.raddrizza(tratto([{ x: 495, y: 204 }, { x: 304, y: 204 }, { x: 304, y: 298 }], 0.6), { tol: 2.5 });
+  const a = O.agganciaBordi(m, scuro, 6);
+  assert.ok(Math.abs(a.vertici[1].y - 200) < 1.01 && Math.abs(a.vertici[1].x - 300) < 1.01, 'agganciato: ' + JSON.stringify(a.vertici));
+  // niente linea vicina: resta dove l'hai messo
+  const lontano = O.agganciaBordi(O.raddrizza(tratto([{ x: 495, y: 250 }, { x: 350, y: 250 }], 0.6), { tol: 2.5 }), scuro, 6);
+  assert.ok(Math.abs(lontano.vertici[0].y - 250) < 2);
+  assert.strictEqual(O.trovaAsse(406, scuro, 100, 700, 10), 400);
+});
+prova('profilo dalla foto: fresa, contorno chiuso con angolo raggiato', () => {
+  // piastra 80 x 50 (3 pixel per mm), angolo in alto a destra R10; origine in basso a sinistra (x=100, y=400)
+  const k = 3, at = (x, y) => ({ x: 100 + x * k, y: 400 - y * k });
+  const pts = [at(0, 0), at(80, 0), at(80, 40)];
+  for (let t = 1; t <= 14; t++) { const th = t / 14 * Math.PI / 2; pts.push(at(70 + 10 * Math.cos(th), 40 + 10 * Math.sin(th))); }
+  pts.push(at(0, 50), at(0, 1));
+  const m = O.raddrizza(tratto(pts, 0.7), { tol: 2.5 });
+  const W = 800, H = 600, q = (id, tipo, valore, x, y) => ({ id, tipo, valore, testo: String(valore), x: x / W, y: y / H, stato: 'ok' });
+  const r = O.profiloFresa(m, [q(1, 'lunghezza', 80, 220, 430), q(2, 'lunghezza', 50, 60, 320), q(3, 'raggio', 10, 360, 230), q(4, 'lunghezza', 70, 200, 450)], W, H);
+  assert.ok(!r.errore, r.errore);
+  const xy = r.punti.map(p => p.x + ',' + p.y);
+  ['0,0', '80,0', '80,40', '70,50', '0,50'].forEach(v => assert.ok(xy.includes(v), 'manca il vertice ' + v + ': ' + xy.join(' ')));
+  const arco = r.punti.find(p => p.tratto);
+  assert.ok(arco && arco.r === 10 && arco.tratto === 'ccw' && arco.x === 70 && arco.y === 50, 'arco: ' + JSON.stringify(arco));
+  assert.strictEqual(r.punti.length, 5);
 });
 prova('dal disegno al pezzo: quote con la posizione, tornio e fresa', () => {
   const mt = O.MATERIALI.find(m => m.n === 'C40');

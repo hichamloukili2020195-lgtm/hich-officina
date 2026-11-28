@@ -754,3 +754,19 @@ body.cad-pieno #schermo.pieno.con-foglio .barra-vista{bottom:calc(58vh + 8px)}
 .foto-riga.dubbia .foto-prima small{color:var(--avviso);font-weight:600}
 .foto-riga.ok{opacity:.6}
 .foto-prima mark{background:color-mix(in srgb,var(--avviso) 35%,transparent);color:var(--testo);border-radius:3px;padding:0 1px;font-weight:700}
+/* 2.49.0: ripassa il profilo sulla foto del disegno */
+.dd-schede{margin:10px 0}
+.pf-passo{display:flex;gap:6px;list-style:none;padding:0;margin:4px 0 6px;counter-reset:pf}
+.pf-passo li{flex:1;counter-increment:pf;font-size:13px;color:var(--tenue);border-top:4px solid var(--bordo);padding-top:6px}
+.pf-passo li::before{content:counter(pf) ". "}
+.pf-passo li.ora{color:var(--testo);font-weight:700;border-color:var(--accento)}
+.pf-passo li.fatto{border-color:var(--ok)}
+.pf-aiuto{margin:0 0 8px;color:var(--tenue);font-size:14px}
+.pf-barra{flex-wrap:wrap;margin:8px 0}
+.pf-misure{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.pf-mis{font-family:var(--mono);font-weight:700;padding:6px 10px;border-radius:99px;border:1px solid var(--bordo)}
+.pf-mis.quota{border-color:var(--ok);color:var(--ok)}
+.pf-mis.foto{border-color:var(--avviso);color:var(--avviso)}
+body.cad-pieno #schermo.pieno .dd-profilo .pf-tela{max-height:calc(100vh - 140px)}
+.pf-tela{display:block;width:100%;height:160px;cursor:crosshair;touch-action:none}
+
