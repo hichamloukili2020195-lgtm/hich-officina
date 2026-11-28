@@ -801,50 +801,90 @@
   }
 
   /**
-   * Pulizia del testo letto da una foto: lettere maiuscole, O e I lette al posto di 0 e 1 dentro i numeri,
-   * virgole al posto dei punti, spazi dentro i numeri, numeri di riga dello schermo, righe che non sono programma.
-   * Ritorna {testo, cambiate, tolte}.
+   * Pulizia del testo letto da una foto. Regola di fondo: in un programma ISO una lettera e un indirizzo solo se ha un
+   * valore subito dopo. Se una lettera "che somiglia a una cifra" (O I L S B Z D Q) segue un indirizzo ancora senza valore
+   * (YI2, XS0, Z-O.5, GO1) o chiude un numero senza valore (X1.234S, G0I), e una cifra letta male; O dopo una cifra e sempre 0.
+   * Poi: maiuscole, trattini lunghi e ~ letti al posto del meno, virgole al posto dei punti, spazi dentro i numeri, simboli
+   * sporchi, numeri di riga dello schermo, righe che non sono programma. I commenti non si toccano. Le righe con parole
+   * intere (macro, altri linguaggi, scritte dei menu) hanno solo le correzioni sicure.
+   * Ritorna {testo, cambiate, tolte, numeri, righe: [{riga, prima, dopo, dubbia}]} (righe = quelle cambiate, da controllare).
    */
+  const CIFRA_DA_LETTERA = { O: '0', D: '0', Q: '0', I: '1', L: '1', S: '5', B: '8', Z: '2' };
+  const PAROLE_LETTURA = /\b(TOOL|CALL|CYCL|DEF|BEGIN|END\d*|PGM|LBL|FMAX|MCALL|CYCLE\d*|BLK|FORM|IF|GOTO\d*|WHILE|DO\d*|THEN|EQ|NE|GT|LT|GE|LE|AND|OR|XOR|MOD|SIN|COS|TAN|ATAN|SQRT|ABS|ROUND|FIX|FUP)\b|[A-Z]{4,}|[#[\]=]/;
+  function cifreDaLettere(q) {
+    let out = '';
+    for (let i = 0; i < q.length; i++) {
+      const c = q[i];
+      if (CIFRA_DA_LETTERA[c] !== undefined) {
+        const pr = out[out.length - 1] || ' ', pr2 = out[out.length - 2] || ' ', nx = q[i + 1] || ' ';
+        const indirizzoVuoto = /[A-Z]/.test(pr) || (/[-+]/.test(pr) && /[A-Z]/.test(pr2));
+        if (indirizzoVuoto) { out += CIFRA_DA_LETTERA[c]; continue; }
+        if (/[\d.]/.test(pr)) {
+          if (c === 'O') { out += '0'; continue; }
+          if (!/[-+\d.#[]/.test(nx)) { out += CIFRA_DA_LETTERA[c]; continue; }   // nessun valore dopo: non e un indirizzo
+        }
+      }
+      out += c;
+    }
+    return out;
+  }
   function pulisciLettura(testo) {
-    let cambiate = 0, tolte = 0, numeri = 0;
-    const out = [];
+    let tolte = 0, numeri = 0;
+    const out = [], righe = [];
     String(testo || '').replace(/\r/g, '').split('\n').forEach(riga => {
       let r = riga.replace(/[‘’´`]/g, "'").replace(/[“”]/g, '"').replace(/\t/g, ' ').trim();
       if (!r) return;
       const prima = r;
+      let dubbia = false;
+      // numero di programma con lo zero al posto della O: 0I234 (PEZZO) -> O1234 (PEZZO)
+      r = r.replace(/^0([\dOIl|]{3,4})(?=\s*\(|\s*$)/, (m0, n) => 'O' + n.replace(/O/g, '0').replace(/[Il|]/g, '1'));
       // commenti a parte: non si toccano
       const pezzi = r.split(/(\([^)]*\)?)/);
+      const speciale = pezzi.some(p => !p.startsWith('(') && PAROLE_LETTURA.test(p.toUpperCase()));
       r = pezzi.map(p => {
         if (p.startsWith('(')) return p.toUpperCase();
-        let q = p.toUpperCase();
-        q = q.replace(/(\d)\s*[,]\s*(\d)/g, '$1.$2');                   // 10,5 -> 10.5
+        // l minuscola e | lette al posto di 1, vicino a cifre o a lettere maiuscole
+        let q = p.replace(/[l|](?=[\dOIl|.]|$|\s)|(?<=[\dA-Z])[l|]/g, '1').toUpperCase();
+        q = q.replace(/[—–−~](?=\s*[\d.OSB])/g, '-');                    // trattino lungo o ~ al posto del meno
+        // simboli che in un programma non ci sono (il punto e virgola resta: e un commento)
+        q = q.replace(/[^A-Z0-9 .,+\-#[\]=*/<>%:;$&!?_]/g, (m0, k, tutto) => { if (/[A-Z0-9]/.test(tutto[k - 1] || '') && /[A-Z0-9.]/.test(tutto[k + 1] || '')) dubbia = true; return ''; });
+        if (!speciale) q = q.replace(/(\d)\s*[,]\s*(\d)/g, '$1.$2');    // 10,5 -> 10.5 (non nei cicli con le virgole)
+        if (speciale) return q;                                          // macro e altri linguaggi: gli spazi contano
         q = q.replace(/([A-Z#])\s+(?=[-+]?[\d.#[])/g, '$1');              // X 10 -> X10
-        q = q.replace(/([-+\d.])\s+(?=[\d.])/g, (m0, a) => a);             // 10 .5 -> 10.5
-        // lettere lette al posto delle cifre, dentro un numero
-        q = q.replace(/[\d.][\dOLI|.]*/g, m0 => m0.replace(/O/g, '0').replace(/[LI|]/g, '1'));   // 1O.5 -> 10.5, 2OO -> 200
-        q = q.replace(/([GM])O(?=[\dO])/g, '$10').replace(/([GM])O(?=[\dO])/g, '$10');            // GO1 -> G01
-        let s2 = '';
-        const mappa = { S: '5', B: '8', Z: '2', D: '0', Q: '0' };
-        for (let i = 0; i < q.length; i++) {
-          const c = q[i], pr = s2[s2.length - 1] || '', nx = q[i + 1] || '';
-          if (mappa[c] && /[-+\d.]/.test(pr) && /[\d.]/.test(nx) && !/[A-Z]/.test(pr)) { s2 += mappa[c]; continue; }   // Z-S.0 -> Z-5.0
-          s2 += c;
-        }
-        return s2;
-      }).join('');
+        q = q.replace(/([A-Z])([-+])\s+(?=[\d.])/g, '$1$2');               // Y- 5 -> Y-5
+        q = q.replace(/([-+\d.])\s+(?=[\d.])/g, (m0, a) => a);             // 10 .5 -> 10.5, 1 0 -> 10
+        q = cifreDaLettere(q);
+        return q;
+      }).join('').replace(/\s+/g, ' ').trim();
       // numero di riga dello schermo davanti (non la N del programma): si toglie, non conta come correzione
-      const senzaNumero = r.replace(/^\d{1,5}\s+(?=[A-Z%(#:])/, '');
-      const primaN = prima.toUpperCase().replace(/^\d{1,5}\s+(?=[A-Z%(#:])/, '');
+      const senzaNumero = r.replace(/^\d{1,5}\s+(?=[A-Z%(#:;])/, '');
+      const primaN = prima.toUpperCase().replace(/^\d{1,5}\s+(?=[A-Z%(#:;])/, '');
       if (senzaNumero !== r) numeri++;
       r = senzaNumero;
-      if (!/^(%|[O:]\d+|\(|;)/.test(r) && !/[GMXYZUWFSTNIJKRPQ#]-?[\d.#[]/.test(r) && !/^(IF|WHILE|END|GOTO|DO)/.test(r)) { tolte++; return; }
-      if (r !== primaN && r.replace(/\s+/g, '') !== primaN.replace(/\s+/g, '').replace(/,/g, '.')) cambiate++;
+      if (!/^(%|[O:]\d+|\(|;)/.test(r) && !/[GMXYZUWFSTNIJKRPQ#]-?[\d.#[]/.test(r) && !/^(IF|WHILE|END|GOTO|DO|L |TOOL|CYCL|BEGIN|BLK|MCALL|CYCLE)/.test(r)) { tolte++; return; }
+      if (r.replace(/\s+/g, '') !== primaN.replace(/\s+/g, '')) righe.push({ riga: out.length, prima, dopo: r, dubbia });
       out.push(r);
     });
-    return { testo: out.join('\n'), cambiate, tolte, numeri };
+    return { testo: out.join('\n'), cambiate: righe.length, tolte, numeri, righe };
   }
 
-  const Iso = { centroFresa, controllaIngombri, eseguiISO: esegui, controllaISO: controlla, pulisciLettura, indovinaModo, pulisciRiga: pulisci };
+  /**
+   * Due letture di seguito (programma lungo, piu foto): le righe ripetute tra la fine della prima e l'inizio della seconda
+   * si tengono una volta sola. Una sola riga in comune conta solo se e lunga (una riga corta come G0 Z50 si ripete per caso).
+   */
+  function uniscLetture(a, b) {
+    const A = String(a || '').split('\n').filter(x => x.trim()), B = String(b || '').split('\n').filter(x => x.trim());
+    const nor = x => x.replace(/\s+/g, '');
+    let k = Math.min(A.length, B.length);
+    for (; k > 0; k--) {
+      let uguali = true;
+      for (let i = 0; i < k && uguali; i++) uguali = nor(A[A.length - k + i]) === nor(B[i]);
+      if (uguali && (k >= 2 || nor(B[0]).length >= 8)) break;
+    }
+    return { testo: A.concat(B.slice(k)).join('\n'), ripetute: k };
+  }
+
+  const Iso = { centroFresa, controllaIngombri, eseguiISO: esegui, controllaISO: controlla, pulisciLettura, uniscLetture, indovinaModo, pulisciRiga: pulisci };
   Object.assign(O, Iso);
   if (typeof module !== 'undefined' && module.exports) module.exports = O;
 })(typeof self !== 'undefined' ? self : this);

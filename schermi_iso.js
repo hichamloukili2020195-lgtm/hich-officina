@@ -136,18 +136,69 @@
       const v = A.sezione('apri');
       const pan = el('div', { class: 'pannello' }), esito = el('div');
       const notaFoto = el('div');
-      const foto = el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Leggi da una foto', onclick: () => {
+      // lettura da foto: le righe corrette da controllare e il seguito con un'altra foto (programmi lunghi)
+      let lettura = null;   // { letto: testo come letto (per trovare le righe ripetute), righe: [{prima, dopo, dubbia, stato}], ripetute }
+      const righeProgramma = () => String(v.testo || '').split('\n');
+      // il testo letto con evidenziati i caratteri che la correzione ha cambiato (la O e lo 0 si somigliano: si deve vedere)
+      const segnaCambiati = (letto, corretto) => {
+        const a = letto.replace(/^\d{1,5}\s+(?=[A-Za-z%(#:;])/, ''), A2 = a.toUpperCase(), B = corretto.toUpperCase();
+        const n = A2.length, m = B.length, L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+        for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A2[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+        let i = 0, j = 0, out = '';
+        while (i < n) {
+          if (j < m && A2[i] === B[j]) { out += esc(a[i]); i++; j++; }
+          else if (j < m && L[i][j + 1] >= L[i + 1][j]) j++;
+          else { out += /\s/.test(a[i]) ? a[i] : '<mark>' + esc(a[i]) + '</mark>'; i++; }
+        }
+        return out;
+      };
+      const mostraLettura = () => {
+        notaFoto.innerHTML = '';
+        if (!lettura) return;
+        const R = lettura.righe, resta = R.filter(x => !x.stato).length;
+        notaFoto.appendChild(A.info('<b>Letto dalla foto: ' + righeProgramma().filter(x => x.trim()).length + ' righe</b>' + (lettura.tolte ? ', ' + lettura.tolte + ' tolte (non erano programma)' : '') +
+          (lettura.ripetute ? ', ' + lettura.ripetute + ' righe ripetute tra una foto e l\'altra tenute una volta sola' : '') + '. Confronta il testo con lo schermo prima di fidarti: una cifra letta male cambia la quota.', 'avviso'));
+        const box = el('div', { class: 'pannello foto-controllo' }, [el('div', { class: 'sez', style: 'margin:4px 0 8px', testo: (R.length ? 'Righe corrette: ' + resta + ' da controllare' : 'Nessuna riga corretta') + (lettura.ripetute ? ' · ' + lettura.ripetute + ' righe ripetute tolte' : '') })]);
+        R.forEach(x => {
+          const ing = el('input', { type: 'text', value: x.dopo, spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Riga corretta' });
+          const cambia = nuovo => {
+            const L = righeProgramma(); let i = L.indexOf(x.dopo);
+            if (i < 0) return;
+            L[i] = nuovo; x.dopo = nuovo; f.metti('testo', L.join('\n'));
+          };
+          ing.addEventListener('change', () => { const t = ing.value.trim().toUpperCase(); if (!t || t === x.dopo) return; cambia(t); x.stato = 'ok'; mostraLettura(); analizza(); });
+          const si = el('button', { class: 'dd-si' + (x.stato ? ' on' : ''), 'aria-label': 'La riga e giusta', 'aria-pressed': x.stato ? 'true' : 'false', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>', onclick: () => { x.stato = x.stato ? null : 'ok'; mostraLettura(); } });
+          box.appendChild(el('div', { class: 'foto-riga' + (x.stato ? ' ok' : '') + (x.dubbia ? ' dubbia' : '') }, [
+            el('div', { class: 'foto-prima' }, [el('small', { html: (x.dubbia ? 'Dubbia, letto: ' : 'Letto: ') + segnaCambiati(x.prima, x.dopo) })]),
+            el('div', { class: 'foto-dopo' }, [el('div', { class: 'ctrl' }, [ing]), si])]));
+        });
+        notaFoto.appendChild(box);
+        notaFoto.appendChild(el('div', { class: 'pulsanti' }, [el('button', { class: 'pul sec', id: 'foto-agg', html: A.icona('fotocamera') + 'Aggiungi un\'altra foto (il seguito)', onclick: () => leggi(true) })]));
+      };
+      const leggi = seguito => {
         if (!A.ANDROID || !A.ANDROID.leggiFoto) { A.avviso('La lettura delle foto funziona nell\'app Android (APK). Qui incolla il testo o scegli un file.'); return; }
         window.__fotoLetta = (testo, errore) => {
           if (errore || !testo) { A.avviso(errore || 'Nella foto non ho trovato testo'); return; }
           const p = O.pulisciLettura(testo);
-          f.metti('modo', 'auto'); f.metti('testo', p.testo);
-          notaFoto.innerHTML = '';
-          notaFoto.appendChild(A.info('<b>Letto dalla foto: ' + p.testo.split('\n').length + ' righe</b>' + (p.cambiate ? ', ' + p.cambiate + ' corrette (lettere lette al posto delle cifre)' : '') + (p.tolte ? ', ' + p.tolte + ' tolte (non erano programma)' : '') + '. Confronta il testo con lo schermo prima di fidarti: una cifra letta male cambia la quota.', 'avviso'));
+          const nuove = p.righe.map(x => ({ prima: x.prima, dopo: x.dopo, dubbia: x.dubbia, stato: null, riga: x.riga }));
+          if (seguito && lettura) {
+            // le righe ripetute si cercano nel testo come era stato letto, cosi le correzioni fatte a mano non contano
+            const u = O.uniscLetture(lettura.letto, p.testo);
+            const resto = p.testo.split('\n').slice(u.ripetute);
+            const prima = righeProgramma().filter(x => x.trim());
+            f.metti('testo', prima.concat(resto).join('\n'));
+            lettura.letto = u.testo; lettura.ripetute += u.ripetute; lettura.tolte += p.tolte;
+            lettura.righe = lettura.righe.concat(nuove.filter(x => x.riga >= u.ripetute));
+          } else {
+            f.metti('modo', 'auto'); f.metti('testo', p.testo);
+            lettura = { letto: p.testo, righe: nuove, ripetute: 0, tolte: p.tolte };
+          }
+          mostraLettura();
           analizza();
         };
         A.ANDROID.leggiFoto();
-      } });
+      };
+      const foto = el('button', { class: 'pul', html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Leggi da una foto', onclick: () => leggi(false) });
       m.append(el('div', { class: 'pulsanti' }, [foto, el('button', { class: 'pul sec', html: A.icona('salvati') + 'Scegli un file', onclick: () => A.scegliTesto(t => { f.metti('testo', t); analizza(); }) })]), notaFoto, pan,
         el('div', { class: 'pulsanti' }, [el('button', { class: 'pul', html: A.icona('codice') + 'Controlla e simula', onclick: () => analizza() })]), esito);
       const f = A.modulo(pan, [{ id: 'modo', et: 'Macchina', tipo: 'scelta', scelte: [['auto', 'La riconosce da sola'], ['fresa', 'Fresa'], ['tornio', 'Tornio']] },

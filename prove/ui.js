@@ -1272,6 +1272,40 @@ const server = http.createServer((q, r) => {
   ok((await pg2.$$eval('.dro-riga', x => x.length)) === 3, 'simulazione del programma letto');
   await ctx2.close();
 
+  // ===== 2.48.0: lettura da foto: righe da controllare e piu foto di seguito =====
+  {
+    const c4 = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await c4.addInitScript(() => {
+      const foto = ['1 %\n2 O0007 (PROVA)\n3 G21 G17 G9O\n4 T1 M6\n5 S2OOO M3\n6 G0 X1O Y1O Z5\n7 G1 Z-2 F15O',
+        '6 G0 X1O Y1O Z5\n7 G1 Z-2 F15O\n8 G1 X5O\n9 G1 Y3@0\n10 G0 Z5\n11 M30'];
+      window.Android = { leggiFoto() { const t = foto.shift(); setTimeout(() => window.__fotoLetta(t, null), 20); } };
+    });
+    const p4 = await c4.newPage();
+    p4.on('pageerror', e => errori.push('pagina foto: ' + e.message));
+    await p4.goto(url + '#apri'); await p4.waitForTimeout(150);
+    await p4.click('text=Leggi da una foto'); await p4.waitForTimeout(250);
+    ok((await p4.$$eval('.foto-riga', x => x.length)) === 4, 'righe corrette da controllare: ' + (await p4.$$eval('.foto-riga', x => x.map(e => e.textContent))));
+    ok((await p4.textContent('.foto-riga >> nth=0')).includes('G9O') && (await p4.inputValue('.foto-riga >> nth=0 >> input')) === 'G21 G17 G90', 'prima e dopo nella riga da controllare');
+    ok(await p4.isVisible('#foto-agg'), 'pulsante per la foto dopo');
+    ok((await p4.$eval('.foto-riga .foto-prima', e => [...e.querySelectorAll('mark')].map(x => x.textContent).join(''))) === 'O', 'carattere corretto evidenziato');
+    ok(!/Letto: 3 /.test(await p4.textContent('.foto-riga >> nth=0')), 'il numero di riga dello schermo non si mostra');
+    // conferma della prima riga: diventa verde e il conto scende
+    await p4.click('.foto-riga >> nth=0 >> .dd-si'); await p4.waitForTimeout(60);
+    ok((await p4.$$eval('.foto-riga.ok', x => x.length)) === 1, 'riga confermata');
+    ok(/3 da controllare/.test(await p4.textContent('.foto-controllo')), 'conto delle righe da controllare: ' + await p4.textContent('.foto-controllo'));
+    // correzione a mano di una riga: cambia anche il programma
+    const ing = p4.locator('.foto-riga >> nth=3 >> input');
+    await ing.fill('G1 Z-2 F120'); await ing.dispatchEvent('change'); await p4.waitForTimeout(80);
+    ok((await p4.inputValue('#f-testo')).includes('G1 Z-2 F120') && !(await p4.inputValue('#f-testo')).includes('F150'), 'correzione a mano nel programma');
+    // seconda foto: si accoda il seguito senza ripetere le righe in comune
+    await p4.click('#foto-agg'); await p4.waitForTimeout(250);
+    const tutto = await p4.inputValue('#f-testo');
+    ok(tutto.split('\n').filter(x => x === 'G0 X10 Y10 Z5').length === 1 && tutto.endsWith('M30') && tutto.includes('G1 X50'), 'seconda foto accodata: ' + JSON.stringify(tutto));
+    ok(/2 righe ripetute/.test(await p4.textContent('.foto-controllo')), 'righe ripetute dette: ' + await p4.textContent('.foto-controllo'));
+    ok((await p4.$$eval('.foto-riga.dubbia', x => x.map(e => e.textContent))).some(t => t.includes('Y3@0')), 'riga dubbia evidenziata');
+    await c4.close();
+  }
+
   // ===== 2.30.0: cosa fa il programma, correzioni con un tocco, commento della simulazione =====
   await vai('apri'); await pg.waitForTimeout(80);
   await pg.fill('#f-testo', ['%', 'O0005 (PROVA)', 'G21 G90 G17', '(PUNTA 8.5)', 'T1 M6', 'S1200 M3', 'G0 X10 Y10', 'G43 H1 Z50', 'G83 X10 Y10 Z-20 R2 Q4 F150', 'X40', 'G80', 'G0 Z100', 'T2', 'G0 X0 Y0 (nota', 'M5', '%'].join('\n'));

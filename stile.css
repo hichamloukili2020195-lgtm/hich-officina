@@ -744,3 +744,13 @@ body.cad-pieno #schermo.pieno.con-foglio .barra-vista{bottom:calc(58vh + 8px)}
 .rapido-apri{min-height:44px}
 .tipo-linea span{max-width:100%;font-size:11px;letter-spacing:-.2px;overflow-wrap:anywhere;text-align:center}
 .barra-vista{flex-wrap:wrap}
+/* 2.48.0: lettura da foto, righe corrette da controllare */
+.foto-riga{border-top:1px solid var(--bordo);padding:8px 0}
+.foto-riga:first-of-type{border-top:0}
+.foto-prima small{color:var(--tenue);font-family:var(--mono);overflow-wrap:anywhere}
+.foto-dopo{display:flex;gap:8px;align-items:center;margin-top:4px}
+.foto-dopo .ctrl{flex:1 1 auto;min-width:0}
+.foto-dopo input{font-family:var(--mono)}
+.foto-riga.dubbia .foto-prima small{color:var(--avviso);font-weight:600}
+.foto-riga.ok{opacity:.6}
+.foto-prima mark{background:color-mix(in srgb,var(--avviso) 35%,transparent);color:var(--testo);border-radius:3px;padding:0 1px;font-weight:700}

@@ -410,6 +410,67 @@ prova('lettura da foto: pulizia del testo', () => {
   const g = O.gcodeFresa('tasca', { n: 3000, f: 600, t: 3, zSic: 50, zR: 2, cx: 40, cy: 25, lx: 40, ly: 20, prof: 6, ap: 3, d: 10 });
   assert.strictEqual(O.pulisciLettura(g.righe.join('\n')).testo, g.righe.join('\n'));
 });
+prova('lettura da foto 2.48.0: errori tipici della foto corretti, programma giusto mai toccato', () => {
+  const casi = [
+    ['GO0 X1O.5 YI2', 'G00 X10.5 Y12'], ['G01 Z—5. F2O0', 'G01 Z-5. F200'], ['G01 Z–5.0', 'G01 Z-5.0'], ['G01 X~10', 'G01 X-10'],
+    ['M3O', 'M30'], ['T0lOl', 'T0101'], ['G0 X 10 Y- 5', 'G0 X10 Y-5'], ['G1 X10,5 Y2,25', 'G1 X10.5 Y2.25'], ['S12OO M03', 'S1200 M03'],
+    ['G43 HI Z5O', 'G43 H1 Z50'], ['G83 X0 Y0 Z-2O R2 Q3 F1OO', 'G83 X0 Y0 Z-20 R2 Q3 F100'], ['GOl X5', 'G01 X5'], ['G0I X5', 'G01 X5'],
+    ['G4l', 'G41'], ['g0 x10 y20', 'G0 X10 Y20'], ['G1 X1O.O', 'G1 X10.0'], ['G1 Z-O.5', 'G1 Z-0.5'], ['G1 X10. 5', 'G1 X10.5'],
+    ['0I234 (PROVA)', 'O1234 (PROVA)'], ['G96 S18O', 'G96 S180'], ['G1 XS0', 'G1 X50'], ['G1 X8O Z-B', 'G1 X80 Z-8'],
+    ['12 G1 X10', 'G1 X10'], ['G1 X10 Y20 »', 'G1 X10 Y20'], ['G1 X10° Y2', 'G1 X10 Y2'], ['M98 P1OOO', 'M98 P1000'],
+    ['G1 X10 YI0.5', 'G1 X10 Y10.5'], ['G1 X 1 0 . 5', 'G1 X10.5'], ['N1O G0 X5', 'N10 G0 X5'], ['G01 Z-5 F2O0 M8', 'G01 Z-5 F200 M8'],
+    ['G0 X10 Y 2O', 'G0 X10 Y20'], ['G1 X1.234S', 'G1 X1.2345'], ['G1 Z-.5', 'G1 Z-.5'], ['(FRESA D1O)', '(FRESA D1O)']
+  ];
+  casi.forEach(([dentro, atteso]) => assert.strictEqual(O.pulisciLettura(dentro).testo, atteso, JSON.stringify(dentro)));
+  // un programma giusto resta identico (lettere attaccate, macro, cicli del tornio, numeri di programma)
+  const giusti = ['G0 X10Y20Z5', 'G1X10Y20Z-5F200', 'O1234 (PROVA)', '%', '#1=10', 'G0 X#1', 'IF[#1GT10]GOTO5', 'WHILE[#2LT5]DO1', 'END1',
+    'G28 U0. W0.', 'G71 U2. R0.5', 'G71 P10 Q20 U0.4 W0.1 F0.25', 'G76 P020060 Q100 R0.05', 'G1 X10 F.2', 'T0101', 'G96 S180 M3', 'G50 S2500',
+    'G02 X10 Y10 I5 J0', 'G03 X0 Y0 R5.', 'N10 G90 G54', 'M98 P1000 L2', 'G65 P9000 A10 B20', 'G83 X0 Y0 Z-20 R2 Q3 F100', 'G1 Z-.5', 'M30', 'G4 X0.5', 'G10 L2 P1 X0 Y0 Z0'];
+  giusti.forEach(r => assert.strictEqual(O.pulisciLettura(r).testo, r, 'cambiata una riga giusta: ' + r));
+  const progr = [];
+  ['tasca', 'contorno', 'spianatura'].forEach(op => { try { progr.push(O.gcodeFresa(op, { n: 3000, f: 600, t: 3, zSic: 50, zR: 2, cx: 40, cy: 25, lx: 40, ly: 20, prof: 6, ap: 3, d: 10, r: 15 }).righe); } catch (e) { /* operazione non prevista */ } });
+  const baseT = { mat: O.MATERIALI.find(m => m.n === 'C40'), n: 1500, vc: 180, f: 0.2, nmax: 3000, t: 1 };
+  [['sgrossatura', { dg: 40, df: 30, l: 50, ap: 2, finitura: true, smusso: 1 }], ['filetto', { dg: 20, d: 20, p: 2.5, l: 30, n: 6, giri: 600, metodo: 'ciclo' }], ['troncatura', { dg: 40, zt: -30, w: 3 }]]
+    .forEach(([op, x]) => { try { progr.push(O.gcodeTornio(op, Object.assign({}, baseT, x)).righe); } catch (e) { /* */ } });
+  assert.ok(progr.length >= 4, 'programmi di prova: ' + progr.length);
+  progr.forEach(r => { const t = r.filter(x => x.trim()).join('\n'); assert.strictEqual(O.pulisciLettura(t).testo, t); });
+  // anche tradotti nei linguaggi delle altre macchine (cicli, dialoghi, parole intere): identici
+  let tradotti = 0;
+  Object.keys(O.LINGUAGGI).filter(l => l !== 'iso' && l !== 'personalizzato').forEach(ling => progr.slice(0, 3).forEach(r => {
+    const tr = O.postProcessor(r, { linguaggio: ling, modo: 'fresa', nome: 'prova' });
+    if (tr.errore) return;
+    const t = tr.righe.filter(x => x.trim()).join('\n');
+    const p = O.pulisciLettura(t);
+    p.righe.forEach(x => assert.fail(ling + ': cambiata ' + JSON.stringify(x.prima) + ' -> ' + JSON.stringify(x.dopo)));
+    // i numeri di blocco davanti (dialogo) si tolgono come i numeri di riga dello schermo; i commenti con ; restano
+    const norm = x => x.split('\n').map(y => y.replace(/\s+/g, ' ').trim().replace(/^\d{1,5} (?=[A-Z%(#:;])/, '')).join('\n');
+    assert.strictEqual(p.testo, norm(t), ling);
+    tradotti++;
+  }));
+  assert.ok(tradotti >= 3, 'programmi tradotti provati: ' + tradotti);
+  ['G2X10Y10I5J0', 'TOOL CALL 1 Z S3000', 'L X+10 Y+20 R0 FMAX', 'MCALL CYCLE81(50,0,2,-10)', 'BLK FORM 0.1 Z X+0 Y+0 Z-20', 'Q200=2']
+    .forEach(r => assert.strictEqual(O.pulisciLettura(r).testo, r, 'cambiata una riga giusta: ' + r));
+  // le righe cambiate sono elencate, con il prima e il dopo
+  const q = O.pulisciLettura('G0 X0 Y0\nG01 Z—5. F2O0\nG1 X10');
+  assert.strictEqual(q.righe.length, 1);
+  assert.deepStrictEqual([q.righe[0].riga, q.righe[0].prima, q.righe[0].dopo], [1, 'G01 Z—5. F2O0', 'G01 Z-5. F200']);
+  // dubbia: dopo la pulizia restano caratteri che un programma non ha
+  const d = O.pulisciLettura('G1 X10 Y2@0\nG1 X5');
+  assert.ok(d.righe.some(x => x.riga === 0 && x.dubbia), 'riga con un carattere strano non segnalata');
+});
+prova('lettura da foto 2.48.0: piu foto di seguito, le righe ripetute tra una foto e l\'altra si tolgono', () => {
+  const a = 'O0001\nG0 X0 Y0\nG1 Z-2 F100\nG1 X40', b = 'G1 Z-2 F100\nG1 X40\nG1 Y30\nM30';
+  const r = O.uniscLetture(a, b);
+  assert.strictEqual(r.testo, 'O0001\nG0 X0 Y0\nG1 Z-2 F100\nG1 X40\nG1 Y30\nM30'); assert.strictEqual(r.ripetute, 2);
+  // senza righe in comune si accoda tutto
+  assert.deepStrictEqual(O.uniscLetture('G0 X0\nG1 X5', 'G1 Y5\nM30'), { testo: 'G0 X0\nG1 X5\nG1 Y5\nM30', ripetute: 0 });
+  // una riga corta uguale per caso (G0 Z50 ripetuta nel programma) non basta da sola
+  assert.strictEqual(O.uniscLetture('G1 X10\nG0 Z50', 'G0 Z50\nG1 X20').ripetute, 0);
+  // gli spazi non contano nel confronto
+  assert.strictEqual(O.uniscLetture('G1 X10 Y5\nG1 Z-3 F100', 'G1 X10Y5\nG1 Z-3 F100\nM30').ripetute, 2);
+  // primo testo vuoto
+  assert.deepStrictEqual(O.uniscLetture('', 'G0 X0'), { testo: 'G0 X0', ripetute: 0 });
+});
 prova('ciclo proposto: albero', () => {
   const mt = O.MATERIALI.find(m => m.n === 'C40');
   const a = O.pianificaAlbero({ dg: 40, lg: 100, smusso: 0.5, tratti: [{ d: 20, l: 25, passo: 2.5 }, { d: 30, l: 20, toll: 'h6' }, { d: 36, l: 15 }], foro: { d: 8, prof: 20 }, troncatura: true }, { mat: mt, nmax: 3000 });

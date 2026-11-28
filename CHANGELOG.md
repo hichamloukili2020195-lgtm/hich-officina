@@ -2,6 +2,15 @@
 
 Hich-Officina: una voce per versione, la piu recente in alto.
 
+## 2.48.0 - Lettura del programma da una foto piu sicura, righe da controllare, piu foto di seguito
+- **Correzioni migliori**: una lettera e un indirizzo solo se ha un valore dopo; se segue un indirizzo vuoto o chiude un numero senza valore e una cifra letta male (YI2 -> Y12, XS0 -> X50, Z-O.5 -> Z-0.5, GOl -> G01, HI -> H1, X1.234S -> X1.2345). Trattini lunghi e ~ diventano il meno; simboli sporchi (», °) si tolgono; 0I234 (PEZZO) -> O1234 (PEZZO).
+- Corretto: una Z attaccata tra due numeri (X10Y20Z5) diventava un 2 e cambiava la quota. Le righe con parole intere (macro, altri linguaggi, scritte dei menu) non si toccano piu: prima "CALL 1" diventava "CALL1" e le scritte dei menu potevano passare per programma.
+- Corretto: le righe di commento con il numero davanti ("3 ; TASCA") venivano tolte.
+- **Righe da controllare**: dopo la lettura ogni riga corretta mostra cosa e stato letto, con i caratteri cambiati evidenziati, e la riga corretta in un campo: si conferma con la spunta o si corregge li. Le righe con caratteri strani in mezzo a un numero sono "dubbie" e si vedono in arancione.
+- **Piu foto di seguito**: "Aggiungi un'altra foto" accoda il seguito di un programma lungo; le righe ripetute tra una foto e l'altra restano una volta sola (anche se nel frattempo hai corretto qualcosa).
+- Guida: percorsi aggiornati al menu nuovo.
+- Prove: 34 errori tipici della foto; 33 righe giuste e i programmi generati (anche tradotti negli altri linguaggi) che non devono cambiare; unione di piu foto; righe da controllare nell'interfaccia.
+
 ## 2.47.0 - Menu con uno schema solo, avvio piu rapido, dati piu sicuri
 - **Uno schema solo**: la barra in basso e la home hanno gli stessi quattro gruppi: **Disegna** (lavoro guidato, CAD fresa e tornio, dal disegno, ciclo, programma a mano, macro), **Controlla** (apri e simula, programmi salvati, esempi), **Calcoli** (taglio, tolleranze, tabelle, angolo, materiali) e **Archivio** (pezzi, utensili, preferiti, guida). Ogni funzione sta in un posto solo; il gruppo Officina non c'e piu.
 - **Avvio piu rapido**: la libreria della vista 3D non si carica piu all'apertura dell'app ma la prima volta che si apre la vista 3D della simulazione (nel frattempo si vede il 2D).
